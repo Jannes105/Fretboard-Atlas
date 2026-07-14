@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#1b1a18"/>
+
+  <!-- Nut -->
+  <rect x="96" y="128" width="16" height="256" rx="8" fill="#d8d3ca"/>
+
+  <!-- Frets -->
+  <g stroke="#4c4842" stroke-width="6">
+    <line x1="184" y1="128" x2="184" y2="384"/>
+    <line x1="272" y1="128" x2="272" y2="384"/>
+    <line x1="360" y1="128" x2="360" y2="384"/>
+    <line x1="448" y1="128" x2="448" y2="384"/>
+  </g>
+
+  <!-- Strings, thicker at the bottom -->
+  <g stroke="#6e685f">
+    <line x1="104" y1="384" x2="448" y2="384" stroke-width="9"/>
+    <line x1="104" y1="333" x2="448" y2="333" stroke-width="8"/>
+    <line x1="104" y1="282" x2="448" y2="282" stroke-width="7"/>
+    <line x1="104" y1="230" x2="448" y2="230" stroke-width="6"/>
+    <line x1="104" y1="179" x2="448" y2="179" stroke-width="5"/>
+    <line x1="104" y1="128" x2="448" y2="128" stroke-width="4"/>
+  </g>
+
+  <!-- Scale notes, with the root in red — the same idea as the app -->
+  <g>
+    <circle cx="140" cy="384" r="26" fill="#e0655f" stroke="#f0928d" stroke-width="4"/>
+    <circle cx="316" cy="384" r="22" fill="#6b96d4"/>
+    <circle cx="140" cy="333" r="22" fill="#6b96d4"/>
+    <circle cx="228" cy="333" r="22" fill="#6b96d4"/>
+    <circle cx="140" cy="282" r="22" fill="#6b96d4"/>
+    <circle cx="228" cy="282" r="26" fill="#e0655f" stroke="#f0928d" stroke-width="4"/>
+    <circle cx="140" cy="230" r="22" fill="#6b96d4"/>
+    <circle cx="228" cy="230" r="22" fill="#6b96d4"/>
+    <circle cx="140" cy="179" r="22" fill="#6b96d4"/>
+    <circle cx="316" cy="179" r="22" fill="#6b96d4"/>
+    <circle cx="140" cy="128" r="26" fill="#e0655f" stroke="#f0928d" stroke-width="4"/>
+    <circle cx="316" cy="128" r="22" fill="#6b96d4"/>
+  </g>
+</svg>

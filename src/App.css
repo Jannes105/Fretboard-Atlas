@@ -1,0 +1,375 @@
+:root {
+  --bg: #f7f6f3;
+  --panel: #ffffff;
+  --border: #e2ded7;
+  --text: #22201d;
+  --text-muted: #7c766c;
+
+  --nut: #33302b;
+  --fret-wire: #c3bcb1;
+  --string: #9a938a;
+  --inlay: #ddd7cd;
+
+  --note: #4f7ab8;
+  --note-stroke: #3a5e94;
+  --note-text: #ffffff;
+
+  --root: #d9534f;
+  --root-stroke: #a83b38;
+  --root-text: #ffffff;
+
+  --capo: #c98a2b;
+  --box: #8a8177;
+  --chord: #3f9a6d;
+  --chord-stroke: #2c7150;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1a18;
+    --panel: #252320;
+    --border: #3a3733;
+    --text: #ece9e4;
+    --text-muted: #9b948a;
+
+    --nut: #d8d3ca;
+    --fret-wire: #4c4842;
+    --string: #6e685f;
+    --inlay: #55504a;
+
+    --note: #6b96d4;
+    --note-stroke: #90b3e4;
+    --note-text: #10151d;
+
+    --root: #e0655f;
+    --root-stroke: #f0928d;
+    --root-text: #1d100f;
+
+    --capo: #e0a54b;
+    --box: #8d857a;
+    --chord: #58b98a;
+    --chord-stroke: #8ad8b2;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.app {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--text-muted);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 1rem 1.25rem;
+  margin: 1.75rem 0;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.controls label {
+  /* Anchors the chevron drawn in ::after. */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* Replaces the native dropdown arrow, which cannot be styled. Sits 0.8rem off the
+ * bottom to land centred on the select. */
+.controls label::after {
+  content: '▾';
+  position: absolute;
+  right: 0.8rem;
+  bottom: 0.8rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.controls span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.controls select {
+  width: 100%;
+  padding: 0.55rem 2rem 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+
+  appearance: none;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.controls select:hover {
+  border-color: var(--text-muted);
+}
+
+.controls select:focus-visible {
+  outline: none;
+  border-color: var(--note);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--note) 25%, transparent);
+}
+
+.summary {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  margin-bottom: 1.5rem;
+}
+
+.summary h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.note-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.note-list li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 3rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.note-list li.is-root {
+  border-color: var(--root);
+  background: color-mix(in srgb, var(--root) 14%, transparent);
+}
+
+.note-name {
+  font-weight: 700;
+}
+
+.note-degree {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.panel {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.panel h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.panel-head h2 {
+  margin: 0;
+}
+
+.panel-head select {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.panel-head select:hover {
+  border-color: var(--text-muted);
+}
+
+.panel-head select:focus-visible {
+  outline: none;
+  border-color: var(--note);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--note) 25%, transparent);
+}
+
+.hint {
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.hint--warn {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--capo) 45%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--capo) 10%, transparent);
+  color: var(--text);
+}
+
+.chord-row,
+.progression {
+  display: flex;
+  flex-wrap: wrap;
+  /* Otherwise every card stretches to the height of an expanded picker. */
+  align-items: flex-start;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.chord-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 6rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.chord-card:hover {
+  border-color: var(--chord);
+}
+
+.chord-card.is-active {
+  border-color: var(--chord);
+  background: color-mix(in srgb, var(--chord) 16%, transparent);
+}
+
+.chord-card:focus-visible {
+  outline: none;
+  border-color: var(--chord);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--chord) 25%, transparent);
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--note);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.roman {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--root);
+  letter-spacing: 0.03em;
+}
+
+.chord-symbol {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.chord-notes {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Phone, next to the guitar. The fretboard still scrolls sideways — a neck is
+   wide and squeezing it would make it unreadable — but nothing else should. */
+@media (max-width: 640px) {
+  .app {
+    padding: 1.25rem 0.9rem 2rem;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+  }
+
+  .controls {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    padding: 0.9rem;
+    margin: 1.25rem 0;
+  }
+
+  .controls select {
+    min-width: 0;
+  }
+
+  .summary,
+  .panel {
+    padding: 0.9rem;
+  }
+
+  .panel-head {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .chord-row,
+  .progression {
+    gap: 0.5rem;
+  }
+
+  .chord-card {
+    min-width: 4.5rem;
+    padding: 0.5rem 0.6rem;
+  }
+
+  /* Anchored to the left edge it would otherwise hang off the screen. */
+  .voicing-picker {
+    left: auto;
+    right: 0;
+  }
+}

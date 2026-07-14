@@ -1,0 +1,104 @@
+.fretboard-scroll {
+  overflow-x: auto;
+  width: 100%;
+  padding-bottom: 0.5rem;
+}
+
+.fretboard {
+  /* min-width comes from the component — it depends on the fret count. */
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.nut {
+  stroke: var(--nut);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.fret-wire {
+  stroke: var(--fret-wire);
+  stroke-width: 2;
+}
+
+.string {
+  stroke: var(--string);
+}
+
+.inlay {
+  fill: var(--inlay);
+}
+
+.string-label,
+.fret-number {
+  fill: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.fret-number.is-muted {
+  opacity: 0.35;
+}
+
+.capo {
+  stroke: var(--capo);
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+
+.capo-label {
+  fill: var(--capo);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* The frets behind the capo cannot be reached. */
+.capo-dead-zone {
+  fill: var(--bg);
+  opacity: 0.72;
+}
+
+.note-dot {
+  fill: var(--note);
+  stroke: var(--note-stroke);
+  stroke-width: 1;
+}
+
+.note-dot--root {
+  fill: var(--root);
+  stroke: var(--root-stroke);
+  stroke-width: 2;
+}
+
+.note-label {
+  fill: var(--note-text);
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.note-label--root {
+  fill: var(--root-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Tones of the selected chord, so you see where it sits inside the scale. */
+.note-dot--chord {
+  fill: var(--chord);
+  stroke: var(--chord-stroke);
+  stroke-width: 2;
+}
+
+/* Outside the selected box, or not part of the selected chord. */
+.is-dimmed {
+  opacity: 0.16;
+}
+
+.box-outline {
+  fill: none;
+  stroke: var(--box);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}

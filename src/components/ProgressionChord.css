@@ -1,0 +1,85 @@
+.progression-chord {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 6rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.voicing-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  margin-top: 0.2rem;
+  padding: 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.voicing-button:disabled {
+  cursor: default;
+}
+
+.voicing-button:not(:disabled):hover,
+.voicing-button:focus-visible {
+  border-color: var(--note);
+  outline: none;
+}
+
+.voicing-count {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--note);
+}
+
+.no-shape {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/*
+ * Expands in normal flow rather than as an absolute popover: a popover anchored
+ * to the card gets clipped by the viewport on the outermost chords of the row,
+ * and fixing that properly would mean measuring positions at runtime.
+ */
+.voicing-picker {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.voicing-option {
+  padding: 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.voicing-option:hover,
+.voicing-option:focus-visible {
+  border-color: var(--note);
+  outline: none;
+}
+
+.voicing-option.is-selected {
+  border-color: var(--root);
+  background: color-mix(in srgb, var(--root) 12%, transparent);
+}

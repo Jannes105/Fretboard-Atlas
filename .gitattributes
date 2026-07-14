@@ -1,0 +1,6 @@
+# Keep the repository on LF regardless of who checks it out, so a Windows
+# checkout does not show every file as modified.
+* text=auto eol=lf
+
+*.png binary
+*.woff2 binary

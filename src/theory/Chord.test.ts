@@ -1,0 +1,146 @@
+import { describe, expect, it } from 'vitest';
+import { Chord, diatonicChords } from './Chord';
+import { Note } from './Note';
+import { Scale } from './Scale';
+import { HARMONIC_MINOR, MAJOR, MAJOR_PENTATONIC, NATURAL_MINOR } from './ScaleType';
+
+const cMajor = new Scale(Note.parse('C'), MAJOR);
+const aMinor = new Scale(Note.parse('A'), NATURAL_MINOR);
+
+function symbols(chords: Chord[]): string[] {
+  return chords.map((chord) => chord.name());
+}
+
+function romans(chords: Chord[]): string[] {
+  return chords.map((chord, i) => chord.romanNumeral(i));
+}
+
+describe('Diatonische Dreiklänge', () => {
+  it('C-Dur: C Dm Em F G Am Bdim', () => {
+    expect(symbols(diatonicChords(cMajor))).toEqual(['C', 'Dm', 'Em', 'F', 'G', 'Am', 'Bdim']);
+  });
+
+  it('liefert in Dur die Stufen I ii iii IV V vi vii°', () => {
+    expect(romans(diatonicChords(cMajor))).toEqual(['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°']);
+  });
+
+  it('A-Moll: Am Bdim C Dm Em F G', () => {
+    expect(symbols(diatonicChords(aMinor))).toEqual(['Am', 'Bdim', 'C', 'Dm', 'Em', 'F', 'G']);
+  });
+
+  it('liefert in Moll die Stufen i ii° III iv v VI VII', () => {
+    expect(romans(diatonicChords(aMinor))).toEqual(['i', 'ii°', 'III', 'iv', 'v', 'VI', 'VII']);
+  });
+
+  it('macht die V. Stufe in harmonisch Moll zu Dur', () => {
+    const scale = new Scale(Note.parse('A'), HARMONIC_MINOR);
+    const chords = diatonicChords(scale);
+
+    // Der erhöhte Leitton G# macht aus Em ein E und aus G ein G#dim.
+    expect(chords[4].name()).toBe('E');
+    expect(chords[4].romanNumeral(4)).toBe('V');
+    expect(chords[6].name()).toBe('G#dim');
+    expect(chords[2].name()).toBe('Caug');
+  });
+
+  it('buchstabiert die Akkordtöne passend zur Tonart', () => {
+    const scale = new Scale(Note.parse('F#'), MAJOR);
+    const chords = diatonicChords(scale);
+
+    // F#-Dur enthält E#, also heißt die III. Stufe A#m — nicht Bbm.
+    expect(chords[2].name()).toBe('A#m');
+    expect(chords[6].name()).toBe('E#dim');
+  });
+
+  it('baut die Akkorde nur aus Skalentönen', () => {
+    for (const chord of diatonicChords(cMajor)) {
+      for (const pitchClass of chord.pitchClasses) {
+        expect(cMajor.contains(pitchClass)).toBe(true);
+      }
+    }
+  });
+
+  it('lehnt Skalen ohne 7 Stufen ab', () => {
+    const pentatonic = new Scale(Note.parse('C'), MAJOR_PENTATONIC);
+    expect(() => diatonicChords(pentatonic)).toThrow(/7-stufige/);
+  });
+});
+
+describe('Diatonische Septakkorde', () => {
+  it('C-Dur: Cmaj7 Dm7 Em7 Fmaj7 G7 Am7 Bm7b5', () => {
+    expect(symbols(diatonicChords(cMajor, 4))).toEqual([
+      'Cmaj7',
+      'Dm7',
+      'Em7',
+      'Fmaj7',
+      'G7',
+      'Am7',
+      'Bm7b5',
+    ]);
+  });
+
+  it('hat genau einen Dominantseptakkord auf der V. Stufe', () => {
+    const sevenths = diatonicChords(cMajor, 4);
+    const dominants = sevenths.filter((chord) => chord.quality?.id === 'dominant7');
+
+    expect(dominants).toHaveLength(1);
+    expect(dominants[0].name()).toBe('G7');
+  });
+
+  it('liefert die Stufen mit Septim-Symbolik', () => {
+    expect(romans(diatonicChords(cMajor, 4))).toEqual([
+      'Imaj7',
+      'ii7',
+      'iii7',
+      'IVmaj7',
+      'V7',
+      'vi7',
+      'viiø7',
+    ]);
+  });
+
+  it('erzeugt in harmonisch Moll einen verminderten Septakkord', () => {
+    const scale = new Scale(Note.parse('A'), HARMONIC_MINOR);
+    expect(diatonicChords(scale, 4)[6].name()).toBe('G#dim7');
+  });
+});
+
+describe('Chord.fromQuality', () => {
+  it('baut einen Dominantseptakkord aus dem Grundton', () => {
+    const chord = Chord.fromQuality(Note.parse('A'), 'dominant7');
+    expect(chord.name()).toBe('A7');
+    expect(chord.notes.map((n) => n.name())).toEqual(['A', 'C#', 'E', 'G']);
+  });
+
+  it('lehnt unbekannte Qualitäten ab', () => {
+    expect(() => Chord.fromQuality(Note.parse('A'), 'quantenakkord')).toThrow();
+  });
+});
+
+describe('Erkennung der Akkordqualität', () => {
+  it('erkennt die Qualität aus den Intervallen, nicht aus der Stufe', () => {
+    const cMajorTriad = new Chord(Note.parse('C'), [
+      Note.parse('C'),
+      Note.parse('E'),
+      Note.parse('G'),
+    ]);
+    expect(cMajorTriad.quality?.id).toBe('major');
+
+    const cDim = new Chord(Note.parse('C'), [
+      Note.parse('C'),
+      Note.parse('Eb'),
+      Note.parse('Gb'),
+    ]);
+    expect(cDim.quality?.id).toBe('diminished');
+  });
+
+  it('gibt null für einen Stapel, der kein bekannter Akkord ist', () => {
+    const nonsense = new Chord(Note.parse('C'), [
+      Note.parse('C'),
+      Note.parse('Db'),
+      Note.parse('D'),
+    ]);
+    expect(nonsense.quality).toBeNull();
+    expect(nonsense.name()).toBe('C?');
+  });
+});

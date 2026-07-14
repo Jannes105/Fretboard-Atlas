@@ -1,0 +1,38 @@
+.chord-diagram {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.chord-diagram svg {
+  width: 88px;
+  height: auto;
+}
+
+.chord-diagram figcaption {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.chord-diagram .nut {
+  stroke: var(--nut);
+  stroke-width: 3;
+}
+
+.chord-diagram .fret,
+.chord-diagram .string {
+  stroke: var(--fret-wire);
+  stroke-width: 1;
+}
+
+.chord-diagram .finger {
+  fill: var(--note);
+}
+
+.chord-diagram .marker,
+.chord-diagram .base-fret {
+  fill: var(--text-muted);
+  font-size: 10px;
+}
