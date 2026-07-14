@@ -14,8 +14,9 @@
     <!-- iOS ignores the manifest icons and looks only at this one. -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
-    <!-- Colours the phone's status bar around the app. -->
-    <meta name="theme-color" content="#1b1a18" />
+    <!-- Colours the phone's status bar around the app; must match the page, not the neck. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#faf8f4" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#171614" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   </head>

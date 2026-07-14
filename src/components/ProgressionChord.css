@@ -3,10 +3,11 @@
   flex-direction: column;
   align-items: center;
   gap: 0.2rem;
-  min-width: 6rem;
+  min-width: 6.5rem;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
+  background: var(--panel);
 }
 
 .voicing-button {
@@ -14,14 +15,15 @@
   flex-direction: column;
   align-items: center;
   gap: 0.15rem;
-  margin-top: 0.2rem;
-  padding: 0.25rem;
+  margin-top: 0.3rem;
+  padding: 0.3rem;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 8px;
   background: none;
   color: inherit;
   font: inherit;
   cursor: pointer;
+  transition: border-color 0.12s ease;
 }
 
 .voicing-button:disabled {
@@ -30,14 +32,14 @@
 
 .voicing-button:not(:disabled):hover,
 .voicing-button:focus-visible {
-  border-color: var(--note);
+  border-color: var(--accent);
   outline: none;
 }
 
 .voicing-count {
   font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--note);
+  font-weight: 650;
+  color: var(--accent);
 }
 
 .no-shape {
@@ -57,29 +59,32 @@
   justify-content: center;
   gap: 0.4rem;
   width: 100%;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
   border-top: 1px solid var(--border);
 }
 
 .voicing-option {
-  padding: 0.3rem;
+  padding: 0.35rem;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 8px;
   background: none;
   color: inherit;
   font: inherit;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
 }
 
 .voicing-option:hover,
 .voicing-option:focus-visible {
-  border-color: var(--note);
+  border-color: var(--accent);
   outline: none;
 }
 
 .voicing-option.is-selected {
-  border-color: var(--root);
-  background: color-mix(in srgb, var(--root) 12%, transparent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }

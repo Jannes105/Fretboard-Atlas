@@ -1,55 +1,65 @@
+/*
+ * Two palettes, deliberately separate:
+ *
+ * The PAGE follows the OS theme. The INSTRUMENT does not — a fretboard is
+ * rosewood or ebony, so the neck stays dark in both themes. That is what gives
+ * the light theme an anchor, and it is why the neck now reads as a neck rather
+ * than as a wireframe: light metal frets on a dark board, the way a guitar
+ * actually looks. Drawing dark lines on a light page was the inversion of reality.
+ */
 :root {
-  --bg: #f7f6f3;
+  /* --- The instrument. Theme-independent. --- */
+  --board: #2c2825;
+  --board-top: #363029;
+  --board-edge: #1c1917;
+
+  --fret-wire: #9c948a;
+  --nut: #e9e2d5;
+  --string: #b4aca1;
+  --inlay: #cdc4b3;
+  /* A capo is a metal bar. Steel is honest — and it frees up a hue. */
+  --capo: #c2c6cb;
+  --box: #b0a798;
+
+  /* Scale tones are the field, not the statement: one muted neutral. */
+  --note: #8b95a0;
+  --note-stroke: #aab3bc;
+  --note-text: #14171a;
+
+  /* The root is the one thing you always look for. Warm, and never error-red. */
+  --root: #e0a33f;
+  --root-stroke: #f4c777;
+  --root-text: #2a1a02;
+
+  /* The other accent: what you asked about (a chord, a degree). */
+  --chord: #4fb8a8;
+  --chord-stroke: #8adacf;
+  --chord-text: #05201d;
+
+  /* --- The page. Follows the theme. --- */
+  --bg: #faf8f4;
   --panel: #ffffff;
-  --border: #e2ded7;
-  --text: #22201d;
-  --text-muted: #7c766c;
-
-  --nut: #33302b;
-  --fret-wire: #c3bcb1;
-  --string: #9a938a;
-  --inlay: #ddd7cd;
-
-  --note: #4f7ab8;
-  --note-stroke: #3a5e94;
-  --note-text: #ffffff;
-
-  --root: #d9534f;
-  --root-stroke: #a83b38;
-  --root-text: #ffffff;
-
-  --capo: #c98a2b;
-  --box: #8a8177;
-  --chord: #3f9a6d;
-  --chord-stroke: #2c7150;
+  --panel-sunken: #f2efe9;
+  --border: #e5e0d6;
+  --text: #1f1d1a;
+  --text-muted: #78716a;
+  --accent: #c08430;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1b1a18;
-    --panel: #252320;
-    --border: #3a3733;
-    --text: #ece9e4;
-    --text-muted: #9b948a;
-
-    --nut: #d8d3ca;
-    --fret-wire: #4c4842;
-    --string: #6e685f;
-    --inlay: #55504a;
-
-    --note: #6b96d4;
-    --note-stroke: #90b3e4;
-    --note-text: #10151d;
-
-    --root: #e0655f;
-    --root-stroke: #f0928d;
-    --root-text: #1d100f;
-
-    --capo: #e0a54b;
-    --box: #8d857a;
-    --chord: #58b98a;
-    --chord-stroke: #8ad8b2;
+    --bg: #171614;
+    --panel: #201e1c;
+    --panel-sunken: #1b1a18;
+    --border: #34312d;
+    --text: #ede9e3;
+    --text-muted: #9a9389;
+    --accent: #e0a33f;
   }
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
@@ -57,75 +67,90 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.5;
 }
 
 .app {
-  max-width: 1500px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 2rem 1.5rem 3rem;
+  padding: 2.5rem 1.5rem 4rem;
 }
 
-h1 {
+/* ---------- Header ---------- */
+
+.app-header {
+  margin-bottom: 1.75rem;
+}
+
+.app-header h1 {
   margin: 0;
-  font-size: 1.75rem;
-  letter-spacing: -0.01em;
+  font-size: 1.6rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
 }
 
 .subtitle {
-  margin: 0.25rem 0 0;
+  margin: 0.15rem 0 0;
   color: var(--text-muted);
+  font-size: 0.95rem;
 }
 
-.controls {
+/* ---------- Toolbar ---------- */
+
+.toolbar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: 1rem 1.25rem;
-  margin: 1.75rem 0;
-  padding: 1.1rem 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
+  gap: 0.85rem 1rem;
+  margin-bottom: 2rem;
 }
 
-.controls label {
-  /* Anchors the chevron drawn in ::after. */
+/* On a wide screen the extra fields simply join the toolbar grid. */
+.toolbar-more {
+  display: contents;
+}
+
+.toolbar-toggle {
+  display: none;
+}
+
+.field {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
+  min-width: 0;
 }
 
-/* Replaces the native dropdown arrow, which cannot be styled. Sits 0.8rem off the
- * bottom to land centred on the select. */
-.controls label::after {
+.field > span {
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+/* Replaces the native dropdown arrow, which cannot be styled. */
+.field::after {
   content: '▾';
   position: absolute;
-  right: 0.8rem;
-  bottom: 0.8rem;
-  font-size: 0.75rem;
+  right: 0.7rem;
+  bottom: 0.72rem;
+  font-size: 0.7rem;
   line-height: 1;
   color: var(--text-muted);
   pointer-events: none;
 }
 
-.controls span {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.controls select {
+.field select,
+.select {
   width: 100%;
-  padding: 0.55rem 2rem 0.55rem 0.7rem;
+  padding: 0.5rem 1.9rem 0.5rem 0.65rem;
   border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--bg);
+  border-radius: 8px;
+  background: var(--panel);
   color: var(--text);
   font: inherit;
-  font-size: 0.95rem;
-
+  font-size: 0.9rem;
   appearance: none;
   cursor: pointer;
   transition:
@@ -133,73 +158,92 @@ h1 {
     box-shadow 0.12s ease;
 }
 
-.controls select:hover {
+.field select:hover,
+.select:hover {
   border-color: var(--text-muted);
 }
 
-.controls select:focus-visible {
+.field select:focus-visible,
+.select:focus-visible,
+button:focus-visible {
   outline: none;
-  border-color: var(--note);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--note) 25%, transparent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
-.summary {
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
-  margin-bottom: 1.5rem;
-}
+/* ---------- Scale strip: the key, right above the neck ---------- */
 
-.summary h2 {
-  margin: 0 0 0.75rem;
-  font-size: 1.1rem;
-}
-
-.note-list {
+.scale-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  align-items: baseline;
+  gap: 0.6rem 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.scale-strip h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.degree-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.note-list li {
+/* These looked like buttons and did nothing. Now they are buttons: clicking a
+   degree picks it out on the neck. */
+.degree-chip {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 3rem;
-  padding: 0.4rem 0.6rem;
+  min-width: 2.6rem;
+  padding: 0.25rem 0.45rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 7px;
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  line-height: 1.15;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
 }
 
-.note-list li.is-root {
-  border-color: var(--root);
-  background: color-mix(in srgb, var(--root) 14%, transparent);
+.degree-chip:hover {
+  border-color: var(--accent);
 }
 
-.note-name {
+.degree-chip.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.degree-chip .note-name {
   font-weight: 700;
+  font-size: 0.92rem;
 }
 
-.note-degree {
-  font-size: 0.75rem;
+.degree-chip .note-degree {
+  font-size: 0.68rem;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
+
+.degree-chip.is-root .note-name {
+  color: var(--accent);
+}
+
+/* ---------- Panels ---------- */
 
 .panel {
-  margin-top: 1.5rem;
-  padding: 1rem 1.25rem 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
-}
-
-.panel h2 {
-  margin: 0 0 0.75rem;
-  font-size: 1.1rem;
+  margin-top: 2.25rem;
 }
 
 .panel-head {
@@ -207,50 +251,58 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
 }
 
-.panel-head h2 {
+.panel h2 {
   margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
 }
 
-.panel-head select {
-  padding: 0.5rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--bg);
-  color: var(--text);
-  font: inherit;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition:
-    border-color 0.12s ease,
-    box-shadow 0.12s ease;
-}
-
-.panel-head select:hover {
-  border-color: var(--text-muted);
-}
-
-.panel-head select:focus-visible {
-  outline: none;
-  border-color: var(--note);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--note) 25%, transparent);
+/* The toolbar's selects fill their grid cell; this one must not — it sits next to
+   a heading and should be only as wide as its content. */
+.panel-head .select {
+  width: auto;
+  padding-right: 1.6rem;
 }
 
 .hint {
-  margin: 0.6rem 0 0;
+  margin: 0 0 0.9rem;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.87rem;
 }
 
 .hint--warn {
   padding: 0.6rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--capo) 45%, transparent);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--capo) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--text);
 }
+
+.empty {
+  margin-top: 2.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---------- Chords ---------- */
 
 .chord-row,
 .progression {
@@ -258,9 +310,9 @@ h1 {
   flex-wrap: wrap;
   /* Otherwise every card stretches to the height of an expanded picker. */
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: 0.6rem;
   list-style: none;
-  margin: 1rem 0 0;
+  margin: 0;
   padding: 0;
 }
 
@@ -268,12 +320,12 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  min-width: 6rem;
-  padding: 0.6rem 0.75rem;
+  gap: 0.15rem;
+  min-width: 5.5rem;
+  padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: transparent;
+  border-radius: 9px;
+  background: var(--panel);
   color: inherit;
   font: inherit;
   cursor: pointer;
@@ -291,27 +343,10 @@ h1 {
   background: color-mix(in srgb, var(--chord) 16%, transparent);
 }
 
-.chord-card:focus-visible {
-  outline: none;
-  border-color: var(--chord);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--chord) 25%, transparent);
-}
-
-.link-button {
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--note);
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
 .roman {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: var(--root);
+  color: var(--accent);
   letter-spacing: 0.03em;
 }
 
@@ -321,53 +356,76 @@ h1 {
 }
 
 .chord-notes {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
 }
 
-/* Phone, next to the guitar. The fretboard still scrolls sideways — a neck is
-   wide and squeezing it would make it unreadable — but nothing else should. */
-@media (max-width: 640px) {
+/* ---------- Phone ---------- */
+
+@media (max-width: 700px) {
   .app {
-    padding: 1.25rem 0.9rem 2rem;
+    padding: 1.5rem 1rem 3rem;
   }
 
-  h1 {
-    font-size: 1.4rem;
+  .app-header {
+    margin-bottom: 1.25rem;
   }
 
-  .controls {
+  .app-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .toolbar {
     grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-    padding: 0.9rem;
-    margin: 1.25rem 0;
+    gap: 0.7rem;
+    margin-bottom: 1.25rem;
   }
 
-  .controls select {
-    min-width: 0;
+  /*
+   * The whole point of the phone layout: only the three fields you actually keep
+   * changing stay on screen, so the NECK is above the fold. The rest folds away
+   * behind a toggle instead of pushing the neck off the screen.
+   */
+  .toolbar-more {
+    display: none;
   }
 
-  .summary,
+  .toolbar-more.is-open {
+    display: contents;
+  }
+
+  .toolbar-toggle {
+    display: block;
+    grid-column: 1 / -1;
+    padding: 0.45rem;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+
+  .toolbar-toggle:hover {
+    border-color: var(--text-muted);
+    color: var(--text);
+  }
+
   .panel {
-    padding: 0.9rem;
+    margin-top: 1.75rem;
   }
 
   .panel-head {
     flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .chord-row,
-  .progression {
-    gap: 0.5rem;
   }
 
   .chord-card {
-    min-width: 4.5rem;
-    padding: 0.5rem 0.6rem;
+    min-width: 4.4rem;
+    padding: 0.45rem 0.55rem;
   }
 
-  /* Anchored to the left edge it would otherwise hang off the screen. */
+  /* Anchored left it would hang off the screen edge. */
   .voicing-picker {
     left: auto;
     right: 0;
