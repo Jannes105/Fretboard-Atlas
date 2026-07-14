@@ -13,8 +13,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
 
       manifest: {
-        name: 'Griffbrett — Skalen und Akkorde',
-        short_name: 'Griffbrett',
+        name: 'Fretboard Atlas — Skalen und Akkorde',
+        // What actually fits under a home-screen icon.
+        short_name: 'Atlas',
         description:
           'Tonarten auf dem Gitarrengriffbrett sichtbar machen: Skalen, Lagen, leitereigene Akkorde und Griffe.',
         lang: 'de',

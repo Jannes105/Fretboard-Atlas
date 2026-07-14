@@ -127,7 +127,7 @@ export default function App() {
   return (
     <main className="app">
       <header className="app-header">
-        <h1>Griffbrett</h1>
+        <h1>Fretboard Atlas</h1>
         <p className="subtitle">Tonarten und Skalen auf dem Hals sichtbar machen.</p>
       </header>
 

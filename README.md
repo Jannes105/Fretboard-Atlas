@@ -1,7 +1,9 @@
-# Griffbrett
+# Fretboard Atlas
 
 Tonarten auf dem Gitarrengriffbrett sichtbar machen: Skalen, Lagen, leitereigene
 Akkorde und Griffe. Läuft komplett im Browser — kein Backend, keine API.
+
+Ein Atlas kartiert und lässt navigieren — genau das tut die App mit dem Hals.
 
 ## Entwicklung
 
