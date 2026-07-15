@@ -9,8 +9,8 @@ import {
   diatonicChords,
   Fretboard,
   hasChordShapes,
-  midiForPitchClass,
   Note,
+  positionsToMidi,
   progressionsFor,
   ROOT_CHOICES,
   Scale,
@@ -78,10 +78,24 @@ export default function App() {
   // A box number from the URL — or left over from another scale — may not exist here.
   const box = boxes.find((b) => b.number === state.boxNumber) ?? null;
 
+  // The notes currently on screen, with their real pitches (tuning + capo baked
+  // in). Playback derives from these, so what you hear matches what you see —
+  // a box up the neck sounds higher, a capo raises everything.
+  const visiblePositions = useMemo(() => {
+    const all = fretboard.mapScale(scale);
+    return box ? all.filter((p) => p.fret >= box.startFret && p.fret <= box.endFret) : all;
+  }, [fretboard, scale, box]);
+
+  const lowestMidi = useMemo(
+    () => visiblePositions.reduce((min, p) => Math.min(min, p.midi), Number.POSITIVE_INFINITY),
+    [visiblePositions],
+  );
+
   const [highlight, setHighlight] = useState<Highlight>(null);
 
-  // Resolve the highlight into what the fretboard picks out AND what to play:
-  // a chord is strummed as its tones, a single degree sounds as one note.
+  // Resolve the highlight into what the fretboard picks out AND what to play. The
+  // pitch classes drive the visual highlight; the MIDI notes are the real fretted
+  // pitches of every shown position — for a chord, all of its tones on screen.
   const picked = useMemo(() => {
     if (highlight === null) return null;
 
@@ -91,8 +105,7 @@ export default function App() {
       return {
         pitchClasses: chord.pitchClasses,
         label: chord.name(),
-        midi: chordMidiTones(chord),
-        mode: 'strum' as const,
+        midi: positionsToMidi(visiblePositions, chord.pitchClasses),
       };
     }
 
@@ -101,10 +114,9 @@ export default function App() {
     return {
       pitchClasses: [note.pitchClass],
       label: `Stufe ${scale.degreeLabelOf(note.pitchClass)}`,
-      midi: [midiForPitchClass(note.pitchClass)],
-      mode: 'together' as const,
+      midi: positionsToMidi(visiblePositions, [note.pitchClass]),
     };
-  }, [highlight, chords, scale]);
+  }, [highlight, chords, scale, visiblePositions]);
 
   const isChordActive = (index: number) =>
     highlight?.kind === 'chord' && highlight.index === index;
@@ -144,11 +156,16 @@ export default function App() {
   const playerRef = useRef<AudioPlayer | null>(null);
   const player = () => (playerRef.current ??= createAudioPlayer());
 
+  // Anchor the scale run to the register it actually occupies on screen, so a
+  // capo or a box up the neck is heard, not flattened to a fixed octave.
   const playScale = () =>
-    player().play(scaleMidiSequence(scale, { descend: true }), { mode: 'sequence' });
+    player().play(scaleMidiSequence(scale, { baseMidi: lowestMidi, descend: true }), {
+      mode: 'sequence',
+    });
 
   const playPicked = () => {
-    if (picked) player().play(picked.midi, { mode: picked.mode });
+    // Roll through every shown tone low to high — for a chord, all of its notes.
+    if (picked) player().play(picked.midi, { mode: 'strum' });
   };
 
   const playProgression = () =>

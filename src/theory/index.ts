@@ -52,5 +52,7 @@ export {
   midiForPitchClass,
   scaleMidiSequence,
   chordMidiTones,
+  positionsToMidi,
   type ScaleSequenceOptions,
+  type PlayablePosition,
 } from './pitch';

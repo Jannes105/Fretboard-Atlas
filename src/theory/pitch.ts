@@ -54,3 +54,24 @@ export function chordMidiTones(chord: Chord, baseMidi: number = DEFAULT_BASE_MID
   const root = midiForPitchClass(chord.root.pitchClass, baseMidi);
   return chord.pitchClasses.map((pitchClass) => root + mod(pitchClass - chord.root.pitchClass, 12));
 }
+
+/** Just enough of a fretboard note to sound it: its actual pitch and pitch class. */
+export interface PlayablePosition {
+  readonly midi: number;
+  readonly pitchClass: number;
+}
+
+/**
+ * The distinct MIDI notes among `positions` whose pitch class is wanted, low to
+ * high. This is how playback follows the fret: it sounds the real pitches shown
+ * on the neck (in whatever box, tuning and capo are in effect) instead of a fixed
+ * octave — and for a chord it plays every one of its tones that is on screen.
+ */
+export function positionsToMidi(
+  positions: readonly PlayablePosition[],
+  pitchClasses: readonly number[],
+): number[] {
+  const wanted = new Set(pitchClasses);
+  const midis = positions.filter((p) => wanted.has(p.pitchClass)).map((p) => p.midi);
+  return [...new Set(midis)].sort((a, b) => a - b);
+}

@@ -122,4 +122,36 @@ describe('App — Audio-Verdrahtung', () => {
     const [chords] = player.playChords.mock.calls[0];
     expect(chords.length).toBeGreaterThanOrEqual(3);
   });
+
+  it('lässt eine hohe Lage höher klingen als eine tiefe — die Tonhöhe folgt dem Bund', () => {
+    const lowestNoteAt = (search: string): number => {
+      window.history.replaceState(null, '', search);
+      const { container, unmount } = render(<App />);
+      player.play.mockClear();
+      container.querySelector<HTMLButtonElement>('.scale-title .play-button')!.click();
+      const notes = player.play.mock.calls[0][0] as number[];
+      unmount();
+      return Math.min(...notes);
+    };
+
+    const lage1 = lowestNoteAt('/?root=A&scale=minor-pentatonic&box=1');
+    const lage4 = lowestNoteAt('/?root=A&scale=minor-pentatonic&box=4');
+
+    // Weiter oben am Hals gegriffen heißt höher gestimmt — eine ganze Oktave hier.
+    expect(lage4).toBeGreaterThan(lage1);
+  });
+
+  it('spielt bei einem hervorgehobenen Akkord alle sichtbaren Töne, nicht nur drei', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[0]); // I = A
+    await user.click(container.querySelector<HTMLButtonElement>('.picked-actions .play-button')!);
+
+    const [notes] = player.play.mock.calls.at(-1)!;
+    // Ein Dreiklang über den ganzen 24-Bund-Hals hat weit mehr als drei Positionen.
+    expect(notes.length).toBeGreaterThan(3);
+    // Und aufsteigend sortiert (tief nach hoch).
+    expect([...notes]).toEqual([...notes].sort((a: number, b: number) => a - b));
+  });
 });

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { Chord } from './Chord';
 import { Note } from './Note';
-import { chordMidiTones, midiForPitchClass, midiToFrequency, scaleMidiSequence } from './pitch';
+import {
+  chordMidiTones,
+  midiForPitchClass,
+  midiToFrequency,
+  positionsToMidi,
+  scaleMidiSequence,
+} from './pitch';
 import { Scale } from './Scale';
 import { MAJOR, MINOR_PENTATONIC, NATURAL_MINOR } from './ScaleType';
 
@@ -99,5 +105,35 @@ describe('chordMidiTones', () => {
     const a = Chord.fromQuality(Note.parse('A'), 'minor');
     const tones = chordMidiTones(a, 57);
     expect(tones.map((m) => m % 12)).toEqual([...a.pitchClasses]);
+  });
+});
+
+describe('positionsToMidi', () => {
+  // Stellvertreter für Griffbrett-Positionen: nur Tonhöhe + Tonklasse.
+  const positions = [
+    { midi: 45, pitchClass: 9 }, // A2
+    { midi: 48, pitchClass: 0 }, // C3
+    { midi: 52, pitchClass: 4 }, // E3
+    { midi: 57, pitchClass: 9 }, // A3
+    { midi: 60, pitchClass: 0 }, // C4
+  ];
+
+  it('sammelt die echten Tonhöhen der gesuchten Tonklassen, tief nach hoch', () => {
+    // Ein A-Moll-Dreiklang (A C E): alle passenden Positionen, aufsteigend.
+    expect(positionsToMidi(positions, [9, 0, 4])).toEqual([45, 48, 52, 57, 60]);
+  });
+
+  it('spielt jede Oktave einer Tonklasse — nicht nur eine', () => {
+    // A kommt zweimal vor (45, 57) — beide klingen.
+    expect(positionsToMidi(positions, [9])).toEqual([45, 57]);
+  });
+
+  it('entfernt Dopplungen gleicher Tonhöhe', () => {
+    const doubled = [...positions, { midi: 45, pitchClass: 9 }];
+    expect(positionsToMidi(doubled, [9])).toEqual([45, 57]);
+  });
+
+  it('gibt eine leere Liste, wenn keine Position passt', () => {
+    expect(positionsToMidi(positions, [6])).toEqual([]);
   });
 });
