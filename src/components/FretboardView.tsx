@@ -17,6 +17,8 @@ interface FretboardViewProps {
   highlight?: readonly number[] | null;
   /** Only used for the accessible label, so the picked-out tones have a name. */
   highlightLabel?: string | null;
+  /** Sound a single position when its dot is tapped, at its real pitch. */
+  onPlayNote?: (midi: number) => void;
 }
 
 // Geometry. Frets are evenly spaced — this is a scale map, not a photo of a neck.
@@ -48,6 +50,7 @@ export function FretboardView({
   position = null,
   highlight = null,
   highlightLabel = null,
+  onPlayNote,
 }: FretboardViewProps) {
   const { fretCount, stringCount, capo, tuning } = fretboard;
 
@@ -95,7 +98,7 @@ export function FretboardView({
   return (
     <div className="fretboard-scroll">
       <svg
-        className="fretboard"
+        className={onPlayNote ? 'fretboard fretboard--playable' : 'fretboard'}
         viewBox={`0 0 ${width} ${height}`}
         // Tie the minimum width to the fret count instead of pinning it at one
         // value: a 12-fret neck then fits a phone, where a 24-fret one cannot.
@@ -251,7 +254,13 @@ export function FretboardView({
             .join(' ');
 
           return (
-            <g key={`${note.stringIndex}-${note.fret}`}>
+            <g
+              key={`${note.stringIndex}-${note.fret}`}
+              className="note"
+              onClick={onPlayNote ? () => onPlayNote(note.midi) : undefined}
+            >
+              {/* A title makes the pitch discoverable on hover and to a screen reader. */}
+              {onPlayNote ? <title>{`${note.note.name()} — anhören`}</title> : null}
               <circle
                 className={classes}
                 cx={cx}

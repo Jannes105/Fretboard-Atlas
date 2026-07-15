@@ -38,6 +38,11 @@ export interface AudioPlayer {
   play(midiNotes: readonly number[], options?: PlayOptions): void;
   /** Play several chords one after another in tempo — a progression. */
   playChords(chords: readonly (readonly number[])[], options?: ChordSequenceOptions): void;
+  /**
+   * Sound a single note WITHOUT cancelling anything already ringing — so tapping
+   * several fretboard dots lets them stack into a chord by ear.
+   */
+  playNote(midi: number): void;
   /** Silence everything immediately. */
   stop(): void;
   /** Whether this browser can make sound at all. */
@@ -57,7 +62,13 @@ export function createAudioPlayer(): AudioPlayer {
   const Ctor = audioContextCtor();
 
   if (!Ctor) {
-    return { play: () => {}, playChords: () => {}, stop: () => {}, available: false };
+    return {
+      play: () => {},
+      playChords: () => {},
+      playNote: () => {},
+      stop: () => {},
+      available: false,
+    };
   }
 
   // Created lazily on the first play: a browser only lets audio start from a user
@@ -149,9 +160,15 @@ export function createAudioPlayer(): AudioPlayer {
     });
   };
 
+  const playNote = (midi: number) => {
+    const ctx = ensureContext();
+    voice(ctx, midiToFrequency(midi), ctx.currentTime + 0.02, 1);
+  };
+
   return {
     play,
     playChords,
+    playNote,
     stop,
     available: true,
   };

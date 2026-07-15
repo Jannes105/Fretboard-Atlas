@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { render } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { fireEvent, render } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Fretboard, Note, Scale, MAJOR, MINOR_PENTATONIC } from '../theory';
 import { FretboardView } from './FretboardView';
 
@@ -45,6 +45,36 @@ describe('FretboardView', () => {
     // Alles andere ist gedimmt.
     const dimmed = container.querySelectorAll('.note-dot.is-dimmed').length;
     expect(dimmed).toBe(dots(container).length - pickedCount);
+  });
+
+  it('spielt beim Klick auf einen Notenkreis dessen echte Tonhöhe', () => {
+    const onPlayNote = vi.fn();
+    const { container } = render(
+      <FretboardView
+        scale={aMajor}
+        fretboard={board}
+        labelMode="note"
+        onPlayNote={onPlayNote}
+      />,
+    );
+
+    // Die Notengruppen werden in der Reihenfolge von mapScale gezeichnet.
+    const firstNote = board.mapScale(aMajor)[0];
+    fireEvent.click(container.querySelector('.note')!);
+
+    expect(onPlayNote).toHaveBeenCalledExactlyOnceWith(firstNote.midi);
+  });
+
+  it('markiert das Griffbrett nur als spielbar, wenn ein Handler da ist', () => {
+    const { container: without } = render(
+      <FretboardView scale={aMajor} fretboard={board} labelMode="note" />,
+    );
+    expect(without.querySelector('.fretboard--playable')).toBeNull();
+
+    const { container: withHandler } = render(
+      <FretboardView scale={aMajor} fretboard={board} labelMode="note" onPlayNote={() => {}} />,
+    );
+    expect(withHandler.querySelector('.fretboard--playable')).not.toBeNull();
   });
 
   it('dimmt bei gewählter Lage die Töne außerhalb des Fensters', () => {

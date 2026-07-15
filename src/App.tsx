@@ -352,6 +352,7 @@ export default function App() {
         position={box}
         highlight={picked?.pitchClasses ?? null}
         highlightLabel={picked?.label ?? null}
+        onPlayNote={(midi) => player().playNote(midi)}
       />
 
       {chords.length > 0 ? (

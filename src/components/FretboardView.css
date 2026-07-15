@@ -110,7 +110,18 @@
 .note-label {
   transition:
     opacity 0.18s ease,
-    fill 0.18s ease;
+    fill 0.18s ease,
+    stroke-width 0.1s ease;
+}
+
+/* When the dots are tappable, show it: a pointer and a ring on hover. */
+.fretboard--playable .note {
+  cursor: pointer;
+}
+
+.fretboard--playable .note:hover .note-dot {
+  stroke: var(--nut);
+  stroke-width: 3;
 }
 
 .note-dot {

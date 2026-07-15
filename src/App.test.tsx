@@ -6,7 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // The audio engine is replaced by a spy: the tests check that the UI asks for the
 // right notes, without a real AudioContext (which jsdom has not got anyway).
 const { player } = vi.hoisted(() => ({
-  player: { play: vi.fn(), playChords: vi.fn(), stop: vi.fn(), available: true },
+  player: {
+    play: vi.fn(),
+    playChords: vi.fn(),
+    playNote: vi.fn(),
+    stop: vi.fn(),
+    available: true,
+  },
 }));
 vi.mock('./audio', () => ({ createAudioPlayer: () => player }));
 
@@ -153,5 +159,15 @@ describe('App — Audio-Verdrahtung', () => {
     expect(notes.length).toBeGreaterThan(3);
     // Und aufsteigend sortiert (tief nach hoch).
     expect([...notes]).toEqual([...notes].sort((a: number, b: number) => a - b));
+  });
+
+  it('spielt beim Klick auf einen Notenkreis dessen einzelne Tonhöhe', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<SVGGElement>('.fretboard .note')!);
+
+    expect(player.playNote).toHaveBeenCalledTimes(1);
+    expect(typeof player.playNote.mock.calls[0][0]).toBe('number');
   });
 });
