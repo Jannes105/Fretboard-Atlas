@@ -10,6 +10,8 @@ interface ProgressionChordProps {
   /** Owned by App so that opening one chord's picker closes every other. */
   isOpen: boolean;
   onToggle: () => void;
+  /** Sound the selected voicing — the exact grip shown, as MIDI notes. */
+  onHear?: (midiNotes: number[]) => void;
 }
 
 /** "A-Form, 5. Bund" — or "offen" when the shape sits at the nut. */
@@ -26,12 +28,27 @@ function describe(shapeName: string, baseFret: number): string {
  * is what keeps two pickers from being open at once. App remounts this on key
  * changes (scale, progression, chord size), resetting the pick to the default.
  */
-export function ProgressionChord({ step, tuning, isOpen, onToggle }: ProgressionChordProps) {
+export function ProgressionChord({
+  step,
+  tuning,
+  isOpen,
+  onToggle,
+  onHear,
+}: ProgressionChordProps) {
   const voicings = useMemo(() => voicingsFor(step.chord, { tuning }), [step.chord, tuning]);
 
   const [selected, setSelected] = useState(() => defaultVoicingIndex(voicings));
 
   const voicing = voicings[selected];
+
+  /** The MIDI notes the shown grip actually sounds — muted strings dropped. */
+  const hear = () => {
+    if (!onHear || !voicing) return;
+    const midi = voicing.frets
+      .map((fret, string) => (fret < 0 ? null : tuning.midiAt(string, fret)))
+      .filter((note): note is number => note !== null);
+    onHear(midi);
+  };
 
   if (!voicing) {
     return (
@@ -64,6 +81,18 @@ export function ProgressionChord({ step, tuning, isOpen, onToggle }: Progression
           <span className="voicing-count">{voicings.length} Griffe ▾</span>
         ) : null}
       </button>
+
+      {onHear ? (
+        <button
+          type="button"
+          className="play-button play-button--small"
+          onClick={hear}
+          aria-label={`${step.chord.name()} anhören`}
+          title="Griff anhören"
+        >
+          ▶
+        </button>
+      ) : null}
 
       {isOpen ? (
         <div className="voicing-picker" role="listbox">

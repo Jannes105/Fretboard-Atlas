@@ -187,6 +187,60 @@ button:focus-visible {
   font-weight: 650;
 }
 
+.scale-title,
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.picked-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* The play affordance: a warm round button, the app's accent. */
+.play-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  padding-left: 0.12rem; /* optically centres the triangle */
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    transform 0.08s ease;
+}
+
+.play-button:hover {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+.play-button:active {
+  transform: scale(0.92);
+}
+
+.play-button--small {
+  width: 1.6rem;
+  height: 1.6rem;
+  font-size: 0.62rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play-button:active {
+    transform: none;
+  }
+}
+
 .degree-chips {
   display: flex;
   flex-wrap: wrap;

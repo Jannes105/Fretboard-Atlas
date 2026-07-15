@@ -42,6 +42,10 @@
   color: var(--accent);
 }
 
+.progression-chord .play-button {
+  margin-top: 0.35rem;
+}
+
 .no-shape {
   font-size: 0.7rem;
   color: var(--text-muted);

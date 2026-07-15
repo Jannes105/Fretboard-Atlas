@@ -46,3 +46,11 @@ export {
   type Progression,
   type ProgressionStep,
 } from './Progression';
+export {
+  DEFAULT_BASE_MIDI,
+  midiToFrequency,
+  midiForPitchClass,
+  scaleMidiSequence,
+  chordMidiTones,
+  type ScaleSequenceOptions,
+} from './pitch';

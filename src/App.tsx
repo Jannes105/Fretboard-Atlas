@@ -1,16 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { type AudioPlayer, createAudioPlayer } from './audio';
 import { FretboardView, type LabelMode } from './components/FretboardView';
 import { ProgressionChord } from './components/ProgressionChord';
 import {
   buildProgression,
   type ChordSize,
+  chordMidiTones,
   diatonicChords,
   Fretboard,
   hasChordShapes,
+  midiForPitchClass,
   Note,
   progressionsFor,
   ROOT_CHOICES,
   Scale,
+  scaleMidiSequence,
   SCALE_TYPES,
   scaleTypesInGroup,
   Tuning,
@@ -76,19 +80,30 @@ export default function App() {
 
   const [highlight, setHighlight] = useState<Highlight>(null);
 
-  // Resolve the highlight into the pitch classes the fretboard has to pick out.
+  // Resolve the highlight into what the fretboard picks out AND what to play:
+  // a chord is strummed as its tones, a single degree sounds as one note.
   const picked = useMemo(() => {
     if (highlight === null) return null;
 
     if (highlight.kind === 'chord') {
       const chord = chords[highlight.index];
-      return chord ? { pitchClasses: chord.pitchClasses, label: chord.name() } : null;
+      if (!chord) return null;
+      return {
+        pitchClasses: chord.pitchClasses,
+        label: chord.name(),
+        midi: chordMidiTones(chord),
+        mode: 'strum' as const,
+      };
     }
 
     const note = scale.notes[highlight.index];
-    return note
-      ? { pitchClasses: [note.pitchClass], label: `Stufe ${scale.degreeLabelOf(note.pitchClass)}` }
-      : null;
+    if (!note) return null;
+    return {
+      pitchClasses: [note.pitchClass],
+      label: `Stufe ${scale.degreeLabelOf(note.pitchClass)}`,
+      midi: [midiForPitchClass(note.pitchClass)],
+      mode: 'together' as const,
+    };
   }, [highlight, chords, scale]);
 
   const isChordActive = (index: number) =>
@@ -123,6 +138,21 @@ export default function App() {
 
   // On a phone the secondary fields fold away, so the neck stays above the fold.
   const [moreOpen, setMoreOpen] = useState(false);
+
+  // One player for the whole session, built lazily so no AudioContext exists
+  // until the first play — browsers require a user gesture to start audio.
+  const playerRef = useRef<AudioPlayer | null>(null);
+  const player = () => (playerRef.current ??= createAudioPlayer());
+
+  const playScale = () =>
+    player().play(scaleMidiSequence(scale, { descend: true }), { mode: 'sequence' });
+
+  const playPicked = () => {
+    if (picked) player().play(picked.midi, { mode: picked.mode });
+  };
+
+  const playProgression = () =>
+    player().playChords(steps.map((step) => chordMidiTones(step.chord)));
 
   return (
     <main className="app">
@@ -245,7 +275,18 @@ export default function App() {
       </section>
 
       <section className="scale-strip">
-        <h2>{scale.name()}</h2>
+        <div className="scale-title">
+          <h2>{scale.name()}</h2>
+          <button
+            type="button"
+            className="play-button"
+            onClick={playScale}
+            aria-label={`${scale.name()} abspielen`}
+            title="Skala abspielen"
+          >
+            ▶
+          </button>
+        </div>
 
         <ul className="degree-chips">
           {scale.notes.map((note, i) => (
@@ -270,9 +311,20 @@ export default function App() {
         </ul>
 
         {picked ? (
-          <button type="button" className="link-button" onClick={() => setHighlight(null)}>
-            {picked.label} hervorgehoben — aufheben
-          </button>
+          <span className="picked-actions">
+            <button
+              type="button"
+              className="play-button play-button--small"
+              onClick={playPicked}
+              aria-label={`${picked.label} abspielen`}
+              title="Anhören"
+            >
+              ▶
+            </button>
+            <button type="button" className="link-button" onClick={() => setHighlight(null)}>
+              {picked.label} hervorgehoben — aufheben
+            </button>
+          </span>
         ) : null}
       </section>
 
@@ -319,7 +371,18 @@ export default function App() {
 
           <section className="panel">
             <div className="panel-head">
-              <h2>Akkordfolge</h2>
+              <div className="panel-title">
+                <h2>Akkordfolge</h2>
+                <button
+                  type="button"
+                  className="play-button play-button--small"
+                  onClick={playProgression}
+                  aria-label="Akkordfolge abspielen"
+                  title="Folge abspielen"
+                >
+                  ▶
+                </button>
+              </div>
               <select
                 className="select"
                 value={progression?.id ?? ''}
@@ -362,6 +425,7 @@ export default function App() {
                     onToggle={() =>
                       setOpenChordKey((open) => (open === chordKey ? null : chordKey))
                     }
+                    onHear={(midi) => player().play(midi, { mode: 'strum' })}
                   />
                 );
               })}

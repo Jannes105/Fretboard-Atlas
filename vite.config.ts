@@ -46,7 +46,10 @@ export default defineConfig({
     }),
   ],
   test: {
+    // Theory tests stay on fast node; component tests opt into jsdom per file
+    // via a `// @vitest-environment jsdom` docblock.
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    setupFiles: ['src/test/setup.ts'],
   },
 })
