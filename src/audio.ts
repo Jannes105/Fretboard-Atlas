@@ -17,12 +17,20 @@ export interface PlayOptions {
   gap?: number;
   /** How long each note rings. */
   duration?: number;
+  /**
+   * Let this ring alongside whatever is already sounding instead of replacing it.
+   *
+   * Single-shot sounds (a note, a chord) stack: you want to stack chords up and
+   * hear them ring out. Timed runs (a scale, a progression) replace, because two
+   * of those over each other is just mush.
+   */
+  stack?: boolean;
 }
 
 const DEFAULTS: Record<PlayMode, { gap: number; duration: number }> = {
   sequence: { gap: 0.28, duration: 0.42 }, // a scale, one note after another
-  strum: { gap: 0.035, duration: 1.1 }, // a chord, strings brushed in quick succession
-  together: { gap: 0, duration: 1.1 }, // a chord struck as a block
+  strum: { gap: 0.035, duration: 1.9 }, // a chord, strings brushed — left to ring out
+  together: { gap: 0, duration: 1.9 }, // a chord struck as a block
 };
 
 export interface ChordSequenceOptions {
@@ -120,8 +128,9 @@ export function createAudioPlayer(): AudioPlayer {
   const play = (midiNotes: readonly number[], options: PlayOptions = {}) => {
     if (midiNotes.length === 0) return;
 
-    // A fresh play always interrupts the previous one, so rapid clicks never pile up.
-    stop();
+    // Unless asked to stack, a fresh play interrupts the previous one so that
+    // repeated clicks on a scale or progression never pile up.
+    if (!options.stack) stop();
 
     const mode = options.mode ?? 'sequence';
     const { gap, duration } = DEFAULTS[mode];

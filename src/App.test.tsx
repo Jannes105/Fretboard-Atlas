@@ -154,11 +154,23 @@ describe('App — Audio-Verdrahtung', () => {
     await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[0]); // I = A
     await user.click(container.querySelector<HTMLButtonElement>('.picked-actions .play-button')!);
 
-    const [notes] = player.play.mock.calls.at(-1)!;
+    const [notes, options] = player.play.mock.calls.at(-1)!;
     // Ein Dreiklang über den ganzen 24-Bund-Hals hat weit mehr als drei Positionen.
     expect(notes.length).toBeGreaterThan(3);
     // Und aufsteigend sortiert (tief nach hoch).
     expect([...notes]).toEqual([...notes].sort((a: number, b: number) => a - b));
+    // Akkorde stapeln sich, statt den vorigen abzuwürgen.
+    expect(options).toMatchObject({ stack: true });
+  });
+
+  it('lässt die Skala dagegen ersetzen statt stapeln — zwei Läufe übereinander wären Matsch', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.scale-title .play-button')!);
+
+    const [, options] = player.play.mock.calls[0];
+    expect(options?.stack).toBeFalsy();
   });
 
   it('spielt beim Klick auf einen Notenkreis dessen einzelne Tonhöhe', async () => {

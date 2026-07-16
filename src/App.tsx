@@ -165,7 +165,8 @@ export default function App() {
 
   const playPicked = () => {
     // Roll through every shown tone low to high — for a chord, all of its notes.
-    if (picked) player().play(picked.midi, { mode: 'strum' });
+    // Stacks like the note dots do, so chords ring out over each other.
+    if (picked) player().play(picked.midi, { mode: 'strum', stack: true });
   };
 
   const playProgression = () =>
@@ -443,7 +444,7 @@ export default function App() {
                     onToggle={() =>
                       setOpenChordKey((open) => (open === chordKey ? null : chordKey))
                     }
-                    onHear={(midi) => player().play(midi, { mode: 'strum' })}
+                    onHear={(midi) => player().play(midi, { mode: 'strum', stack: true })}
                   />
                 );
               })}
