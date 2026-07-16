@@ -163,6 +163,13 @@ export default function App() {
       mode: 'sequence',
     });
 
+  /** Strum a chord at the pitches it actually has on screen. Stacks and rings out. */
+  const playChord = (chord: (typeof chords)[number]) =>
+    player().play(positionsToMidi(visiblePositions, chord.pitchClasses), {
+      mode: 'strum',
+      stack: true,
+    });
+
   const playPicked = () => {
     // Roll through every shown tone low to high — for a chord, all of its notes.
     // Stacks like the note dots do, so chords ring out over each other.
@@ -364,8 +371,8 @@ export default function App() {
             </div>
 
             <p className="hint">
-              Auf einen Akkord klicken, um seine Töne im Griffbrett zu sehen — sie sind alle
-              leitereigen.
+              Auf einen Akkord klicken zeigt seine Töne im Griffbrett — sie sind alle leitereigen.
+              Mit ▶ hörst du ihn.
             </p>
 
             <ol className="chord-row">
@@ -382,6 +389,18 @@ export default function App() {
                     <span className="chord-notes">
                       {chord.notes.map((note) => note.name()).join(' ')}
                     </span>
+                  </button>
+
+                  {/* Right on the chord: hearing it should not mean travelling
+                      up to the scale strip. */}
+                  <button
+                    type="button"
+                    className="play-button play-button--small"
+                    onClick={() => playChord(chord)}
+                    aria-label={`${chord.name()} abspielen`}
+                    title="Akkord anhören"
+                  >
+                    ▶
                   </button>
                 </li>
               ))}

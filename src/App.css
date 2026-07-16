@@ -370,6 +370,15 @@ button:focus-visible {
   padding: 0;
 }
 
+/* Card and its play button read as one unit, so hearing a chord is a click away
+   from seeing it — not a trip up to the scale strip. */
+.chord-row li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .chord-card {
   display: flex;
   flex-direction: column;

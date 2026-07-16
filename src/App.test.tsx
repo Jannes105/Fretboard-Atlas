@@ -173,6 +173,24 @@ describe('App — Audio-Verdrahtung', () => {
     expect(options?.stack).toBeFalsy();
   });
 
+  it('spielt einen Akkord direkt über den ▶ auf seiner Karte — ohne ihn erst hervorzuheben', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    // Der ▶ sitzt bei der Karte selbst; nichts ist vorher angeklickt.
+    const playButtons = container.querySelectorAll<HTMLButtonElement>('.chord-row .play-button');
+    expect(playButtons).toHaveLength(7); // eine je Stufe
+    await user.click(playButtons[4]); // V = E-Dur
+
+    expect(player.play).toHaveBeenCalledTimes(1);
+    const [notes, options] = player.play.mock.calls[0];
+    expect(notes.length).toBeGreaterThan(3);
+    expect(options).toMatchObject({ mode: 'strum', stack: true });
+
+    // Anhören hebt nichts hervor — die beiden Gesten bleiben getrennt.
+    expect(container.querySelectorAll('.chord-card.is-active')).toHaveLength(0);
+  });
+
   it('spielt beim Klick auf einen Notenkreis dessen einzelne Tonhöhe', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
