@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { Chord } from './Chord';
 import { Note } from './Note';
+import { defaultVoicingIndex, voicingsFor } from './ChordShape';
 import {
   chordMidiTones,
   midiForPitchClass,
   midiToFrequency,
   positionsToMidi,
   scaleMidiSequence,
+  voicingMidi,
 } from './pitch';
 import { Scale } from './Scale';
 import { MAJOR, MINOR_PENTATONIC, NATURAL_MINOR } from './ScaleType';
+import { Tuning } from './Tuning';
 
 describe('midiToFrequency', () => {
   it('verankert A4 (MIDI 69) auf 440 Hz', () => {
@@ -135,5 +138,54 @@ describe('positionsToMidi', () => {
 
   it('gibt eine leere Liste, wenn keine Position passt', () => {
     expect(positionsToMidi(positions, [6])).toEqual([]);
+  });
+});
+
+describe('voicingMidi', () => {
+  const eMajor = Chord.fromQuality(Note.parse('E'), 'major');
+  const openE = voicingsFor(eMajor).find((v) => v.baseFret === 0)!;
+
+  it('klingt der offene E-Dur-Griff als seine sechs echten Saiten', () => {
+    // [0,2,2,1,0,0] auf E A D G B E = E2 B2 E3 G#3 B3 E4
+    expect(voicingMidi(openE, Tuning.STANDARD)).toEqual([40, 47, 52, 56, 59, 64]);
+  });
+
+  it('lässt gedämpfte Saiten weg', () => {
+    const cMajor = Chord.fromQuality(Note.parse('C'), 'major');
+    const aForm = voicingsFor(cMajor).find((v) => v.shapeName === 'A-Form')!;
+
+    // Die A-Form dämpft die tiefe E-Saite (-1) — sie darf nicht klingen.
+    expect(aForm.frets[0]).toBe(-1);
+    expect(voicingMidi(aForm, Tuning.STANDARD)).toHaveLength(
+      aForm.frets.filter((f) => f >= 0).length,
+    );
+  });
+
+  it('behält Oktav-Dopplungen — anders als der abstrakte Dreiklang', () => {
+    const midi = voicingMidi(openE, Tuning.STANDARD);
+    // Der Griff hat drei E und zwei B; chordMidiTones hätte je genau einen Ton.
+    expect(midi).toHaveLength(6);
+    expect(chordMidiTones(eMajor)).toHaveLength(3);
+    // Aber es klingen nur Akkordtöne.
+    expect(new Set(midi.map((m) => m % 12))).toEqual(new Set(eMajor.pitchClasses));
+  });
+
+  it('folgt dem Kapo, weil eine kapierte Stimmung einfach eine Stimmung ist', () => {
+    const capo3 = Tuning.STANDARD.withCapo(3);
+    const ohne = voicingMidi(openE, Tuning.STANDARD);
+    const mit = voicingMidi(openE, capo3);
+
+    mit.forEach((midi, i) => expect(midi).toBe(ohne[i] + 3));
+  });
+
+  it('klingt für jeden diatonischen Akkord die vorgewählte Lage', () => {
+    for (const chord of [eMajor, Chord.fromQuality(Note.parse('G'), 'minor7')]) {
+      const voicings = voicingsFor(chord, { tuning: Tuning.STANDARD });
+      const voicing = voicings[defaultVoicingIndex(voicings)];
+      const midi = voicingMidi(voicing, Tuning.STANDARD);
+
+      expect(midi.length, chord.name()).toBeGreaterThan(0);
+      expect(new Set(midi.map((m) => m % 12)), chord.name()).toEqual(new Set(chord.pitchClasses));
+    }
   });
 });

@@ -4,8 +4,11 @@ import './ChordDiagram.css';
 interface ChordDiagramProps {
   chord: Chord;
   voicing: Voicing;
-  /** Defaults to the shape name; override to spell out the position too. */
-  caption?: string;
+  /**
+   * Defaults to the shape name; override to spell out the position too.
+   * Pass null where the caller already labels the grip — no need to say it twice.
+   */
+  caption?: string | null;
 }
 
 // A five-fret window, strings drawn vertically as on a classic chord chart.
@@ -141,7 +144,7 @@ export function ChordDiagram({ chord, voicing, caption }: ChordDiagramProps) {
           );
         })}
       </svg>
-      <figcaption>{caption ?? voicing.shapeName}</figcaption>
+      {caption === null ? null : <figcaption>{caption ?? voicing.shapeName}</figcaption>}
     </figure>
   );
 }

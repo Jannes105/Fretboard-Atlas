@@ -235,6 +235,67 @@ button:focus-visible {
   font-size: 0.62rem;
 }
 
+/* Stop reads as a filled, active control rather than another play triangle. */
+.play-button.is-playing {
+  padding-left: 0;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* ---------- Transport ---------- */
+
+.transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem 1.25rem;
+  margin-bottom: 1rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-sunken);
+}
+
+.tempo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.tempo output {
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.tempo input[type='range'] {
+  width: 10rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.toggle input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.transport-note {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .play-button:active {
     transform: none;
@@ -368,15 +429,6 @@ button:focus-visible {
   list-style: none;
   margin: 0;
   padding: 0;
-}
-
-/* Card and its play button read as one unit, so hearing a chord is a click away
-   from seeing it — not a trip up to the scale strip. */
-.chord-row li {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
 }
 
 .chord-card {

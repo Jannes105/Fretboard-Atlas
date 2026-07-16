@@ -1,19 +1,28 @@
 // @vitest-environment jsdom
-import { cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// Type-only: erased at runtime, so it does not defeat the vi.mock below.
+import type { ProgressionOptions } from './audio';
 
 // The audio engine is replaced by a spy: the tests check that the UI asks for the
 // right notes, without a real AudioContext (which jsdom has not got anyway).
-const { player } = vi.hoisted(() => ({
-  player: {
-    play: vi.fn(),
-    playChords: vi.fn(),
-    playNote: vi.fn(),
-    stop: vi.fn(),
-    available: true,
-  },
-}));
+const { player, transport } = vi.hoisted(() => {
+  const transport = { stop: vi.fn() };
+  return {
+    transport,
+    player: {
+      play: vi.fn(),
+      playNote: vi.fn(),
+      // Typed params, so the recorded calls stay inspectable in the tests below.
+      startProgression: vi.fn(
+        (_chords: readonly (readonly number[])[], _options: ProgressionOptions) => transport,
+      ),
+      stop: vi.fn(),
+      available: true,
+    },
+  };
+});
 vi.mock('./audio', () => ({ createAudioPlayer: () => player }));
 
 import App from './App';
@@ -83,6 +92,54 @@ describe('App — Hervorhebung', () => {
     await user.click(container.querySelector<HTMLButtonElement>('.picked-actions .link-button')!);
     expect(container.querySelectorAll('.note-dot--picked')).toHaveLength(0);
   });
+
+  it('bleibt beim zweiten Klick hervorgehoben, statt sich wegzuschalten', async () => {
+    // Unter „Klick = hören“ klickt man denselben Akkord mehrfach, um ihn mehrfach
+    // zu hören — die Hervorhebung dabei zu verlieren wäre überraschend.
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    const card = container.querySelectorAll<HTMLButtonElement>('.chord-card')[0];
+    await user.click(card);
+    await user.click(card);
+
+    expect(card.getAttribute('aria-pressed')).toBe('true');
+    expect(player.play).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('App — Klick = hören', () => {
+  it('spielt und zeigt einen Akkord mit demselben Klick — ohne eigenen ▶', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    // Die Konfetti-Reihe aus Play-Kreisen unter den Karten ist weg.
+    expect(container.querySelectorAll('.chord-row .play-button')).toHaveLength(0);
+
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[4]); // V = E
+
+    expect(player.play).toHaveBeenCalledTimes(1);
+    const [notes, options] = player.play.mock.calls[0];
+    expect(notes.length).toBeGreaterThan(3);
+    expect(options).toMatchObject({ mode: 'strum', stack: true });
+    // Und hervorgehoben ist er auch.
+    expect(container.querySelectorAll('.chord-card')[4].getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('spielt beim Klick auf eine Stufe deren Töne', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.degree-chip')[2]);
+
+    expect(player.play).toHaveBeenCalledTimes(1);
+    expect(player.play.mock.calls[0][0].length).toBeGreaterThan(0);
+  });
+
+  it('kommt insgesamt mit zwei Play-Buttons aus: Skala und Transport', () => {
+    const { container } = render(<App />);
+    expect(container.querySelectorAll('.play-button')).toHaveLength(2);
+  });
 });
 
 describe('App — Lage', () => {
@@ -118,15 +175,19 @@ describe('App — Audio-Verdrahtung', () => {
     expect(options).toMatchObject({ mode: 'sequence' });
   });
 
-  it('spielt die Akkordfolge als mehrere Akkorde', async () => {
+  it('spielt bei einem hervorgehobenen Akkord alle sichtbaren Töne, nicht nur drei', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    await user.click(container.querySelector<HTMLButtonElement>('.panel-title .play-button')!);
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[0]); // I = A
 
-    expect(player.playChords).toHaveBeenCalledTimes(1);
-    const [chords] = player.playChords.mock.calls[0];
-    expect(chords.length).toBeGreaterThanOrEqual(3);
+    const [notes, options] = player.play.mock.calls.at(-1)!;
+    // Ein Dreiklang über den ganzen 24-Bund-Hals hat weit mehr als drei Positionen.
+    expect(notes.length).toBeGreaterThan(3);
+    // Und aufsteigend sortiert (tief nach hoch).
+    expect([...notes]).toEqual([...notes].sort((a: number, b: number) => a - b));
+    // Akkorde stapeln sich, statt den vorigen abzuwürgen.
+    expect(options).toMatchObject({ stack: true });
   });
 
   it('lässt eine hohe Lage höher klingen als eine tiefe — die Tonhöhe folgt dem Bund', () => {
@@ -147,22 +208,6 @@ describe('App — Audio-Verdrahtung', () => {
     expect(lage4).toBeGreaterThan(lage1);
   });
 
-  it('spielt bei einem hervorgehobenen Akkord alle sichtbaren Töne, nicht nur drei', async () => {
-    const user = userEvent.setup();
-    const { container } = render(<App />);
-
-    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[0]); // I = A
-    await user.click(container.querySelector<HTMLButtonElement>('.picked-actions .play-button')!);
-
-    const [notes, options] = player.play.mock.calls.at(-1)!;
-    // Ein Dreiklang über den ganzen 24-Bund-Hals hat weit mehr als drei Positionen.
-    expect(notes.length).toBeGreaterThan(3);
-    // Und aufsteigend sortiert (tief nach hoch).
-    expect([...notes]).toEqual([...notes].sort((a: number, b: number) => a - b));
-    // Akkorde stapeln sich, statt den vorigen abzuwürgen.
-    expect(options).toMatchObject({ stack: true });
-  });
-
   it('lässt die Skala dagegen ersetzen statt stapeln — zwei Läufe übereinander wären Matsch', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
@@ -173,24 +218,6 @@ describe('App — Audio-Verdrahtung', () => {
     expect(options?.stack).toBeFalsy();
   });
 
-  it('spielt einen Akkord direkt über den ▶ auf seiner Karte — ohne ihn erst hervorzuheben', async () => {
-    const user = userEvent.setup();
-    const { container } = render(<App />);
-
-    // Der ▶ sitzt bei der Karte selbst; nichts ist vorher angeklickt.
-    const playButtons = container.querySelectorAll<HTMLButtonElement>('.chord-row .play-button');
-    expect(playButtons).toHaveLength(7); // eine je Stufe
-    await user.click(playButtons[4]); // V = E-Dur
-
-    expect(player.play).toHaveBeenCalledTimes(1);
-    const [notes, options] = player.play.mock.calls[0];
-    expect(notes.length).toBeGreaterThan(3);
-    expect(options).toMatchObject({ mode: 'strum', stack: true });
-
-    // Anhören hebt nichts hervor — die beiden Gesten bleiben getrennt.
-    expect(container.querySelectorAll('.chord-card.is-active')).toHaveLength(0);
-  });
-
   it('spielt beim Klick auf einen Notenkreis dessen einzelne Tonhöhe', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
@@ -199,5 +226,106 @@ describe('App — Audio-Verdrahtung', () => {
 
     expect(player.playNote).toHaveBeenCalledTimes(1);
     expect(typeof player.playNote.mock.calls[0][0]).toBe('number');
+  });
+});
+
+describe('App — Transport der Akkordfolge', () => {
+  const transportButton = (container: HTMLElement) =>
+    container.querySelector<HTMLButtonElement>('.transport .play-button')!;
+
+  /** The marker callback the app handed the player, so tests can drive playback. */
+  const onChordOf = (call: number) => {
+    const onChord = player.startProgression.mock.calls[call][1].onChord;
+    if (!onChord) throw new Error('App hat keinen onChord-Rückruf übergeben');
+    return onChord;
+  };
+
+  it('spielt die GEZEIGTEN Griffe, nicht einen abstrakten Dreiklang', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(transportButton(container));
+
+    expect(player.startProgression).toHaveBeenCalledTimes(1);
+    const [chords] = player.startProgression.mock.calls[0];
+
+    // Ein gegriffener Akkord klingt über mehrere Saiten mit Oktav-Dopplungen;
+    // chordMidiTones hätte je genau drei Töne geliefert.
+    expect(chords).toHaveLength(4); // I – V – vi – IV
+    expect(chords.some((chord) => chord.length > 3)).toBe(true);
+  });
+
+  it('leitet das Tempo als ein Takt pro Akkord ab', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?bpm=120');
+    const { container } = render(<App />);
+
+    await user.click(transportButton(container));
+
+    const [, options] = player.startProgression.mock.calls[0];
+    // 120 BPM, 4 Schläge je Takt => 2 s pro Akkord.
+    expect(options.secondsPerChord).toBeCloseTo(2, 5);
+    expect(options.loop).toBe(true);
+  });
+
+  it('stoppt beim zweiten Klick', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(transportButton(container));
+    // Der Player meldet den laufenden Akkord zurück — das schaltet auf ■.
+    act(() => onChordOf(0)(0));
+
+    await user.click(transportButton(container));
+    expect(transport.stop).toHaveBeenCalled();
+  });
+
+  it('nimmt eine Tempoänderung während der Wiedergabe sofort auf, statt abzubrechen', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(transportButton(container));
+    act(() => onChordOf(0)(0)); // läuft
+
+    fireEvent.change(container.querySelector<HTMLInputElement>('.tempo input')!, {
+      target: { value: '60' },
+    });
+
+    // Neu gestartet — mit dem neuen Tempo, nicht gestoppt.
+    expect(player.startProgression).toHaveBeenCalledTimes(2);
+    expect(player.startProgression.mock.calls[1][1].secondsPerChord).toBeCloseTo(4, 5);
+  });
+
+  it('startet nichts, wenn nach einem beendeten Durchlauf das Tempo verstellt wird', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(transportButton(container));
+    // Der Durchlauf endet von selbst (kein Loop): der Player meldet null.
+    act(() => onChordOf(0)(null));
+
+    fireEvent.change(container.querySelector<HTMLInputElement>('.tempo input')!, {
+      target: { value: '60' },
+    });
+
+    // Es darf NICHT aus dem Nichts wieder losspielen.
+    expect(player.startProgression).toHaveBeenCalledTimes(1);
+  });
+
+  it('markiert den gerade klingenden Akkord', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(transportButton(container));
+    const onChord = onChordOf(0);
+
+    act(() => onChord(2));
+    const marked = container.querySelectorAll('.progression-chord.is-playing');
+    expect(marked).toHaveLength(1);
+    expect(marked[0].querySelector('.chord-symbol')?.textContent).toBe('F#m'); // vi in A-Dur
+
+    // Ende der Wiedergabe räumt die Markierung ab.
+    act(() => onChord(null));
+    expect(container.querySelectorAll('.progression-chord.is-playing')).toHaveLength(0);
   });
 });

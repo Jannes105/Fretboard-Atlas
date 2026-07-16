@@ -26,6 +26,18 @@ describe('readState', () => {
     expect(state).toEqual(DEFAULT_STATE);
   });
 
+  it('liest Tempo und Loop', () => {
+    expect(readState('?bpm=120&loop=0')).toMatchObject({ bpm: 120, loop: false });
+    expect(readState('?loop=1').loop).toBe(true);
+  });
+
+  it('lehnt ein Tempo außerhalb des Reglers ab', () => {
+    expect(readState('?bpm=10').bpm).toBe(DEFAULT_STATE.bpm);
+    expect(readState('?bpm=9000').bpm).toBe(DEFAULT_STATE.bpm);
+    expect(readState('?bpm=40').bpm).toBe(40);
+    expect(readState('?bpm=200').bpm).toBe(200);
+  });
+
   it('lehnt einen Kapo jenseits des Reglers ab', () => {
     expect(readState('?capo=8').capo).toBe(DEFAULT_STATE.capo);
     expect(readState('?capo=-1').capo).toBe(DEFAULT_STATE.capo);
@@ -61,6 +73,8 @@ describe('writeState', () => {
       chordSize: 4 as const,
       progressionId: 'ii-V-I',
       boxNumber: 3,
+      bpm: 120,
+      loop: false,
     };
 
     expect(readState(writeState(state))).toEqual(state);

@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { type AudioPlayer, createAudioPlayer } from './audio';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type AudioPlayer, createAudioPlayer, type ProgressionHandle } from './audio';
 import { FretboardView, type LabelMode } from './components/FretboardView';
 import { ProgressionChord } from './components/ProgressionChord';
 import {
   buildProgression,
   type ChordSize,
   chordMidiTones,
+  defaultVoicingIndex,
   diatonicChords,
   Fretboard,
   hasChordShapes,
@@ -18,8 +19,11 @@ import {
   SCALE_TYPES,
   scaleTypesInGroup,
   Tuning,
+  type Voicing,
+  voicingMidi,
+  voicingsFor,
 } from './theory';
-import { type AppState, readState, writeState } from './urlState';
+import { type AppState, MAX_BPM, MIN_BPM, readState, writeState } from './urlState';
 import './App.css';
 
 /**
@@ -40,8 +44,18 @@ export default function App() {
   const update = <K extends keyof AppState>(key: K, value: AppState[K]) =>
     setState((previous) => ({ ...previous, [key]: value }));
 
-  const { root, scaleTypeId, labelMode, fretCount, chordSize, tuningId, capo, progressionId } =
-    state;
+  const {
+    root,
+    scaleTypeId,
+    labelMode,
+    fretCount,
+    chordSize,
+    tuningId,
+    capo,
+    progressionId,
+    bpm,
+    loop,
+  } = state;
 
   // Replace rather than push, so the back button does not walk through every
   // twiddle of a dropdown.
@@ -123,12 +137,6 @@ export default function App() {
   const isDegreeActive = (index: number) =>
     highlight?.kind === 'degree' && highlight.index === index;
 
-  /** Clicking what is already picked clears it — the click is a toggle. */
-  const toggleHighlight = (next: NonNullable<Highlight>) =>
-    setHighlight((current) =>
-      current?.kind === next.kind && current.index === next.index ? null : next,
-    );
-
   const progressions = useMemo(() => progressionsFor(scale), [scale]);
 
   // The selected progression may not exist in this key — fall back to the first.
@@ -140,13 +148,29 @@ export default function App() {
     [scale, progression, chordSize],
   );
 
-  // Changing any of these invalidates a per-chord voicing the user picked, so it
-  // goes into the ProgressionChord keys to force a remount.
-  const contextKey = `${scale.name()}|${progression?.id}|${chordSize}|${chordTuning.name}`;
+  /**
+   * The grips available per step, and which one is chosen. This lives here rather
+   * than inside ProgressionChord because the transport has to play the very shapes
+   * on screen — that was the whole point of lifting it.
+   */
+  const stepVoicings = useMemo(
+    () => steps.map((step) => voicingsFor(step.chord, { tuning: chordTuning })),
+    [steps, chordTuning],
+  );
 
-  // At most one voicing picker is open. Storing the full key rather than an index
-  // means a change of key, progression or chord size closes it on its own.
-  const [openChordKey, setOpenChordKey] = useState<string | null>(null);
+  const [chosenVoicings, setChosenVoicings] = useState<number[]>([]);
+
+  // A different key, progression, chord size or tuning means different grips, so
+  // any earlier choice is meaningless — fall back to the barre default.
+  useEffect(() => {
+    setChosenVoicings(stepVoicings.map(defaultVoicingIndex));
+  }, [stepVoicings]);
+
+  const voicingIndex = (step: number) =>
+    chosenVoicings[step] ?? defaultVoicingIndex(stepVoicings[step] ?? []);
+
+  // At most one voicing picker is open.
+  const [openPicker, setOpenPicker] = useState<number | null>(null);
 
   // On a phone the secondary fields fold away, so the neck stays above the fold.
   const [moreOpen, setMoreOpen] = useState(false);
@@ -163,21 +187,89 @@ export default function App() {
       mode: 'sequence',
     });
 
-  /** Strum a chord at the pitches it actually has on screen. Stacks and rings out. */
-  const playChord = (chord: (typeof chords)[number]) =>
-    player().play(positionsToMidi(visiblePositions, chord.pitchClasses), {
-      mode: 'strum',
-      stack: true,
-    });
-
-  const playPicked = () => {
-    // Roll through every shown tone low to high — for a chord, all of its notes.
-    // Stacks like the note dots do, so chords ring out over each other.
-    if (picked) player().play(picked.midi, { mode: 'strum', stack: true });
+  /**
+   * The app's one rule: click a thing and you hear it. Clicking a chord sounds it
+   * at the pitches it has on screen AND shows it on the neck — no separate button,
+   * and no toggling off, because you want to click the same chord twice to hear it
+   * twice. The "aufheben" link is what clears.
+   */
+  const pickChord = (index: number) => {
+    setHighlight({ kind: 'chord', index });
+    const chord = chords[index];
+    if (chord) {
+      player().play(positionsToMidi(visiblePositions, chord.pitchClasses), {
+        mode: 'strum',
+        stack: true,
+      });
+    }
   };
 
-  const playProgression = () =>
-    player().playChords(steps.map((step) => chordMidiTones(step.chord)));
+  const pickDegree = (index: number) => {
+    setHighlight({ kind: 'degree', index });
+    const note = scale.notes[index];
+    if (note) {
+      player().play(positionsToMidi(visiblePositions, [note.pitchClass]), {
+        mode: 'strum',
+        stack: true,
+      });
+    }
+  };
+
+  /** Sound a grip exactly as drawn — the real strings under the fingers. */
+  const hearVoicing = (voicing: Voicing) =>
+    player().play(voicingMidi(voicing, chordTuning), { mode: 'strum', stack: true });
+
+  // ---- Progression transport ----
+
+  const [playingStep, setPlayingStep] = useState<number | null>(null);
+  const transportRef = useRef<ProgressionHandle | null>(null);
+
+  const stopProgression = useCallback(() => {
+    transportRef.current?.stop();
+    transportRef.current = null;
+    setPlayingStep(null);
+  }, []);
+
+  const startProgression = () => {
+    // Play the grips actually on screen; only fall back to an abstract voicing
+    // where no shape exists for this tuning.
+    const chordNotes = steps.map((step, i) => {
+      const voicing = stepVoicings[i]?.[voicingIndex(i)];
+      return voicing ? voicingMidi(voicing, chordTuning) : chordMidiTones(step.chord);
+    });
+
+    transportRef.current = player().startProgression(chordNotes, {
+      // One chord is one bar of 4/4.
+      secondsPerChord: (4 * 60) / bpm,
+      loop,
+      onChord: (index) => {
+        setPlayingStep(index);
+        // A run that ends on its own must clear the handle too, or the tempo
+        // knob below would "restart" a take that already finished.
+        if (index === null) transportRef.current = null;
+      },
+    });
+  };
+
+  const isPlaying = playingStep !== null;
+  const toggleProgression = () => (isPlaying ? stopProgression() : startProgression());
+
+  // Leaving the page with a loop still armed would keep scheduling forever.
+  useEffect(() => stopProgression, [stopProgression]);
+
+  // Different material (key, grips, tuning) — the loop would otherwise carry on
+  // with chords that are no longer on screen.
+  useEffect(() => {
+    stopProgression();
+  }, [steps, chordTuning, chosenVoicings, stopProgression]);
+
+  // Tempo and loop are the knobs you reach for WHILE practising, so those pick up
+  // straight away instead of stopping the take.
+  const restartRef = useRef(startProgression);
+  restartRef.current = startProgression;
+  useEffect(() => {
+    if (transportRef.current) restartRef.current();
+  }, [bpm, loop]);
 
   return (
     <main className="app">
@@ -326,7 +418,7 @@ export default function App() {
                   .filter(Boolean)
                   .join(' ')}
                 aria-pressed={isDegreeActive(i)}
-                onClick={() => toggleHighlight({ kind: 'degree', index: i })}
+                onClick={() => pickDegree(i)}
               >
                 <span className="note-name">{note.name()}</span>
                 <span className="note-degree">{scale.degreeLabelOf(note.pitchClass)}</span>
@@ -337,15 +429,6 @@ export default function App() {
 
         {picked ? (
           <span className="picked-actions">
-            <button
-              type="button"
-              className="play-button play-button--small"
-              onClick={playPicked}
-              aria-label={`${picked.label} abspielen`}
-              title="Anhören"
-            >
-              ▶
-            </button>
             <button type="button" className="link-button" onClick={() => setHighlight(null)}>
               {picked.label} hervorgehoben — aufheben
             </button>
@@ -370,10 +453,7 @@ export default function App() {
               <h2>Leitereigene Akkorde</h2>
             </div>
 
-            <p className="hint">
-              Auf einen Akkord klicken zeigt seine Töne im Griffbrett — sie sind alle leitereigen.
-              Mit ▶ hörst du ihn.
-            </p>
+            <p className="hint">Anklicken: du hörst den Akkord und siehst seine Töne im Hals.</p>
 
             <ol className="chord-row">
               {chords.map((chord, i) => (
@@ -382,25 +462,13 @@ export default function App() {
                     type="button"
                     className={isChordActive(i) ? 'chord-card is-active' : 'chord-card'}
                     aria-pressed={isChordActive(i)}
-                    onClick={() => toggleHighlight({ kind: 'chord', index: i })}
+                    onClick={() => pickChord(i)}
                   >
                     <span className="roman">{chord.romanNumeral(i)}</span>
                     <span className="chord-symbol">{chord.name()}</span>
                     <span className="chord-notes">
                       {chord.notes.map((note) => note.name()).join(' ')}
                     </span>
-                  </button>
-
-                  {/* Right on the chord: hearing it should not mean travelling
-                      up to the scale strip. */}
-                  <button
-                    type="button"
-                    className="play-button play-button--small"
-                    onClick={() => playChord(chord)}
-                    aria-label={`${chord.name()} abspielen`}
-                    title="Akkord anhören"
-                  >
-                    ▶
                   </button>
                 </li>
               ))}
@@ -409,18 +477,7 @@ export default function App() {
 
           <section className="panel">
             <div className="panel-head">
-              <div className="panel-title">
-                <h2>Akkordfolge</h2>
-                <button
-                  type="button"
-                  className="play-button play-button--small"
-                  onClick={playProgression}
-                  aria-label="Akkordfolge abspielen"
-                  title="Folge abspielen"
-                >
-                  ▶
-                </button>
-              </div>
+              <h2>Akkordfolge</h2>
               <select
                 className="select"
                 value={progression?.id ?? ''}
@@ -436,37 +493,70 @@ export default function App() {
 
             {progression?.hint ? <p className="hint">{progression.hint}</p> : null}
 
-            {shapesFit ? (
-              <p className="hint">
-                Barré-Griffe als Vorgabe — auf einen Akkord klicken, um auf eine offene oder höhere
-                Lage zu wechseln.
-                {capo > 0 ? ' Die Bundlagen zählen ab dem Kapo.' : ''}
-              </p>
-            ) : (
+            <div className="transport">
+              <button
+                type="button"
+                className={isPlaying ? 'play-button is-playing' : 'play-button'}
+                onClick={toggleProgression}
+                aria-label={isPlaying ? 'Akkordfolge stoppen' : 'Akkordfolge abspielen'}
+              >
+                {isPlaying ? '■' : '▶'}
+              </button>
+
+              <label className="tempo">
+                <span>
+                  Tempo <output>{bpm}</output> BPM
+                </span>
+                <input
+                  type="range"
+                  min={MIN_BPM}
+                  max={MAX_BPM}
+                  step={5}
+                  value={bpm}
+                  onChange={(e) => update('bpm', Number(e.target.value))}
+                />
+              </label>
+
+              <label className="toggle">
+                <input
+                  type="checkbox"
+                  checked={loop}
+                  onChange={(e) => update('loop', e.target.checked)}
+                />
+                <span>Wiederholen</span>
+              </label>
+
+              <span className="transport-note">Ein Akkord = ein Takt</span>
+            </div>
+
+            {!shapesFit ? (
               <p className="hint hint--warn">
                 Die Akkordnamen stimmen — die Grifftabellen zeigt die App in {tuning.name} aber
                 nicht: Die hinterlegten Formen setzen die Saitenabstände der Standardstimmung
                 voraus und würden hier andere Akkorde ergeben.
               </p>
-            )}
+            ) : null}
 
             <ol className="progression">
-              {steps.map((step, i) => {
-                const chordKey = `${contextKey}#${i}`;
-                return (
-                  <ProgressionChord
-                    // Remounting on a context change resets the picked voicing.
-                    key={chordKey}
-                    step={step}
-                    tuning={chordTuning}
-                    isOpen={openChordKey === chordKey}
-                    onToggle={() =>
-                      setOpenChordKey((open) => (open === chordKey ? null : chordKey))
-                    }
-                    onHear={(midi) => player().play(midi, { mode: 'strum', stack: true })}
-                  />
-                );
-              })}
+              {steps.map((step, i) => (
+                <ProgressionChord
+                  key={`${step.chord.name()}#${i}`}
+                  step={step}
+                  voicings={stepVoicings[i] ?? []}
+                  selected={voicingIndex(i)}
+                  onSelect={(index) =>
+                    setChosenVoicings((current) => {
+                      const next = [...current];
+                      next[i] = index;
+                      return next;
+                    })
+                  }
+                  isOpen={openPicker === i}
+                  onToggle={() => setOpenPicker((open) => (open === i ? null : i))}
+                  onHear={hearVoicing}
+                  isPlaying={playingStep === i}
+                />
+              ))}
             </ol>
           </section>
         </>

@@ -8,6 +8,15 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--panel);
+  transition:
+    border-color 0.1s ease,
+    background 0.1s ease;
+}
+
+/* Marks the chord sounding right now, so you can see where the loop is. */
+.progression-chord.is-playing {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
 }
 
 .voicing-button {
@@ -36,14 +45,28 @@
   outline: none;
 }
 
-.voicing-count {
+/* The diagram itself is the play control, so the grip switch is plain text. */
+.voicing-switch {
+  margin-top: 0.15rem;
+  padding: 0.15rem 0.3rem;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
   font-size: 0.7rem;
   font-weight: 650;
-  color: var(--accent);
+  cursor: pointer;
 }
 
-.progression-chord .play-button {
-  margin-top: 0.35rem;
+.voicing-switch:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.voicing-caption {
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
 }
 
 .no-shape {

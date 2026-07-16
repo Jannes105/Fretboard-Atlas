@@ -9,11 +9,11 @@ import { midiToFrequency } from './theory';
  * every method is a harmless no-op.
  */
 
-export type PlayMode = 'sequence' | 'strum' | 'together';
+export type PlayMode = 'sequence' | 'strum';
 
 export interface PlayOptions {
   mode?: PlayMode;
-  /** Seconds between successive onsets. Ignored for 'together'. */
+  /** Seconds between successive onsets. */
   gap?: number;
   /** How long each note rings. */
   duration?: number;
@@ -30,28 +30,37 @@ export interface PlayOptions {
 const DEFAULTS: Record<PlayMode, { gap: number; duration: number }> = {
   sequence: { gap: 0.28, duration: 0.42 }, // a scale, one note after another
   strum: { gap: 0.035, duration: 1.9 }, // a chord, strings brushed — left to ring out
-  together: { gap: 0, duration: 1.9 }, // a chord struck as a block
 };
 
-export interface ChordSequenceOptions {
-  /** Seconds between chords. */
-  chordGap?: number;
+export interface ProgressionOptions {
+  /** How long each chord gets. One chord is one bar, so this comes from the tempo. */
+  secondsPerChord: number;
+  loop?: boolean;
   /** Seconds between the strings of one chord. */
   strumGap?: number;
-  duration?: number;
+  /** Fires as each chord starts, and with null when playback ends — drives the marker. */
+  onChord?: (index: number | null) => void;
+}
+
+/** Lets the caller stop a progression it started. */
+export interface ProgressionHandle {
+  stop(): void;
 }
 
 export interface AudioPlayer {
-  /** Play a list of MIDI notes. Cancels whatever was playing first. */
+  /** Play a list of MIDI notes. Cancels whatever was playing first, unless stacking. */
   play(midiNotes: readonly number[], options?: PlayOptions): void;
-  /** Play several chords one after another in tempo — a progression. */
-  playChords(chords: readonly (readonly number[])[], options?: ChordSequenceOptions): void;
   /**
    * Sound a single note WITHOUT cancelling anything already ringing — so tapping
    * several fretboard dots lets them stack into a chord by ear.
    */
   playNote(midi: number): void;
-  /** Silence everything immediately. */
+  /** Play chords in tempo, optionally looping. Replaces any current playback. */
+  startProgression(
+    chords: readonly (readonly number[])[],
+    options: ProgressionOptions,
+  ): ProgressionHandle;
+  /** Silence everything immediately, including a running progression. */
   stop(): void;
   /** Whether this browser can make sound at all. */
   readonly available: boolean;
@@ -66,14 +75,16 @@ function audioContextCtor(): Ctor | null {
   return w.AudioContext ?? w.webkitAudioContext ?? null;
 }
 
+const NO_OP_HANDLE: ProgressionHandle = { stop: () => {} };
+
 export function createAudioPlayer(): AudioPlayer {
   const Ctor = audioContextCtor();
 
   if (!Ctor) {
     return {
       play: () => {},
-      playChords: () => {},
       playNote: () => {},
+      startProgression: () => NO_OP_HANDLE,
       stop: () => {},
       available: false,
     };
@@ -84,13 +95,18 @@ export function createAudioPlayer(): AudioPlayer {
   let context: AudioContext | null = null;
   let live: OscillatorNode[] = [];
 
+  /** Timers of the running progression — its loop keeps arming new ones. */
+  let progressionTimers: number[] = [];
+  let progressionCancelled = true;
+  let progressionOnChord: ProgressionOptions['onChord'] = undefined;
+
   const ensureContext = (): AudioContext => {
     context ??= new Ctor();
     if (context.state === 'suspended') void context.resume();
     return context;
   };
 
-  const stop = () => {
+  const stopVoices = () => {
     for (const osc of live) {
       try {
         osc.stop();
@@ -99,6 +115,28 @@ export function createAudioPlayer(): AudioPlayer {
       }
     }
     live = [];
+  };
+
+  /**
+   * Tears down a running progression. Kept separate from stop() so that stop()
+   * can call it without recursing back through the handle.
+   */
+  const cancelProgression = () => {
+    progressionCancelled = true;
+    for (const timer of progressionTimers) clearTimeout(timer);
+    progressionTimers = [];
+
+    progressionOnChord?.(null);
+    progressionOnChord = undefined;
+  };
+
+  /**
+   * Silences everything. Crucially this also kills a looping progression — its
+   * timers would otherwise keep scheduling new chords after the sound stopped.
+   */
+  const stop = () => {
+    cancelProgression();
+    stopVoices();
   };
 
   const voice = (ctx: AudioContext, frequency: number, at: number, duration: number) => {
@@ -129,7 +167,7 @@ export function createAudioPlayer(): AudioPlayer {
     if (midiNotes.length === 0) return;
 
     // Unless asked to stack, a fresh play interrupts the previous one so that
-    // repeated clicks on a scale or progression never pile up.
+    // repeated clicks on a scale never pile up.
     if (!options.stack) stop();
 
     const mode = options.mode ?? 'sequence';
@@ -145,39 +183,71 @@ export function createAudioPlayer(): AudioPlayer {
     });
   };
 
-  const playChords = (
-    chords: readonly (readonly number[])[],
-    options: ChordSequenceOptions = {},
-  ) => {
-    const voiced = chords.filter((chord) => chord.length > 0);
-    if (voiced.length === 0) return;
-
-    stop();
-
-    const chordGap = options.chordGap ?? 0.62;
-    const strumGap = options.strumGap ?? 0.035;
-    const ring = options.duration ?? 0.7;
-
-    const ctx = ensureContext();
-    const base = ctx.currentTime + 0.03;
-
-    voiced.forEach((chord, chordIndex) => {
-      const at = base + chordIndex * chordGap;
-      chord.forEach((midi, string) => {
-        voice(ctx, midiToFrequency(midi), at + string * strumGap, ring);
-      });
-    });
-  };
-
   const playNote = (midi: number) => {
     const ctx = ensureContext();
     voice(ctx, midiToFrequency(midi), ctx.currentTime + 0.02, 1);
   };
 
+  const startProgression = (
+    chords: readonly (readonly number[])[],
+    options: ProgressionOptions,
+  ): ProgressionHandle => {
+    const voiced = chords.filter((chord) => chord.length > 0);
+    if (voiced.length === 0) return NO_OP_HANDLE;
+
+    stop(); // a timed run replaces whatever was going on
+
+    const { secondsPerChord, loop = false, strumGap = 0.035, onChord } = options;
+    // Let a chord ring almost to the next one, but never absurdly long at slow tempi.
+    const ring = Math.min(secondsPerChord * 0.98, 2.4);
+
+    const ctx = ensureContext();
+    progressionCancelled = false;
+    progressionOnChord = onChord;
+
+    const after = (seconds: number, run: () => void) => {
+      const delayMs = Math.max(0, (seconds - ctx.currentTime) * 1000);
+      progressionTimers.push(
+        window.setTimeout(() => {
+          if (!progressionCancelled) run();
+        }, delayMs),
+      );
+    };
+
+    const schedulePass = (startAt: number) => {
+      if (progressionCancelled) return;
+
+      voiced.forEach((chord, index) => {
+        const at = startAt + index * secondsPerChord;
+        chord.forEach((midi, string) => {
+          voice(ctx, midiToFrequency(midi), at + string * strumGap, ring);
+        });
+        // The audio is scheduled sample-accurately; the marker just follows along.
+        if (onChord) after(at, () => onChord(index));
+      });
+
+      const endAt = startAt + voiced.length * secondsPerChord;
+
+      if (loop) {
+        // Arm the next pass slightly early so the loop joins without a gap.
+        after(endAt - 0.3, () => schedulePass(endAt));
+      } else {
+        after(endAt, () => {
+          onChord?.(null);
+          progressionCancelled = true;
+        });
+      }
+    };
+
+    schedulePass(ctx.currentTime + 0.06);
+
+    return { stop };
+  };
+
   return {
     play,
-    playChords,
     playNote,
+    startProgression,
     stop,
     available: true,
   };

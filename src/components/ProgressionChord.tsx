@@ -1,17 +1,20 @@
-import { useMemo, useState } from 'react';
-import { defaultVoicingIndex, type ProgressionStep, type Tuning, voicingsFor } from '../theory';
+import type { ProgressionStep, Voicing } from '../theory';
 import { ChordDiagram } from './ChordDiagram';
 import './ProgressionChord.css';
 
 interface ProgressionChordProps {
   step: ProgressionStep;
-  /** Already carries the capo, so voicing frets come out relative to it. */
-  tuning: Tuning;
+  /** Every grip we know for this chord, in the current tuning. Owned by App. */
+  voicings: readonly Voicing[];
+  selected: number;
+  onSelect: (index: number) => void;
   /** Owned by App so that opening one chord's picker closes every other. */
   isOpen: boolean;
   onToggle: () => void;
-  /** Sound the selected voicing — the exact grip shown, as MIDI notes. */
-  onHear?: (midiNotes: number[]) => void;
+  /** Sound the grip shown. Clicking the diagram plays it — the same rule as everywhere. */
+  onHear?: (voicing: Voicing) => void;
+  /** True while the progression is playing this chord. */
+  isPlaying?: boolean;
 }
 
 /** "A-Form, 5. Bund" — or "offen" when the shape sits at the nut. */
@@ -20,35 +23,26 @@ function describe(shapeName: string, baseFret: number): string {
 }
 
 /**
- * One chord of a progression. It starts on a barre shape and clicking it opens
- * every voicing we know, so an open chord is always one click away on any single
- * step without a global setting to flip.
+ * One chord of a progression.
  *
- * The picked voicing lives here; whether the picker is open lives in App, which
- * is what keeps two pickers from being open at once. App remounts this on key
- * changes (scale, progression, chord size), resetting the pick to the default.
+ * Clicking the diagram sounds the grip — the app's one rule: click the thing and
+ * you hear the thing. Changing to another grip is the separate "N Griffe" button,
+ * so hearing a chord never means committing to a different shape.
+ *
+ * Which grip is chosen lives in App, because the transport has to play the very
+ * shapes shown here.
  */
 export function ProgressionChord({
   step,
-  tuning,
+  voicings,
+  selected,
+  onSelect,
   isOpen,
   onToggle,
   onHear,
+  isPlaying = false,
 }: ProgressionChordProps) {
-  const voicings = useMemo(() => voicingsFor(step.chord, { tuning }), [step.chord, tuning]);
-
-  const [selected, setSelected] = useState(() => defaultVoicingIndex(voicings));
-
   const voicing = voicings[selected];
-
-  /** The MIDI notes the shown grip actually sounds — muted strings dropped. */
-  const hear = () => {
-    if (!onHear || !voicing) return;
-    const midi = voicing.frets
-      .map((fret, string) => (fret < 0 ? null : tuning.midiAt(string, fret)))
-      .filter((note): note is number => note !== null);
-    onHear(midi);
-  };
 
   if (!voicing) {
     return (
@@ -64,35 +58,35 @@ export function ProgressionChord({
   }
 
   return (
-    <li className="progression-chord">
+    <li className={isPlaying ? 'progression-chord is-playing' : 'progression-chord'}>
       <span className="roman">{step.roman}</span>
       <span className="chord-symbol">{step.chord.name()}</span>
 
       <button
         type="button"
         className="voicing-button"
-        onClick={onToggle}
-        aria-expanded={isOpen}
-        aria-label={`${step.chord.name()}: Griff wählen (aktuell ${describe(voicing.shapeName, voicing.baseFret)})`}
-        disabled={voicings.length < 2}
+        onClick={() => onHear?.(voicing)}
+        aria-label={`${step.chord.name()} anhören (${describe(voicing.shapeName, voicing.baseFret)})`}
       >
-        <ChordDiagram chord={step.chord} voicing={voicing} />
-        {voicings.length > 1 ? (
-          <span className="voicing-count">{voicings.length} Griffe ▾</span>
-        ) : null}
+        {/* The switch below already names the grip. */}
+        <ChordDiagram chord={step.chord} voicing={voicing} caption={null} />
       </button>
 
-      {onHear ? (
+      {voicings.length > 1 ? (
         <button
           type="button"
-          className="play-button play-button--small"
-          onClick={hear}
-          aria-label={`${step.chord.name()} anhören`}
-          title="Griff anhören"
+          className="voicing-switch"
+          onClick={onToggle}
+          aria-expanded={isOpen}
+          aria-label={`${step.chord.name()}: Griff wechseln (aktuell ${describe(voicing.shapeName, voicing.baseFret)})`}
         >
-          ▶
+          {describe(voicing.shapeName, voicing.baseFret)} ▾
         </button>
-      ) : null}
+      ) : (
+        <span className="voicing-caption">
+          {describe(voicing.shapeName, voicing.baseFret)}
+        </span>
+      )}
 
       {isOpen ? (
         <div className="voicing-picker" role="listbox">
@@ -104,8 +98,9 @@ export function ProgressionChord({
               aria-selected={i === selected}
               className={i === selected ? 'voicing-option is-selected' : 'voicing-option'}
               onClick={() => {
-                setSelected(i);
+                onSelect(i);
                 onToggle();
+                onHear?.(option);
               }}
             >
               <ChordDiagram

@@ -53,6 +53,7 @@ export {
   scaleMidiSequence,
   chordMidiTones,
   positionsToMidi,
+  voicingMidi,
   type ScaleSequenceOptions,
   type PlayablePosition,
 } from './pitch';

@@ -20,6 +20,9 @@ export interface AppState {
   progressionId: string;
   /** 0 = whole neck. */
   boxNumber: number;
+  /** Tempo of the progression, in beats per minute. One chord lasts one bar. */
+  bpm: number;
+  loop: boolean;
 }
 
 export const DEFAULT_STATE: AppState = {
@@ -32,10 +35,14 @@ export const DEFAULT_STATE: AppState = {
   chordSize: 3,
   progressionId: 'I-V-vi-IV',
   boxNumber: 0,
+  bpm: 90,
+  loop: true,
 };
 
 const FRET_COUNTS = [12, 15, 24];
 const MAX_CAPO = 7;
+export const MIN_BPM = 40;
+export const MAX_BPM = 200;
 
 function pickInt(raw: string | null, allowed: (value: number) => boolean, fallback: number): number {
   if (raw === null) return fallback;
@@ -71,6 +78,8 @@ export function readState(search: string): AppState {
     progressionId: params.get('prog') ?? DEFAULT_STATE.progressionId,
     // The scale decides how many boxes exist, so only the lower bound is checked here.
     boxNumber: pickInt(params.get('box'), (v) => v >= 0, DEFAULT_STATE.boxNumber),
+    bpm: pickInt(params.get('bpm'), (v) => v >= MIN_BPM && v <= MAX_BPM, DEFAULT_STATE.bpm),
+    loop: params.get('loop') === null ? DEFAULT_STATE.loop : params.get('loop') !== '0',
   };
 }
 
@@ -91,6 +100,8 @@ export function writeState(state: AppState): string {
   add('chords', state.chordSize, DEFAULT_STATE.chordSize);
   add('prog', state.progressionId, DEFAULT_STATE.progressionId);
   add('box', state.boxNumber, DEFAULT_STATE.boxNumber);
+  add('bpm', state.bpm, DEFAULT_STATE.bpm);
+  if (state.loop !== DEFAULT_STATE.loop) params.set('loop', state.loop ? '1' : '0');
 
   const query = params.toString();
   return query === '' ? '' : `?${query}`;

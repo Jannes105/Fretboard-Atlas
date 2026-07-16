@@ -1,6 +1,8 @@
+import type { Voicing } from './ChordShape';
 import { mod } from './Note';
 import type { Chord } from './Chord';
 import type { Scale } from './Scale';
+import type { Tuning } from './Tuning';
 
 /**
  * Turning the music theory into something audible — but still pure. This file
@@ -74,4 +76,18 @@ export function positionsToMidi(
   const wanted = new Set(pitchClasses);
   const midis = positions.filter((p) => wanted.has(p.pitchClass)).map((p) => p.midi);
   return [...new Set(midis)].sort((a, b) => a - b);
+}
+
+/**
+ * What a grip actually sounds, low string first — muted strings dropped.
+ *
+ * This is the honest voicing: the pitches under the fingers in the shape being
+ * shown, in the tuning being used (capo included, since a capoed tuning is just
+ * a tuning). Unlike chordMidiTones it doubles octaves and unisons exactly the way
+ * the six strings do.
+ */
+export function voicingMidi(voicing: Voicing, tuning: Tuning): number[] {
+  return voicing.frets
+    .map((fret, stringIndex) => (fret < 0 ? null : tuning.midiAt(stringIndex, fret)))
+    .filter((midi): midi is number => midi !== null);
 }
