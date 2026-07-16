@@ -255,6 +255,27 @@ describe('App — Transport der Akkordfolge', () => {
     expect(chords.some((chord) => chord.length > 3)).toBe(true);
   });
 
+  it('lässt das Tempo in Einzelschritten regeln — Tempoarbeit geht in 2-BPM-Schritten', () => {
+    const { container } = render(<App />);
+    const slider = container.querySelector<HTMLInputElement>('.tempo input')!;
+
+    expect(slider.step).toBe('1');
+    expect(slider.min).toBe('40');
+    expect(slider.max).toBe('200');
+  });
+
+  it('nimmt auch krumme Tempi an', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?bpm=92');
+    const { container } = render(<App />);
+
+    expect(container.querySelector('.tempo output')?.textContent).toBe('92');
+
+    await user.click(transportButton(container));
+    const [, options] = player.startProgression.mock.calls[0];
+    expect(options.secondsPerChord).toBeCloseTo((4 * 60) / 92, 5);
+  });
+
   it('leitet das Tempo als ein Takt pro Akkord ab', async () => {
     const user = userEvent.setup();
     window.history.replaceState(null, '', '/?bpm=120');

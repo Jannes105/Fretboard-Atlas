@@ -271,8 +271,11 @@ button:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* Wide enough that a single BPM is actually reachable by dragging — at 10rem one
+   step was barely a pixel. Arrow keys stay the exact way in either case. */
 .tempo input[type='range'] {
-  width: 10rem;
+  width: 13rem;
+  max-width: 100%;
   accent-color: var(--accent);
   cursor: pointer;
 }

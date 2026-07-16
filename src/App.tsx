@@ -507,11 +507,13 @@ export default function App() {
                 <span>
                   Tempo <output>{bpm}</output> BPM
                 </span>
+                {/* Single BPM steps: pushing a passage up by two is how tempo
+                    practice actually works. Arrow keys nudge exactly one. */}
                 <input
                   type="range"
                   min={MIN_BPM}
                   max={MAX_BPM}
-                  step={5}
+                  step={1}
                   value={bpm}
                   onChange={(e) => update('bpm', Number(e.target.value))}
                 />
