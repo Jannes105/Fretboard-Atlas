@@ -1,4 +1,4 @@
-import { midiToFrequency } from './theory';
+import { midiToFrequency, type StrumSlot } from './theory';
 
 /**
  * A thin wrapper over the Web Audio API — the one place in the app that makes
@@ -85,6 +85,10 @@ function voicePeak(simultaneous: number): number {
 export interface ProgressionOptions {
   /** How long one bar lasts — beatsPerBar beats at the current tempo. */
   secondsPerBar: number;
+  /** Beats per bar, so the bar can be divided into the strum grid. */
+  beatsPerBar: number;
+  /** The strum pattern for one bar (eighth-note grid), repeated under each chord. */
+  pattern: readonly StrumSlot[];
   /** Bars each chord is held; defaults to one bar each. Aligned with `chords`. */
   chordBars?: readonly number[];
   loop?: boolean;
@@ -322,8 +326,22 @@ export function createAudioPlayer(): AudioPlayer {
 
     stop(); // a timed run replaces whatever was going on
 
-    const { secondsPerBar, chordBars, loop = false, strumGap = 0.035, onChord } = options;
+    const {
+      secondsPerBar,
+      beatsPerBar,
+      pattern,
+      chordBars,
+      loop = false,
+      strumGap = 0.035,
+      onChord,
+    } = options;
     const barsOf = (index: number) => Math.max(1, chordBars?.[index] ?? 1);
+
+    const secondsPerBeat = secondsPerBar / beatsPerBar;
+    const slotSeconds = secondsPerBeat / 2; // eighth-note grid: two slots per beat
+    // A strum rings a beat or so, overlapping the next a little the way real
+    // strumming sustains; the limiter keeps the stack from clipping.
+    const strumRing = Math.min(secondsPerBeat * 1.3, 2);
 
     const ctx = ensureContext();
     progressionCancelled = false;
@@ -338,6 +356,15 @@ export function createAudioPlayer(): AudioPlayer {
       );
     };
 
+    // One strum: the strings brushed low-to-high (down) or high-to-low (up).
+    const strum = (chord: readonly number[], at: number, slot: StrumSlot, peak: number) => {
+      if (slot === null) return;
+      const order = slot === 'up' ? [...chord].reverse() : chord;
+      order.forEach((midi, i) => {
+        voice(ctx, midiToFrequency(midi), at + i * strumGap, strumRing, peak);
+      });
+    };
+
     // Total span, so the loop knows where to rejoin — chords may differ in length.
     const totalSeconds = voiced.reduce((sum, _, index) => sum + barsOf(index) * secondsPerBar, 0);
 
@@ -347,16 +374,16 @@ export function createAudioPlayer(): AudioPlayer {
       let offset = 0;
       voiced.forEach((chord, index) => {
         const at = startAt + offset;
-        const held = barsOf(index) * secondsPerBar;
-        // Ring almost to the next chord, but never absurdly long at slow tempi.
-        const ring = Math.min(held * 0.98, 2.4);
+        const bars = barsOf(index);
         const peak = voicePeak(chord.length);
-        chord.forEach((midi, string) => {
-          voice(ctx, midiToFrequency(midi), at + string * strumGap, ring, peak);
-        });
+        // Lay the one-bar pattern across each bar the chord is held.
+        for (let bar = 0; bar < bars; bar++) {
+          const barAt = at + bar * secondsPerBar;
+          pattern.forEach((slot, s) => strum(chord, barAt + s * slotSeconds, slot, peak));
+        }
         // The audio is scheduled sample-accurately; the marker just follows along.
         if (onChord) after(at, () => onChord(index));
-        offset += held;
+        offset += bars * secondsPerBar;
       });
 
       const endAt = startAt + totalSeconds;

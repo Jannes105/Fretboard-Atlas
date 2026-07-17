@@ -1,6 +1,14 @@
 import type { Timbre } from './audio';
 import type { LabelMode } from './components/FretboardView';
-import { ROOT_CHOICES, SCALE_TYPES, type ChordSize, Tuning } from './theory';
+import {
+  ROOT_CHOICES,
+  SCALE_TYPES,
+  type ChordSize,
+  isDefaultPattern,
+  serializePattern,
+  defaultPattern,
+  Tuning,
+} from './theory';
 
 /**
  * Everything the app shows, kept in the URL query string.
@@ -28,6 +36,8 @@ export interface AppState {
   sound: Timbre;
   /** Beats per bar — the time signature's feel (4 = 4/4, 3 = 3/4, 6 = 6/8, 2 = 2/4). */
   beatsPerBar: number;
+  /** Strum pattern for one bar as a d/u/- string; length follows beatsPerBar. */
+  rhythm: string;
 }
 
 export const DEFAULT_STATE: AppState = {
@@ -44,6 +54,7 @@ export const DEFAULT_STATE: AppState = {
   loop: true,
   sound: 'soft',
   beatsPerBar: 4,
+  rhythm: serializePattern(defaultPattern(4)),
 };
 
 const FRET_COUNTS = [12, 15, 24];
@@ -137,6 +148,19 @@ function readTuning(raw: string | null): string {
 export function readState(search: string): AppState {
   const params = new URLSearchParams(search);
 
+  const beatsPerBar = pickInt(
+    params.get('sig'),
+    (v) => BEATS_PER_BAR.includes(v),
+    DEFAULT_STATE.beatsPerBar,
+  );
+  // Keep the pattern the right length for the meter — a leftover from another time
+  // signature is dropped rather than kept as garbage.
+  const rawRhythm = params.get('rhythm');
+  const rhythm =
+    rawRhythm !== null && rawRhythm.length === beatsPerBar * 2
+      ? rawRhythm
+      : serializePattern(defaultPattern(beatsPerBar));
+
   return {
     root: pickFrom(params.get('root'), ROOT_CHOICES as readonly string[], DEFAULT_STATE.root),
     scaleTypeId: pickFrom(
@@ -157,11 +181,8 @@ export function readState(search: string): AppState {
     bpm: pickInt(params.get('bpm'), (v) => v >= MIN_BPM && v <= MAX_BPM, DEFAULT_STATE.bpm),
     loop: params.get('loop') === null ? DEFAULT_STATE.loop : params.get('loop') !== '0',
     sound: pickFrom(params.get('sound'), SOUNDS, DEFAULT_STATE.sound),
-    beatsPerBar: pickInt(
-      params.get('sig'),
-      (v) => BEATS_PER_BAR.includes(v),
-      DEFAULT_STATE.beatsPerBar,
-    ),
+    beatsPerBar,
+    rhythm,
   };
 }
 
@@ -186,6 +207,14 @@ export function writeState(state: AppState): string {
   if (state.loop !== DEFAULT_STATE.loop) params.set('loop', state.loop ? '1' : '0');
   add('sound', state.sound, DEFAULT_STATE.sound);
   add('sig', state.beatsPerBar, DEFAULT_STATE.beatsPerBar);
+  // Only a real, meter-matching pattern is worth a link; a wrong-length leftover
+  // would be reset on read anyway.
+  if (
+    state.rhythm.length === state.beatsPerBar * 2 &&
+    !isDefaultPattern(state.rhythm, state.beatsPerBar)
+  ) {
+    params.set('rhythm', state.rhythm);
+  }
 
   const query = params.toString();
   return query === '' ? '' : `?${query}`;

@@ -1,0 +1,81 @@
+.rhythm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.rhythm-grid {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.rhythm-cell {
+  width: 1.9rem;
+  height: 2.1rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-sunken);
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+/* A little more space before each beat's downbeat, so beats read as groups. */
+.rhythm-cell.is-beat {
+  margin-left: 0.35rem;
+}
+
+.rhythm-grid .rhythm-cell.is-beat:first-child {
+  margin-left: 0;
+}
+
+.rhythm-cell.is-down,
+.rhythm-cell.is-up {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.rhythm-cell:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.rhythm-cell:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.rhythm-presets {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.rhythm-preset {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.rhythm-preset:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}

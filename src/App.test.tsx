@@ -166,6 +166,28 @@ describe('App — Eigene Akkordfolge', () => {
     expect(chords[0][0] % 12).toBe(7); // G
   });
 
+  it('gibt Taktart und Schlagmuster an den Transport weiter', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?prog=custom:C,G&sig=3&rhythm=dud-du');
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.transport .play-button')!);
+    const [, options] = player.startProgression.mock.calls[0];
+    expect(options.beatsPerBar).toBe(3);
+    // Das Muster kommt als geparste Slots an — sechs für 3/4.
+    expect(options.pattern).toEqual(['down', 'up', 'down', null, 'down', 'up']);
+  });
+
+  it('lässt ein Schlagmuster-Preset wählen und schreibt es in die URL', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?prog=custom:C,G');
+    const { container } = render(<App />);
+
+    // Slot 1 (erster Abschlag) auf Aufschlag klicken: d → u.
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.rhythm-cell')[0]);
+    expect(window.location.search).toContain('rhythm=u-d-d-d-');
+  });
+
   it('lässt die Länge je Akkord in Takten einstellen', async () => {
     const user = userEvent.setup();
     window.history.replaceState(null, '', '/?prog=custom:C,G');

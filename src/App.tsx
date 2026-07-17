@@ -4,16 +4,20 @@ import { FretboardView, type LabelMode } from './components/FretboardView';
 import { KeyFinder } from './components/KeyFinder';
 import { ProgressionBuilder } from './components/ProgressionBuilder';
 import { ProgressionChord } from './components/ProgressionChord';
+import { RhythmEditor } from './components/RhythmEditor';
 import {
   buildProgression,
   Chord,
   type ChordSize,
   chordMidiTones,
   customSteps,
+  defaultPattern,
   defaultVoicingIndex,
   diatonicChords,
   Fretboard,
+  serializePattern,
   Note,
+  parsePattern,
   pitchClassName,
   positionsToMidi,
   progressionsFor,
@@ -76,6 +80,7 @@ export default function App() {
     loop,
     sound,
     beatsPerBar,
+    rhythm,
   } = state;
 
   // Replace rather than push, so the back button does not walk through every
@@ -345,6 +350,8 @@ export default function App() {
     transportRef.current = player().startProgression(chordNotes, {
       // A bar is beatsPerBar beats at the current tempo; each chord holds its bars.
       secondsPerBar: (beatsPerBar * 60) / bpm,
+      beatsPerBar,
+      pattern: parsePattern(rhythm, beatsPerBar),
       chordBars,
       loop,
       onChord: (index) => {
@@ -374,7 +381,7 @@ export default function App() {
   restartRef.current = startProgression;
   useEffect(() => {
     if (transportRef.current) restartRef.current();
-  }, [bpm, loop, beatsPerBar]);
+  }, [bpm, loop, beatsPerBar, rhythm]);
 
   return (
     <main className="app">
@@ -753,7 +760,15 @@ export default function App() {
                 <select
                   aria-label="Taktart"
                   value={beatsPerBar}
-                  onChange={(e) => update('beatsPerBar', Number(e.target.value))}
+                  onChange={(e) => {
+                    // The pattern length follows the meter, so a new meter resets it.
+                    const nextBeats = Number(e.target.value);
+                    setState((previous) => ({
+                      ...previous,
+                      beatsPerBar: nextBeats,
+                      rhythm: serializePattern(defaultPattern(nextBeats)),
+                    }));
+                  }}
                 >
                   <option value={4}>4/4</option>
                   <option value={3}>3/4</option>
@@ -762,6 +777,12 @@ export default function App() {
                 </select>
               </label>
             </div>
+
+            <RhythmEditor
+              rhythm={rhythm}
+              beatsPerBar={beatsPerBar}
+              onChange={(next) => update('rhythm', next)}
+            />
 
             <ol className="progression">
               {steps.map((step, i) => (

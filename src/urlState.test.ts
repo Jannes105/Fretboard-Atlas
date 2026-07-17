@@ -129,6 +129,20 @@ describe('Taktart in der URL', () => {
   });
 });
 
+describe('Schlagmuster in der URL', () => {
+  it('liest und schreibt ein Muster, lässt die Vorgabe aber weg', () => {
+    expect(readState('?rhythm=dudududu').rhythm).toBe('dudududu');
+    expect(readState('').rhythm).toBe('d-d-d-d-'); // Vorgabe: Abschlag auf jeden Schlag
+    expect(writeState({ ...DEFAULT_STATE, rhythm: 'd-d-d-d-' })).toBe('');
+    expect(writeState({ ...DEFAULT_STATE, rhythm: 'dudududu' })).toBe('?rhythm=dudududu');
+  });
+
+  it('verwirft ein Muster, dessen Länge nicht zur Taktart passt', () => {
+    // 8-Slot-Muster (4/4) in einem 3/4-Takt → Vorgabe für 3/4.
+    expect(readState('?sig=3&rhythm=dudududu').rhythm).toBe('d-d-d-');
+  });
+});
+
 describe('Klang in der URL', () => {
   it('liest und schreibt den Sound, lässt den Default aber weg', () => {
     expect(readState('?sound=electric').sound).toBe('electric');

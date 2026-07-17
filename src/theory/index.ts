@@ -42,6 +42,16 @@ export {
 } from './ChordShape';
 export { generateVoicings } from './voicingSearch';
 export {
+  type StrumSlot,
+  SLOTS_PER_BEAT,
+  serializePattern,
+  defaultPattern,
+  parsePattern,
+  isDefaultPattern,
+  PATTERN_PRESETS,
+  type PatternPreset,
+} from './rhythm';
+export {
   PROGRESSIONS,
   buildProgression,
   customSteps,
