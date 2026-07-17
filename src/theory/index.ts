@@ -43,6 +43,7 @@ export {
 export {
   PROGRESSIONS,
   buildProgression,
+  customSteps,
   progressionsFor,
   type Progression,
   type ProgressionStep,

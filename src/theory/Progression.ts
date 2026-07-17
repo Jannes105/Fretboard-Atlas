@@ -106,6 +106,29 @@ export function buildProgression(
   });
 }
 
+/**
+ * Turns an explicit list of chords into progression steps — the path for a
+ * self-built sequence, where the chords are given outright rather than as scale
+ * degrees (a power chord or a borrowed chord has no degree to stack from).
+ *
+ * The roman numeral is shown only when the chord is genuinely diatonic — every
+ * tone in the key. A borrowed chord keeps a blank numeral rather than a wrong
+ * one; its name is shown alongside anyway.
+ */
+export function customSteps(scale: Scale, chords: readonly Chord[]): ProgressionStep[] {
+  return chords.map((chord) => {
+    const degreeIndex = scale.degreeIndexOf(chord.root.pitchClass);
+    const diatonic =
+      degreeIndex !== null && chord.pitchClasses.every((pitchClass) => scale.contains(pitchClass));
+
+    return {
+      degreeIndex: degreeIndex ?? -1,
+      chord,
+      roman: diatonic ? chord.romanNumeral(degreeIndex) : '',
+    };
+  });
+}
+
 /** The progressions worth showing for a given key. */
 export function progressionsFor(scale: Scale): Progression[] {
   if (!scale.type.isHeptatonic) return [];

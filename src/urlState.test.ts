@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_STATE, readState, writeState } from './urlState';
+import {
+  customProgId,
+  customProgSymbols,
+  DEFAULT_STATE,
+  readState,
+  writeState,
+} from './urlState';
 
 describe('readState', () => {
   it('liefert ohne Parameter die Defaults', () => {
@@ -47,6 +53,24 @@ describe('readState', () => {
   it('nimmt nur Bundzahlen, die es im Regler gibt', () => {
     expect(readState('?frets=15').fretCount).toBe(15);
     expect(readState('?frets=19').fretCount).toBe(DEFAULT_STATE.fretCount);
+  });
+});
+
+describe('Eigene Akkordfolge in der URL', () => {
+  it('kodiert und liest eine Symbolliste verlustfrei — auch mit Vorzeichen', () => {
+    const id = customProgId(['C', 'G', 'Am', 'F#5']);
+    expect(customProgSymbols(id)).toEqual(['C', 'G', 'Am', 'F#5']);
+  });
+
+  it('unterscheidet eine Custom-Folge von einer Vorlage', () => {
+    expect(customProgSymbols('I-V-vi-IV')).toBeNull();
+    expect(customProgSymbols('custom:C,G')).toEqual(['C', 'G']);
+  });
+
+  it('übersteht eine Rundreise durch die URL, Vorzeichen inklusive', () => {
+    // Das # in F#5 muss die Query-Kodierung heil überstehen.
+    const state = { ...DEFAULT_STATE, progressionId: customProgId(['G', 'D', 'Em', 'C', 'F#5']) };
+    expect(readState(writeState(state))).toEqual(state);
   });
 });
 

@@ -44,6 +44,23 @@ const MAX_CAPO = 7;
 export const MIN_BPM = 40;
 export const MAX_BPM = 200;
 
+/**
+ * A self-built progression rides in the same `prog` slot as the presets, marked
+ * off by this prefix: `custom:C,G,Am,F`. The chords are absolute (not scale
+ * degrees), so the sequence survives a key change — only its roman numerals move.
+ */
+const CUSTOM_PROG_PREFIX = 'custom:';
+
+export function customProgId(symbols: readonly string[]): string {
+  return CUSTOM_PROG_PREFIX + symbols.join(',');
+}
+
+/** The chord symbols of a custom progression id, or null if it is a preset. */
+export function customProgSymbols(progressionId: string): string[] | null {
+  if (!progressionId.startsWith(CUSTOM_PROG_PREFIX)) return null;
+  return progressionId.slice(CUSTOM_PROG_PREFIX.length).split(',').filter(Boolean);
+}
+
 function pickInt(raw: string | null, allowed: (value: number) => boolean, fallback: number): number {
   if (raw === null) return fallback;
   const value = Number(raw);

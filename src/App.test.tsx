@@ -76,6 +76,77 @@ describe('App — Tonart finden', () => {
 
     expect(container.querySelector('.keyfinder-note--warn')?.textContent).toContain('H');
   });
+
+  it('übernimmt die getippten Akkorde als spielbare Folge in der gefundenen Tonart', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.keyfinder-trigger')!);
+    await user.type(container.querySelector<HTMLInputElement>('.keyfinder-field input')!, 'G D Em C');
+    await user.click(container.querySelector<HTMLButtonElement>('.keyfinder-adopt')!);
+
+    // Der Kreis schließt sich: Tonart gesetzt UND die Folge im Builder.
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('G-Dur (Ionisch)');
+    expect(chipSymbols(container)).toEqual(['G', 'D', 'Em', 'C']);
+  });
+});
+
+/** The chords in the builder, read off the remove buttons' labels. */
+function chipSymbols(container: HTMLElement): string[] {
+  return [...container.querySelectorAll('.builder-remove')].map((button) =>
+    (button.getAttribute('aria-label') ?? '').replace(' entfernen', ''),
+  );
+}
+
+describe('App — Eigene Akkordfolge', () => {
+  const progressionSelect = (container: HTMLElement) =>
+    [...container.querySelectorAll<HTMLSelectElement>('.panel-head select')].find((select) =>
+      [...select.options].some((option) => option.value === 'custom'),
+    )!;
+
+  it('öffnet den Builder vorbefüllt mit der gerade gezeigten Folge', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.selectOptions(progressionSelect(container), 'custom');
+
+    // A-Dur-Default ist I–V–vi–IV = A E F#m D.
+    expect(chipSymbols(container)).toEqual(['A', 'E', 'F#m', 'D']);
+  });
+
+  it('hängt einen getippten Powerchord an und normalisiert seine Schreibung', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?prog=custom:C,G');
+    const { container } = render(<App />);
+
+    await user.type(container.querySelector<HTMLInputElement>('.builder-type input')!, 'e5');
+    await user.click(container.querySelector<HTMLButtonElement>('.builder-type-add')!);
+
+    expect(chipSymbols(container)).toEqual(['C', 'G', 'E5']);
+  });
+
+  it('weist einen unsinnigen Akkord ab, ohne ihn aufzunehmen', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?prog=custom:C');
+    const { container } = render(<App />);
+
+    await user.type(container.querySelector<HTMLInputElement>('.builder-type input')!, 'Xyz');
+    await user.click(container.querySelector<HTMLButtonElement>('.builder-type-add')!);
+
+    expect(container.querySelector('.builder-error')).not.toBeNull();
+    expect(chipSymbols(container)).toEqual(['C']);
+  });
+
+  it('spielt die eigene Folge über den Transport, nicht eine Vorlage', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?prog=custom:C,G,Am,F');
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.transport .play-button')!);
+
+    const [chords] = player.startProgression.mock.calls[0];
+    expect(chords).toHaveLength(4); // C G Am F, nicht die vierteilige Default-Vorlage zufällig
+  });
 });
 
 describe('App — Einstellungen', () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { Chord } from './Chord';
 import { Note } from './Note';
-import { buildProgression, PROGRESSIONS, progressionsFor } from './Progression';
+import { buildProgression, customSteps, PROGRESSIONS, progressionsFor } from './Progression';
 import { Scale } from './Scale';
 import { MAJOR, MAJOR_PENTATONIC, NATURAL_MINOR } from './ScaleType';
 
@@ -108,5 +109,30 @@ describe('progressionsFor', () => {
   it('bietet für Skalen ohne 7 Stufen nichts an', () => {
     const pentatonic = new Scale(Note.parse('C'), MAJOR_PENTATONIC);
     expect(progressionsFor(pentatonic)).toEqual([]);
+  });
+});
+
+describe('customSteps', () => {
+  const parse = (symbols: string[]) => symbols.map((s) => Chord.parse(s));
+
+  it('nummeriert leitereigene Akkorde mit ihrer Stufe in der Tonart', () => {
+    const steps = customSteps(cMajor, parse(['C', 'G', 'Am', 'F']));
+    expect(steps.map((s) => s.roman)).toEqual(['I', 'V', 'vi', 'IV']);
+    expect(steps.map((s) => s.chord.name())).toEqual(['C', 'G', 'Am', 'F']);
+  });
+
+  it('trägt beliebige Akkorde, auch Powerchords, und behält ihre echte Schreibung', () => {
+    const steps = customSteps(cMajor, parse(['C5', 'F', 'G']));
+    expect(steps[0].chord.name()).toBe('C5');
+    // C5 ist leitereigen (C, G), bekommt also eine Stufe.
+    expect(steps[0].roman).toBe('I5');
+  });
+
+  it('lässt die Stufe eines tonartfremden Akkords leer, statt sie zu erfinden', () => {
+    // D-Dur (mit F#) gehört nicht zu C-Dur.
+    const steps = customSteps(cMajor, parse(['C', 'D', 'G']));
+    expect(steps[1].roman).toBe('');
+    // Der Name bleibt trotzdem korrekt — die Anzeige zeigt ihn separat.
+    expect(steps[1].chord.name()).toBe('D');
   });
 });

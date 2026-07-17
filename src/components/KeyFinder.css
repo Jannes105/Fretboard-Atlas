@@ -123,6 +123,25 @@
   font-size: 0.82rem;
 }
 
+.keyfinder-adopt {
+  width: 100%;
+  margin-top: 0.7rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.keyfinder-adopt:hover {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
 /* A chord that does not belong to the key: named, not numbered, and dimmed. */
 .keyfinder-degree.is-outsider {
   color: var(--accent);

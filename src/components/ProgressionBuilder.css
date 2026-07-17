@@ -1,0 +1,162 @@
+.builder {
+  margin-bottom: 1.1rem;
+}
+
+.builder-sequence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.2rem;
+  margin-bottom: 0.7rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.builder-empty {
+  color: var(--text-muted);
+  font-size: 0.87rem;
+}
+
+/* A chord in the sequence: the symbol plus a remove handle. */
+.builder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.3rem 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.builder-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.builder-remove:hover {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--text);
+}
+
+.builder-clear {
+  margin-left: auto;
+  padding: 0.2rem 0.5rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.builder-clear:hover {
+  color: var(--text);
+}
+
+.builder-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.6rem 1rem;
+}
+
+.builder-diatonic {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.builder-diatonic-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  min-width: 2.6rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-sunken);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.builder-diatonic-btn:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.builder-roman {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.builder-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.builder-type {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.builder-type input {
+  width: 8.5rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-sunken);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.builder-type input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.builder-type-add {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.builder-type-add:hover {
+  border-color: var(--accent);
+}
+
+.builder-error {
+  margin: 0.55rem 0 0;
+  color: var(--accent);
+  font-size: 0.83rem;
+}

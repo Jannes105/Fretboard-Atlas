@@ -5,6 +5,8 @@ import './KeyFinder.css';
 interface KeyFinderProps {
   /** Apply a found key. root is always one of ROOT_CHOICES, id a real scale type. */
   onPick: (root: string, scaleTypeId: string) => void;
+  /** Take the typed chords as a playable progression, in the given key. */
+  onAdopt: (symbols: string[], root: string, scaleTypeId: string) => void;
 }
 
 interface Analysis {
@@ -46,7 +48,7 @@ function keyLabel(match: KeyMatch): string {
  * Reverse lookup: paste the chords from a tab, get the key — and one click sets
  * the whole app to it. Sits at the key line because that is what it changes.
  */
-export function KeyFinder({ onPick }: KeyFinderProps) {
+export function KeyFinder({ onPick, onAdopt }: KeyFinderProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,6 +78,17 @@ export function KeyFinder({ onPick }: KeyFinderProps) {
 
   const pick = (match: KeyMatch) => {
     onPick(match.scale.root.name(), match.scale.type.id);
+    setOpen(false);
+  };
+
+  const adopt = () => {
+    // Play the chords the user actually typed, in the best-matching key.
+    const best = analysis.matches[0];
+    onAdopt(
+      analysis.chords.map((chord) => chord.name()),
+      best.scale.root.name(),
+      best.scale.type.id,
+    );
     setOpen(false);
   };
 
@@ -153,6 +166,12 @@ export function KeyFinder({ onPick }: KeyFinderProps) {
                 </li>
               ))}
             </ul>
+          ) : null}
+
+          {analysis.matches.length > 0 ? (
+            <button type="button" className="keyfinder-adopt" onClick={adopt}>
+              Als spielbare Akkordfolge übernehmen
+            </button>
           ) : null}
         </div>
       ) : null}

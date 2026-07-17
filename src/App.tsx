@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type AudioPlayer, createAudioPlayer, type ProgressionHandle } from './audio';
 import { FretboardView, type LabelMode } from './components/FretboardView';
 import { KeyFinder } from './components/KeyFinder';
+import { ProgressionBuilder } from './components/ProgressionBuilder';
 import { ProgressionChord } from './components/ProgressionChord';
 import {
   buildProgression,
+  Chord,
   type ChordSize,
   chordMidiTones,
+  customSteps,
   defaultVoicingIndex,
   diatonicChords,
   Fretboard,
@@ -24,7 +27,15 @@ import {
   voicingMidi,
   voicingsFor,
 } from './theory';
-import { type AppState, MAX_BPM, MIN_BPM, readState, writeState } from './urlState';
+import {
+  type AppState,
+  customProgId,
+  customProgSymbols,
+  MAX_BPM,
+  MIN_BPM,
+  readState,
+  writeState,
+} from './urlState';
 import './App.css';
 
 /**
@@ -140,14 +151,31 @@ export default function App() {
 
   const progressions = useMemo(() => progressionsFor(scale), [scale]);
 
-  // The selected progression may not exist in this key — fall back to the first.
-  const progression =
-    progressions.find((p) => p.id === progressionId) ?? progressions[0] ?? null;
+  // A self-built progression rides in the same slot, marked by a "custom:" prefix.
+  const customChordSymbols = customProgSymbols(progressionId);
+  const isCustom = customChordSymbols !== null;
 
-  const steps = useMemo(
-    () => (progression ? buildProgression(scale, progression, chordSize) : []),
-    [scale, progression, chordSize],
-  );
+  // The selected preset may not exist in this key — fall back to the first.
+  const preset = isCustom
+    ? null
+    : (progressions.find((p) => p.id === progressionId) ?? progressions[0] ?? null);
+
+  const steps = useMemo(() => {
+    const symbols = customProgSymbols(progressionId);
+    if (symbols !== null) {
+      // Skip anything unparseable, so a mistyped URL degrades rather than throws.
+      const parsed = symbols.flatMap((symbol) => {
+        try {
+          return [Chord.parse(symbol)];
+        } catch {
+          return [];
+        }
+      });
+      return customSteps(scale, parsed);
+    }
+    const chosen = progressions.find((p) => p.id === progressionId) ?? progressions[0] ?? null;
+    return chosen ? buildProgression(scale, chosen, chordSize) : [];
+  }, [progressionId, progressions, scale, chordSize]);
 
   /**
    * The grips available per step, and which one is chosen. This lives here rather
@@ -446,6 +474,14 @@ export default function App() {
                 scaleTypeId: pickedScaleTypeId,
               }))
             }
+            onAdopt={(symbols, pickedRoot, pickedScaleTypeId) =>
+              setState((previous) => ({
+                ...previous,
+                root: pickedRoot,
+                scaleTypeId: pickedScaleTypeId,
+                progressionId: customProgId(symbols),
+              }))
+            }
           />
         </div>
 
@@ -564,18 +600,34 @@ export default function App() {
               <h2>Akkordfolge</h2>
               <select
                 className="select"
-                value={progression?.id ?? ''}
-                onChange={(e) => update('progressionId', e.target.value)}
+                value={isCustom ? 'custom' : (preset?.id ?? '')}
+                onChange={(e) => {
+                  if (e.target.value === 'custom') {
+                    // Seed the builder with what is on screen, so it is never blank.
+                    update('progressionId', customProgId(steps.map((s) => s.chord.name())));
+                  } else {
+                    update('progressionId', e.target.value);
+                  }
+                }}
               >
                 {progressions.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
                 ))}
+                <option value="custom">Eigene Folge</option>
               </select>
             </div>
 
-            {progression?.hint ? <p className="hint">{progression.hint}</p> : null}
+            {isCustom ? (
+              <ProgressionBuilder
+                diatonic={chords}
+                symbols={customChordSymbols ?? []}
+                onChange={(symbols) => update('progressionId', customProgId(symbols))}
+              />
+            ) : preset?.hint ? (
+              <p className="hint">{preset.hint}</p>
+            ) : null}
 
             <div className="transport">
               <button
