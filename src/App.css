@@ -156,6 +156,34 @@ body {
   box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
 }
 
+/* The six per-string note pickers of a custom tuning, low string first. */
+.tuning-strings {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.3rem;
+  margin-top: -0.35rem;
+}
+
+.tuning-strings select {
+  width: 100%;
+  padding: 0.35rem 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-sunken);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: center;
+  appearance: none;
+  cursor: pointer;
+}
+
+.tuning-strings select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
 .field {
   position: relative;
   display: flex;
@@ -651,9 +679,35 @@ button:focus-visible {
     gap: 0.5rem;
   }
 
-  /* Right-anchored it would hang off the edge; the trigger is near the right rim. */
+  /* A custom tuning's summary ("Eigene Stimmung (D-A-D-G-B-E) · 24 Bünde") is long;
+     cap the trigger and ellipsis it so it cannot push the header off-screen — the
+     full detail is in the panel anyway. */
+  .setup {
+    max-width: 62vw;
+  }
+
+  .setup-trigger {
+    max-width: 100%;
+  }
+
+  .setup-trigger > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Right-anchored it would hang off the edge; the trigger is near the right rim.
+     Cap the width so the six-string tuning editor cannot push it off-screen. */
   .setup-panel {
     right: -0.5rem;
+    max-width: calc(100vw - 1.5rem);
+  }
+
+  /* Let the string pickers shrink to share the capped width instead of overflowing. */
+  .tuning-strings select {
+    min-width: 0;
+    padding-inline: 0.1rem;
+    font-size: 0.78rem;
   }
 
   .panel {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type AudioPlayer, createAudioPlayer, type ProgressionHandle } from './audio';
+import { type AudioPlayer, createAudioPlayer, type ProgressionHandle, type Timbre } from './audio';
 import { FretboardView, type LabelMode } from './components/FretboardView';
 import { KeyFinder } from './components/KeyFinder';
 import { ProgressionBuilder } from './components/ProgressionBuilder';
@@ -13,8 +13,8 @@ import {
   defaultVoicingIndex,
   diatonicChords,
   Fretboard,
-  hasChordShapes,
   Note,
+  pitchClassName,
   positionsToMidi,
   progressionsFor,
   ROOT_CHOICES,
@@ -31,6 +31,8 @@ import {
   type AppState,
   customProgId,
   customProgSymbols,
+  customTuningId,
+  customTuningNotes,
   MAX_BPM,
   MIN_BPM,
   readState,
@@ -47,6 +49,11 @@ type Highlight =
   | { kind: 'chord'; index: number }
   | { kind: 'degree'; index: number }
   | null;
+
+/** The twelve notes offered per string in the custom-tuning editor. */
+const NOTE_OPTIONS: string[] = Array.from({ length: 12 }, (_, pitchClass) =>
+  pitchClassName(pitchClass),
+);
 
 export default function App() {
   // One object rather than a dozen useStates: it is exactly what goes in the URL,
@@ -67,6 +74,7 @@ export default function App() {
     progressionId,
     bpm,
     loop,
+    sound,
   } = state;
 
   // Replace rather than push, so the back button does not walk through every
@@ -80,7 +88,19 @@ export default function App() {
     return new Scale(Note.parse(root), type);
   }, [root, scaleTypeId]);
 
-  const tuning = useMemo(() => Tuning.byId(tuningId), [tuningId]);
+  const tuning = useMemo(() => {
+    const notes = customTuningNotes(tuningId);
+    if (notes) {
+      try {
+        return Tuning.fromNoteNames(notes);
+      } catch {
+        return Tuning.STANDARD; // a mistyped custom tuning should not crash the app
+      }
+    }
+    return Tuning.byId(tuningId);
+  }, [tuningId]);
+
+  const isCustomTuning = customTuningNotes(tuningId) !== null;
 
   const fretboard = useMemo(
     () => new Fretboard(tuning, fretCount, Math.min(capo, fretCount)),
@@ -92,7 +112,6 @@ export default function App() {
    * tuning we hand to the voicing search rather than into the fret numbers.
    */
   const chordTuning = useMemo(() => tuning.withCapo(capo), [tuning, capo]);
-  const shapesFit = hasChordShapes(chordTuning);
 
   const chords = useMemo(
     () => (scale.type.isHeptatonic ? diatonicChords(scale, chordSize) : []),
@@ -232,7 +251,8 @@ export default function App() {
   // only earns a mention when there is one — the normal case is no capo, and
   // saying so every time is noise on a phone-width line.
   const setupSummary = [
-    tuning.name,
+    // A custom tuning shows its notes; a preset just its name.
+    isCustomTuning ? tuning.description : tuning.name,
     capo > 0 ? `Kapo ${capo}. Bund` : null,
     `${fretCount} Bünde`,
   ]
@@ -243,6 +263,12 @@ export default function App() {
   // until the first play — browsers require a user gesture to start audio.
   const playerRef = useRef<AudioPlayer | null>(null);
   const player = () => (playerRef.current ??= createAudioPlayer());
+
+  // Push the chosen voice to the player. player() only builds the wrapper, not an
+  // AudioContext, so this is safe before the first gesture.
+  useEffect(() => {
+    player().setTimbre(sound);
+  }, [sound]);
 
   /**
    * Anchored to the register the scale actually occupies on screen, so a capo or
@@ -370,14 +396,51 @@ export default function App() {
             <div className="setup-panel">
               <label className="field">
                 <span>Stimmung</span>
-                <select value={tuningId} onChange={(e) => update('tuningId', e.target.value)}>
+                <select
+                  value={isCustomTuning ? 'custom' : tuningId}
+                  onChange={(e) =>
+                    update(
+                      'tuningId',
+                      // Switching to custom seeds the editor from the current tuning.
+                      e.target.value === 'custom'
+                        ? customTuningId(tuning.stringLabels)
+                        : e.target.value,
+                    )
+                  }
+                >
                   {Tuning.ALL.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.description}
                     </option>
                   ))}
+                  <option value="custom">Eigene Stimmung</option>
                 </select>
               </label>
+
+              {isCustomTuning ? (
+                <div className="tuning-strings" role="group" aria-label="Saiten stimmen">
+                  {tuning.stringLabels.map((label, i) => (
+                    <select
+                      // Strings never reorder, so the index is a stable key.
+                      // eslint-disable-next-line react/no-array-index-key
+                      key={i}
+                      aria-label={`Saite ${tuning.stringLabels.length - i}`}
+                      value={label}
+                      onChange={(e) => {
+                        const notes = [...tuning.stringLabels];
+                        notes[i] = e.target.value;
+                        update('tuningId', customTuningId(notes));
+                      }}
+                    >
+                      {NOTE_OPTIONS.map((note) => (
+                        <option key={note} value={note}>
+                          {note}
+                        </option>
+                      ))}
+                    </select>
+                  ))}
+                </div>
+              ) : null}
 
               <label className="field">
                 <span>Kapo</span>
@@ -400,6 +463,15 @@ export default function App() {
                   <option value={12}>12</option>
                   <option value={15}>15</option>
                   <option value={24}>24</option>
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Klang</span>
+                <select value={sound} onChange={(e) => update('sound', e.target.value as Timbre)}>
+                  <option value="soft">Weich</option>
+                  <option value="clean">Clean</option>
+                  <option value="electric">Overdrive</option>
                 </select>
               </label>
             </div>
@@ -666,14 +738,6 @@ export default function App() {
 
               <span className="transport-note">Ein Akkord = ein Takt</span>
             </div>
-
-            {!shapesFit ? (
-              <p className="hint hint--warn">
-                Die Akkordnamen stimmen — die Grifftabellen zeigt die App in {tuning.description} aber
-                nicht: Die hinterlegten Formen setzen die Saitenabstände der Standardstimmung
-                voraus und würden hier andere Akkorde ergeben.
-              </p>
-            ) : null}
 
             <ol className="progression">
               {steps.map((step, i) => (

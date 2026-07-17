@@ -1,4 +1,4 @@
-import { mod, pitchClassName } from './Note';
+import { mod, Note, pitchClassName } from './Note';
 
 /**
  * A tuning is the list of open-string pitches as MIDI note numbers,
@@ -91,5 +91,22 @@ export class Tuning {
 
   static byId(id: string): Tuning {
     return Tuning.ALL.find((tuning) => tuning.id === id) ?? Tuning.STANDARD;
+  }
+
+  /**
+   * Builds a free tuning from six note names, low string first. The octave is not
+   * asked for: each string takes the octave nearest its standard pitch, which is
+   * how real alternate tunings sit (Drop D, DADGAD, Open G ...) — you retune a
+   * string a little, you do not leap octaves. Throws on a name that is not a note.
+   */
+  static fromNoteNames(names: readonly string[]): Tuning {
+    const reference = Tuning.STANDARD.openStrings;
+    const openStrings = names.map((name, i) => {
+      const pitchClass = Note.parse(name).pitchClass;
+      const ref = reference[Math.min(i, reference.length - 1)];
+      // The MIDI of `pitchClass` closest to the standard string (within ±6).
+      return ref + mod(pitchClass - ref + 6, 12) - 6;
+    });
+    return new Tuning('custom', 'Eigene Stimmung', openStrings);
   }
 }

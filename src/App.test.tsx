@@ -19,6 +19,7 @@ const { player, transport } = vi.hoisted(() => {
         (_chords: readonly (readonly number[])[], _options: ProgressionOptions) => transport,
       ),
       stop: vi.fn(),
+      setTimbre: vi.fn(),
       available: true,
     },
   };
@@ -209,10 +210,61 @@ describe('App — Einstellungen', () => {
     const { container } = render(<App />);
 
     await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
-    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(3);
+    // Stimmung, Kapo, Bünde, Klang.
+    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(4);
 
     await user.keyboard('{Escape}');
     expect(container.querySelectorAll('.setup-panel')).toHaveLength(0);
+  });
+});
+
+describe('App — Eigene Stimmung', () => {
+  const tuningSelect = (container: HTMLElement) =>
+    container.querySelector<HTMLSelectElement>('.setup-panel select')!;
+
+  it('zeigt bei „Eigene Stimmung" sechs Saiten-Dropdowns, aus der aktuellen Stimmung befüllt', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
+    await user.selectOptions(tuningSelect(container), 'custom');
+
+    const strings = [...container.querySelectorAll<HTMLSelectElement>('.tuning-strings select')];
+    expect(strings).toHaveLength(6);
+    // Vorbefüllt aus der Standardstimmung: E A D G B E.
+    expect(strings.map((s) => s.value)).toEqual(['E', 'A', 'D', 'G', 'B', 'E']);
+  });
+
+  it('stimmt eine Saite um und schreibt die eigene Stimmung in die URL', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?tuning=custom:E,A,D,G,B,E');
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
+    const strings = [...container.querySelectorAll<HTMLSelectElement>('.tuning-strings select')];
+    // Tiefe Saite (Index 0) auf D — das ergibt Drop D.
+    await user.selectOptions(strings[0], 'D');
+
+    expect(window.location.search).toContain('tuning=custom%3AD%2CA%2CD%2CG%2CB%2CE');
+  });
+});
+
+describe('App — Klang', () => {
+  it('gibt den gewählten Sound an den Player weiter', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    // Beim Start wird der Default gesetzt.
+    expect(player.setTimbre).toHaveBeenCalledWith('soft');
+
+    await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
+    const soundSelect = [...container.querySelectorAll<HTMLSelectElement>('.setup-panel select')].find(
+      (select) => [...select.options].some((option) => option.value === 'electric'),
+    )!;
+    await user.selectOptions(soundSelect, 'electric');
+
+    expect(player.setTimbre).toHaveBeenCalledWith('electric');
+    expect(window.location.search).toContain('sound=electric');
   });
 });
 

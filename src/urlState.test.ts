@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   customProgId,
   customProgSymbols,
+  customTuningId,
+  customTuningNotes,
   DEFAULT_STATE,
   readState,
   writeState,
@@ -71,6 +73,44 @@ describe('Eigene Akkordfolge in der URL', () => {
     // Das # in F#5 muss die Query-Kodierung heil überstehen.
     const state = { ...DEFAULT_STATE, progressionId: customProgId(['G', 'D', 'Em', 'C', 'F#5']) };
     expect(readState(writeState(state))).toEqual(state);
+  });
+});
+
+describe('Eigene Stimmung in der URL', () => {
+  it('kodiert und liest sechs Saitennamen verlustfrei — auch mit Vorzeichen', () => {
+    const id = customTuningId(['D', 'A', 'D', 'G', 'B', 'F#']);
+    expect(customTuningNotes(id)).toEqual(['D', 'A', 'D', 'G', 'B', 'F#']);
+  });
+
+  it('unterscheidet eine eigene Stimmung von einer Vorlage', () => {
+    expect(customTuningNotes('standard')).toBeNull();
+    expect(customTuningNotes('custom:D,A,D,G,B,E')).toEqual(['D', 'A', 'D', 'G', 'B', 'E']);
+  });
+
+  it('lehnt eine unvollständige oder unsinnige Stimmung ab', () => {
+    expect(customTuningNotes('custom:D,A,D')).toBeNull(); // nicht 6 Saiten
+    expect(customTuningNotes('custom:D,A,D,G,B,H')).toBeNull(); // H ist keine Note
+  });
+
+  it('nimmt eine gültige eigene Stimmung aus der URL an, sonst Standard', () => {
+    expect(readState('?tuning=custom:D,A,D,G,B,E').tuningId).toBe('custom:D,A,D,G,B,E');
+    expect(readState('?tuning=custom:kaputt').tuningId).toBe(DEFAULT_STATE.tuningId);
+    // Voller Roundtrip mit eigener Stimmung.
+    const state = { ...DEFAULT_STATE, tuningId: customTuningId(['D', 'A', 'D', 'G', 'A', 'D']) };
+    expect(readState(writeState(state))).toEqual(state);
+  });
+});
+
+describe('Klang in der URL', () => {
+  it('liest und schreibt den Sound, lässt den Default aber weg', () => {
+    expect(readState('?sound=electric').sound).toBe('electric');
+    expect(readState('?sound=clean').sound).toBe('clean');
+    expect(readState('').sound).toBe('soft');
+    // Unbekannter Wert fällt zurück.
+    expect(readState('?sound=laut').sound).toBe('soft');
+    // Default steht nicht im Link.
+    expect(writeState({ ...DEFAULT_STATE, sound: 'soft' })).toBe('');
+    expect(writeState({ ...DEFAULT_STATE, sound: 'electric' })).toBe('?sound=electric');
   });
 });
 

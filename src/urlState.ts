@@ -1,3 +1,4 @@
+import type { Timbre } from './audio';
 import type { LabelMode } from './components/FretboardView';
 import { ROOT_CHOICES, SCALE_TYPES, type ChordSize, Tuning } from './theory';
 
@@ -23,6 +24,8 @@ export interface AppState {
   /** Tempo of the progression, in beats per minute. One chord lasts one bar. */
   bpm: number;
   loop: boolean;
+  /** The instrument's voice. */
+  sound: Timbre;
 }
 
 export const DEFAULT_STATE: AppState = {
@@ -37,9 +40,11 @@ export const DEFAULT_STATE: AppState = {
   boxNumber: 0,
   bpm: 90,
   loop: true,
+  sound: 'soft',
 };
 
 const FRET_COUNTS = [12, 15, 24];
+const SOUNDS: readonly Timbre[] = ['soft', 'clean', 'electric'];
 const MAX_CAPO = 7;
 export const MIN_BPM = 40;
 export const MAX_BPM = 200;
@@ -61,6 +66,26 @@ export function customProgSymbols(progressionId: string): string[] | null {
   return progressionId.slice(CUSTOM_PROG_PREFIX.length).split(',').filter(Boolean);
 }
 
+/**
+ * A free tuning rides in the same `tuning` slot as the presets, marked by this
+ * prefix: `custom:D,A,D,G,B,E` — six note names, low string first.
+ */
+const CUSTOM_TUNING_PREFIX = 'custom:';
+const NOTE_PATTERN = /^[A-Ga-g][#b]*$/;
+
+export function customTuningId(noteNames: readonly string[]): string {
+  return CUSTOM_TUNING_PREFIX + noteNames.join(',');
+}
+
+/** The six string notes of a custom tuning id, or null if it is a preset or malformed. */
+export function customTuningNotes(tuningId: string): string[] | null {
+  if (!tuningId.startsWith(CUSTOM_TUNING_PREFIX)) return null;
+  const notes = tuningId.slice(CUSTOM_TUNING_PREFIX.length).split(',');
+  // Only a full, note-shaped six-string set counts — anything else falls back.
+  if (notes.length !== 6 || !notes.every((note) => NOTE_PATTERN.test(note))) return null;
+  return notes;
+}
+
 function pickInt(raw: string | null, allowed: (value: number) => boolean, fallback: number): number {
   if (raw === null) return fallback;
   const value = Number(raw);
@@ -69,6 +94,16 @@ function pickInt(raw: string | null, allowed: (value: number) => boolean, fallba
 
 function pickFrom<T extends string>(raw: string | null, allowed: readonly T[], fallback: T): T {
   return raw !== null && (allowed as readonly string[]).includes(raw) ? (raw as T) : fallback;
+}
+
+/** A preset id, or a well-formed custom tuning; anything else falls back to standard. */
+function readTuning(raw: string | null): string {
+  if (raw !== null && customTuningNotes(raw) !== null) return raw;
+  return pickFrom(
+    raw,
+    Tuning.ALL.map((tuning) => tuning.id),
+    DEFAULT_STATE.tuningId,
+  );
 }
 
 export function readState(search: string): AppState {
@@ -81,11 +116,7 @@ export function readState(search: string): AppState {
       SCALE_TYPES.map((type) => type.id),
       DEFAULT_STATE.scaleTypeId,
     ),
-    tuningId: pickFrom(
-      params.get('tuning'),
-      Tuning.ALL.map((tuning) => tuning.id),
-      DEFAULT_STATE.tuningId,
-    ),
+    tuningId: readTuning(params.get('tuning')),
     capo: pickInt(params.get('capo'), (v) => v >= 0 && v <= MAX_CAPO, DEFAULT_STATE.capo),
     fretCount: pickInt(params.get('frets'), (v) => FRET_COUNTS.includes(v), DEFAULT_STATE.fretCount),
     labelMode: pickFrom(params.get('labels'), ['note', 'degree'] as const, DEFAULT_STATE.labelMode),
@@ -97,6 +128,7 @@ export function readState(search: string): AppState {
     boxNumber: pickInt(params.get('box'), (v) => v >= 0, DEFAULT_STATE.boxNumber),
     bpm: pickInt(params.get('bpm'), (v) => v >= MIN_BPM && v <= MAX_BPM, DEFAULT_STATE.bpm),
     loop: params.get('loop') === null ? DEFAULT_STATE.loop : params.get('loop') !== '0',
+    sound: pickFrom(params.get('sound'), SOUNDS, DEFAULT_STATE.sound),
   };
 }
 
@@ -119,6 +151,7 @@ export function writeState(state: AppState): string {
   add('box', state.boxNumber, DEFAULT_STATE.boxNumber);
   add('bpm', state.bpm, DEFAULT_STATE.bpm);
   if (state.loop !== DEFAULT_STATE.loop) params.set('loop', state.loop ? '1' : '0');
+  add('sound', state.sound, DEFAULT_STATE.sound);
 
   const query = params.toString();
   return query === '' ? '' : `?${query}`;

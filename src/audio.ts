@@ -11,6 +11,38 @@ import { midiToFrequency } from './theory';
 
 export type PlayMode = 'sequence' | 'strum';
 
+/**
+ * The instrument's voice. `soft` is the mellow triangle the app started with;
+ * `clean` and `electric` are a filtered sawtooth — brighter, more like an electric
+ * guitar — with `electric` adding a touch of overdrive on top. Only the timbre
+ * changes; the pitches played are identical.
+ */
+export type Timbre = 'soft' | 'clean' | 'electric';
+
+/**
+ * Per-timbre loudness trim, so switching voice does not jump in volume: a
+ * sawtooth carries far more energy than a triangle, and overdrive adds more still.
+ */
+const TIMBRE_GAIN: Record<Timbre, number> = { soft: 1, clean: 0.6, electric: 0.5 };
+
+/**
+ * A soft-clipping curve for the overdrive — tanh rounds the peaks off rather than
+ * chopping them square, which is the difference between warm and harsh. Built once
+ * and shared by every voice's WaveShaper.
+ */
+const DRIVE_CURVE = (() => {
+  const samples = 1024;
+  // Backed by an explicit ArrayBuffer so the type matches WaveShaperNode.curve
+  // (which rejects the ArrayBufferLike a bare `new Float32Array(n)` infers).
+  const curve = new Float32Array(new ArrayBuffer(samples * Float32Array.BYTES_PER_ELEMENT));
+  const amount = 2.5;
+  for (let i = 0; i < samples; i++) {
+    const x = (i / (samples - 1)) * 2 - 1;
+    curve[i] = Math.tanh(amount * x);
+  }
+  return curve;
+})();
+
 export interface PlayOptions {
   mode?: PlayMode;
   /** Seconds between successive onsets. */
@@ -77,6 +109,8 @@ export interface AudioPlayer {
   ): ProgressionHandle;
   /** Silence everything immediately, including a running progression. */
   stop(): void;
+  /** Switch the voice. Takes effect on the next note; no AudioContext is created. */
+  setTimbre(timbre: Timbre): void;
   /** Whether this browser can make sound at all. */
   readonly available: boolean;
 }
@@ -101,6 +135,7 @@ export function createAudioPlayer(): AudioPlayer {
       playNote: () => {},
       startProgression: () => NO_OP_HANDLE,
       stop: () => {},
+      setTimbre: () => {},
       available: false,
     };
   }
@@ -111,6 +146,8 @@ export function createAudioPlayer(): AudioPlayer {
   /** Everything goes through here, so nothing can hit the output raw. */
   let master: GainNode | null = null;
   let live: OscillatorNode[] = [];
+  /** The current voice — changed by setTimbre, read when each note is built. */
+  let timbre: Timbre = 'soft';
 
   /** Timers of the running progression — its loop keeps arming new ones. */
   let progressionTimers: number[] = [];
@@ -182,17 +219,44 @@ export function createAudioPlayer(): AudioPlayer {
   ) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-
-    // A triangle wave is softer and a touch closer to a plucked string than a sine.
-    osc.type = 'triangle';
     osc.frequency.value = frequency;
 
-    // A short attack and an exponential decay — no click on start or end.
+    // A short attack and an exponential decay — no click on start or end. The
+    // per-timbre trim keeps the loudness even when the voice changes.
+    const scaledPeak = peak * TIMBRE_GAIN[timbre];
     gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(peak, at + 0.012);
+    gain.gain.exponentialRampToValueAtTime(scaledPeak, at + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
 
-    osc.connect(gain).connect(master!);
+    if (timbre === 'soft') {
+      // A triangle wave is softer and a touch closer to a plucked string than a sine.
+      osc.type = 'triangle';
+      osc.connect(gain).connect(master!);
+    } else {
+      // A sawtooth is bright and buzzy like an electric pickup; a lowpass that
+      // opens on the attack and closes as the note decays gives it a plucked edge
+      // that softens, instead of a static drone.
+      osc.type = 'sawtooth';
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.value = timbre === 'electric' ? 6 : 3;
+      const open = Math.min(frequency * 6 + 1500, 8000);
+      const close = Math.min(frequency * 2 + 400, 4000);
+      filter.frequency.setValueAtTime(open, at);
+      filter.frequency.exponentialRampToValueAtTime(close, at + duration);
+
+      if (timbre === 'electric') {
+        // Overdrive: round the wave's peaks off before the filter tames the fizz.
+        const shaper = ctx.createWaveShaper();
+        shaper.curve = DRIVE_CURVE;
+        shaper.oversample = '2x';
+        osc.connect(shaper).connect(filter).connect(gain).connect(master!);
+      } else {
+        osc.connect(filter).connect(gain).connect(master!);
+      }
+    }
+
     osc.start(at);
     osc.stop(at + duration + 0.05);
 
@@ -289,11 +353,16 @@ export function createAudioPlayer(): AudioPlayer {
     return { stop };
   };
 
+  const setTimbre = (next: Timbre) => {
+    timbre = next;
+  };
+
   return {
     play,
     playNote,
     startProgression,
     stop,
+    setTimbre,
     available: true,
   };
 }
