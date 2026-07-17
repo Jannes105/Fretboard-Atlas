@@ -180,8 +180,16 @@ export default function App() {
   const playerRef = useRef<AudioPlayer | null>(null);
   const player = () => (playerRef.current ??= createAudioPlayer());
 
-  // Anchor the scale run to the register it actually occupies on screen, so a
-  // capo or a box up the neck is heard, not flattened to a fixed octave.
+  /**
+   * Anchored to the register the scale actually occupies on screen, so a capo or
+   * a box up the neck is heard rather than flattened to a fixed octave.
+   *
+   * Over the whole neck that lands low — A major starts on A2, 110 Hz, which a
+   * phone speaker can barely reproduce. Raising it an octave would sound better,
+   * and was considered and rejected: it would break the very thing this is for.
+   * Mapping the fret wins over being easy to hear. App.test.tsx guards it
+   * ("lässt eine hohe Lage höher klingen als eine tiefe").
+   */
   const playScale = () =>
     player().play(scaleMidiSequence(scale, { baseMidi: lowestMidi, descend: true }), {
       mode: 'sequence',
