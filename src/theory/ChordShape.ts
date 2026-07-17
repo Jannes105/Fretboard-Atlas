@@ -1,6 +1,7 @@
 import type { Chord } from './Chord';
 import { mod } from './Note';
 import { Tuning } from './Tuning';
+import { generateVoicings } from './voicingSearch';
 
 /**
  * A movable chord shape: a pattern of frets, slid up and down the neck.
@@ -172,25 +173,13 @@ function firstFretFor(tuning: Tuning, stringIndex: number, pitchClass: number): 
 }
 
 /**
- * Every playable voicing of a chord, lowest position first — open shapes and
- * barre shapes alike. The UI shows all of them in the picker, so nothing is
- * filtered out here; defaultVoicingIndex decides what starts selected.
- *
- * Returns [] for qualities we have no shape for, and for tunings we have no shape
- * set for — drawing a standard grip there would quietly sound like another chord.
+ * The hand-authored movable shapes placed at concrete positions — the idiomatic
+ * grips (E-form, A-form, ...) for a root-position chord in a tuning we have a set
+ * for. Empty when neither applies; the generator then takes over.
  */
-export function voicingsFor(chord: Chord, options: VoicingOptions = {}): Voicing[] {
-  const { tuning = Tuning.STANDARD, maxFret = 15 } = options;
-
-  if (!chord.quality) return [];
-
-  // A slash chord has no dedicated grip here: the movable shapes all put the root
-  // in the bass, so drawing one under a "C/G" would show the wrong bass. The chord
-  // is still named and sounded correctly (with the bass) — just not diagrammed.
-  if (chord.bass) return [];
-
+function namedVoicings(chord: Chord, tuning: Tuning, maxFret: number): Voicing[] {
   const shapeSet = shapeSetFor(tuning);
-  if (!shapeSet) return [];
+  if (!shapeSet || !chord.quality) return [];
 
   const voicings: Voicing[] = [];
 
@@ -212,6 +201,28 @@ export function voicingsFor(chord: Chord, options: VoicingOptions = {}): Voicing
   }
 
   return voicings.sort((a, b) => a.baseFret - b.baseFret || a.shapeName.localeCompare(b.shapeName));
+}
+
+/**
+ * Every playable voicing of a chord, lowest position first. The UI shows all of
+ * them in the picker, so nothing is filtered out here; defaultVoicingIndex
+ * decides what starts selected.
+ *
+ * Idiomatic hand shapes come first where they exist. Everything else — sixths,
+ * m6, augMaj7, and any slash chord (whose bass the fixed shapes cannot place) —
+ * falls to the search engine, which finds a grip on the actual fretboard. So
+ * every chord the app can name can also be played, and what is drawn is what
+ * sounds.
+ */
+export function voicingsFor(chord: Chord, options: VoicingOptions = {}): Voicing[] {
+  const { tuning = Tuning.STANDARD, maxFret = 15 } = options;
+
+  if (!chord.quality) return [];
+
+  const named = chord.bass ? [] : namedVoicings(chord, tuning, maxFret);
+  if (named.length > 0) return named;
+
+  return generateVoicings(chord, tuning, maxFret);
 }
 
 /**

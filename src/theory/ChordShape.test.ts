@@ -153,9 +153,12 @@ describe('voicingsFor', () => {
     expect(voicingsFor(chord, { maxFret: 5 }).every((v) => Math.max(...v.frets) <= 5)).toBe(true);
   });
 
-  it('gibt für Akkorde ohne hinterlegte Form eine leere Liste', () => {
+  it('findet auch für Akkorde ohne hinterlegte Form einen Griff (über den Generator)', () => {
     const exotic = Chord.fromQuality(Note.parse('C'), 'augmentedMajor7');
-    expect(voicingsFor(exotic)).toEqual([]);
+    const voicings = voicingsFor(exotic);
+    // Kein benannter Griff existiert — der Generator liefert trotzdem einen.
+    expect(voicings.length).toBeGreaterThan(0);
+    expect(voicings.every((v) => v.shapeName === '')).toBe(true);
   });
 
   it('markiert offene Lagen als nicht-Barré', () => {
@@ -233,12 +236,23 @@ describe('Formen-Sets werden über die Saiten-Intervalle zugeordnet', () => {
     expect(shapeSetFor(Tuning.DROP_D.withCapo(3))!.id).toBe('drop-d');
   });
 
-  it('liefert für eine Stimmung ohne Set lieber gar keinen Griff als einen falschen', () => {
-    // Open G — hier stimmen die Saitenabstände mit keinem Set überein.
+  it('findet auch in einer Stimmung ohne Formen-Set korrekte Griffe (generiert)', () => {
+    // Open G — hier stimmen die Saitenabstände mit keinem Set überein, also gibt
+    // es keine benannte Form. Der Generator sucht die Griffe direkt in dieser
+    // Stimmung, statt eine Standardform aufzuzwingen, die falsch klänge.
     const openG = new Tuning('open-g', 'Open G', [38, 43, 50, 55, 59, 62]);
-
     expect(hasChordShapes(openG)).toBe(false);
-    expect(voicingsFor(cMajor, { tuning: openG })).toEqual([]);
+
+    const voicings = voicingsFor(cMajor, { tuning: openG });
+    expect(voicings.length).toBeGreaterThan(0);
+    for (const voicing of voicings) {
+      const sounding = voicing.frets
+        .map((fret, string) => (fret < 0 ? null : openG.pitchClassAt(string, fret)))
+        .filter((pitchClass): pitchClass is number => pitchClass !== null);
+      // Nur Akkordtöne, kein fremder — und der Grundton im Bass.
+      expect(new Set(sounding)).toEqual(new Set(cMajor.pitchClasses));
+      expect(sounding[0]).toBe(cMajor.root.pitchClass);
+    }
   });
 
   it('rechnet mit Kapo die Bünde ab dem Kapo', () => {

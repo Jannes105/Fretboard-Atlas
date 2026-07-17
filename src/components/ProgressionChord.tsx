@@ -17,9 +17,10 @@ interface ProgressionChordProps {
   isPlaying?: boolean;
 }
 
-/** "A-Form, 5. Bund" — or "offen" when the shape sits at the nut. */
+/** "A-Form, 5. Bund" — or just "5. Bund" for a generated grip with no form name. */
 function describe(shapeName: string, baseFret: number): string {
-  return baseFret === 0 ? `${shapeName}, offen` : `${shapeName}, ${baseFret}. Bund`;
+  const position = baseFret === 0 ? 'offen' : `${baseFret}. Bund`;
+  return shapeName === '' ? position : `${shapeName}, ${position}`;
 }
 
 /**

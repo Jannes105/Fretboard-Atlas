@@ -40,6 +40,7 @@ export {
   type Voicing,
   type VoicingOptions,
 } from './ChordShape';
+export { generateVoicings } from './voicingSearch';
 export {
   PROGRESSIONS,
   buildProgression,
