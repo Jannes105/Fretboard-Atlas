@@ -33,6 +33,15 @@ export class Tuning {
   }
 
   /**
+   * Name plus the strings it produces, e.g. "Standard (E-A-D-G-B-E)". Composed
+   * rather than stored: the strings are already in openStrings, and spelling them
+   * out a second time by hand is how the two drift apart.
+   */
+  get description(): string {
+    return `${this.name} (${this.stringLabels.join('-')})`;
+  }
+
+  /**
    * The semitone gaps between adjacent strings. This — not the absolute pitches —
    * is what chord shapes depend on, so it is the key a shape set is looked up by
    * (see ChordShape.shapeSetFor). A capo shifts every string equally and therefore
@@ -70,15 +79,13 @@ export class Tuning {
   }
 
   /** E A D G B E — the default. */
-  static readonly STANDARD = new Tuning('standard', 'Standard (E-A-D-G-B-E)', [
-    40, 45, 50, 55, 59, 64,
-  ]);
+  static readonly STANDARD = new Tuning('standard', 'Standard', [40, 45, 50, 55, 59, 64]);
 
   /**
    * Low E down to D. Only that one string moves, which is why chord shapes can be
    * carried over: everything from the A string up is still tuned like standard.
    */
-  static readonly DROP_D = new Tuning('drop-d', 'Drop D (D-A-D-G-B-E)', [38, 45, 50, 55, 59, 64]);
+  static readonly DROP_D = new Tuning('drop-d', 'Drop D', [38, 45, 50, 55, 59, 64]);
 
   static readonly ALL: readonly Tuning[] = [Tuning.STANDARD, Tuning.DROP_D];
 

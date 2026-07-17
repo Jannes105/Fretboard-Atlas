@@ -172,8 +172,43 @@ export default function App() {
   // At most one voicing picker is open.
   const [openPicker, setOpenPicker] = useState<number | null>(null);
 
-  // On a phone the secondary fields fold away, so the neck stays above the fold.
-  const [moreOpen, setMoreOpen] = useState(false);
+  /**
+   * Tuning, capo and fret count are set once and then left alone, so they live
+   * behind a trigger that spells out the current setup rather than eight
+   * dropdowns competing with the key. Deliberately not URL state: sharing a link
+   * with a panel hanging open makes no sense.
+   */
+  const [setupOpen, setSetupOpen] = useState(false);
+  const setupRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!setupOpen) return;
+
+    const onDown = (event: MouseEvent) => {
+      if (!setupRef.current?.contains(event.target as Node)) setSetupOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSetupOpen(false);
+    };
+
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [setupOpen]);
+
+  // The trigger's label: the setup is readable without opening anything. A capo
+  // only earns a mention when there is one — the normal case is no capo, and
+  // saying so every time is noise on a phone-width line.
+  const setupSummary = [
+    tuning.name,
+    capo > 0 ? `Kapo ${capo}. Bund` : null,
+    `${fretCount} Bünde`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   // One player for the whole session, built lazily so no AudioContext exists
   // until the first play — browsers require a user gesture to start audio.
@@ -282,126 +317,116 @@ export default function App() {
   return (
     <main className="app">
       <header className="app-header">
-        <h1>Fretboard Atlas</h1>
-        <p className="subtitle">Tonarten und Skalen auf dem Hals sichtbar machen.</p>
-      </header>
-
-      <section className="toolbar" aria-label="Einstellungen">
-        <label className="field">
-          <span>Grundton</span>
-          <select value={root} onChange={(e) => update('root', e.target.value)}>
-            {ROOT_CHOICES.map((choice) => (
-              <option key={choice} value={choice}>
-                {choice}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="field">
-          <span>Skala</span>
-          <select value={scaleTypeId} onChange={(e) => update('scaleTypeId', e.target.value)}>
-            <optgroup label="Grundlagen">
-              {scaleTypesInGroup('basics').map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Weitere">
-              {scaleTypesInGroup('more').map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-        </label>
-
-        <label className="field">
-          <span>Lage</span>
-          <select
-            value={box ? state.boxNumber : 0}
-            onChange={(e) => update('boxNumber', Number(e.target.value))}
-          >
-            <option value={0}>Ganzer Hals</option>
-            {boxes.map((option) => (
-              <option key={option.number} value={option.number}>
-                Lage {option.number} ({option.anchorFret}. Bund)
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <button
-          type="button"
-          className="toolbar-toggle"
-          aria-expanded={moreOpen}
-          onClick={() => setMoreOpen((open) => !open)}
-        >
-          {moreOpen ? 'Weniger Einstellungen ▴' : 'Weitere Einstellungen ▾'}
-        </button>
-
-        <div className={moreOpen ? 'toolbar-more is-open' : 'toolbar-more'}>
-          <label className="field">
-            <span>Beschriftung</span>
-            <select
-              value={labelMode}
-              onChange={(e) => update('labelMode', e.target.value as LabelMode)}
-            >
-              <option value="note">Notennamen</option>
-              <option value="degree">Stufen</option>
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Bünde</span>
-            <select value={fretCount} onChange={(e) => update('fretCount', Number(e.target.value))}>
-              <option value={12}>12</option>
-              <option value={15}>15</option>
-              <option value={24}>24</option>
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Stimmung</span>
-            <select value={tuningId} onChange={(e) => update('tuningId', e.target.value)}>
-              {Tuning.ALL.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Kapo</span>
-            <select value={capo} onChange={(e) => update('capo', Number(e.target.value))}>
-              <option value={0}>ohne</option>
-              {[1, 2, 3, 4, 5, 6, 7].map((fret) => (
-                <option key={fret} value={fret}>
-                  {fret}. Bund
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Akkorde</span>
-            <select
-              value={chordSize}
-              onChange={(e) => update('chordSize', Number(e.target.value) as ChordSize)}
-            >
-              <option value={3}>Dreiklänge</option>
-              <option value={4}>Septakkorde</option>
-            </select>
-          </label>
+        <div className="app-title">
+          <h1>Fretboard Atlas</h1>
+          <p className="subtitle">Tonarten und Skalen auf dem Hals sichtbar machen.</p>
         </div>
-      </section>
+
+        {/* The instrument itself: set once, so it states its value and keeps the
+            controls one click away rather than competing with the key. */}
+        <div className="setup" ref={setupRef}>
+          <button
+            type="button"
+            className={setupOpen ? 'setup-trigger is-open' : 'setup-trigger'}
+            aria-expanded={setupOpen}
+            onClick={() => setSetupOpen((open) => !open)}
+          >
+            <span>{setupSummary}</span>
+            <span className="setup-caret" aria-hidden="true">
+              ▾
+            </span>
+          </button>
+
+          {setupOpen ? (
+            <div className="setup-panel">
+              <label className="field">
+                <span>Stimmung</span>
+                <select value={tuningId} onChange={(e) => update('tuningId', e.target.value)}>
+                  {Tuning.ALL.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.description}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Kapo</span>
+                <select value={capo} onChange={(e) => update('capo', Number(e.target.value))}>
+                  <option value={0}>ohne</option>
+                  {[1, 2, 3, 4, 5, 6, 7].map((fret) => (
+                    <option key={fret} value={fret}>
+                      {fret}. Bund
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Bünde</span>
+                <select
+                  value={fretCount}
+                  onChange={(e) => update('fretCount', Number(e.target.value))}
+                >
+                  <option value={12}>12</option>
+                  <option value={15}>15</option>
+                  <option value={24}>24</option>
+                </select>
+              </label>
+            </div>
+          ) : null}
+        </div>
+      </header>
 
       <section className="scale-strip">
         <div className="scale-title">
-          <h2>{scale.name()}</h2>
+          {/*
+           * The key IS the heading — the two selects below spell it out, so a
+           * separate line of text saying the same thing was pure duplication.
+           * The heading stays for screen readers and the document outline.
+           */}
+          <h2 className="sr-only">{scale.name()}</h2>
+
+          {/*
+           * The visible text sizes the control and the select lies invisibly on
+           * top of it: a select is as wide as its LONGEST option, which for a
+           * headline leaves the underline and caret trailing off into space.
+           */}
+          <span className="key-select key-select--root">
+            <span className="key-select-text" aria-hidden="true">{root}</span>
+            <select aria-label="Grundton" value={root} onChange={(e) => update('root', e.target.value)}>
+              {ROOT_CHOICES.map((choice) => (
+                <option key={choice} value={choice}>
+                  {choice}
+                </option>
+              ))}
+            </select>
+          </span>
+
+          <span className="key-select">
+            <span className="key-select-text" aria-hidden="true">{scale.type.name}</span>
+            <select
+              aria-label="Skala"
+              value={scaleTypeId}
+              onChange={(e) => update('scaleTypeId', e.target.value)}
+            >
+              <optgroup label="Grundlagen">
+                {scaleTypesInGroup('basics').map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Weitere">
+                {scaleTypesInGroup('more').map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </span>
+
           <button
             type="button"
             className="play-button"
@@ -444,6 +469,37 @@ export default function App() {
         ) : null}
       </section>
 
+      {/* Both of these change only what the neck shows, so they sit on the neck. */}
+      <div className="neck-bar">
+        <label className="field field--inline">
+          <span>Lage</span>
+          <select
+            aria-label="Lage"
+            value={box ? state.boxNumber : 0}
+            onChange={(e) => update('boxNumber', Number(e.target.value))}
+          >
+            <option value={0}>Ganzer Hals</option>
+            {boxes.map((option) => (
+              <option key={option.number} value={option.number}>
+                Lage {option.number} ({option.anchorFret}. Bund)
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field field--inline">
+          <span>Beschriftung</span>
+          <select
+            aria-label="Beschriftung"
+            value={labelMode}
+            onChange={(e) => update('labelMode', e.target.value as LabelMode)}
+          >
+            <option value="note">Notennamen</option>
+            <option value="degree">Stufen</option>
+          </select>
+        </label>
+      </div>
+
       <FretboardView
         scale={scale}
         fretboard={fretboard}
@@ -459,6 +515,15 @@ export default function App() {
           <section className="panel">
             <div className="panel-head">
               <h2>Leitereigene Akkorde</h2>
+              <select
+                className="select"
+                aria-label="Akkordgröße"
+                value={chordSize}
+                onChange={(e) => update('chordSize', Number(e.target.value) as ChordSize)}
+              >
+                <option value={3}>Dreiklänge</option>
+                <option value={4}>Septakkorde</option>
+              </select>
             </div>
 
             <p className="hint">Anklicken: du hörst den Akkord und siehst seine Töne im Hals.</p>
@@ -541,7 +606,7 @@ export default function App() {
 
             {!shapesFit ? (
               <p className="hint hint--warn">
-                Die Akkordnamen stimmen — die Grifftabellen zeigt die App in {tuning.name} aber
+                Die Akkordnamen stimmen — die Grifftabellen zeigt die App in {tuning.description} aber
                 nicht: Die hinterlegten Formen setzen die Saitenabstände der Standardstimmung
                 voraus und würden hier andere Akkorde ergeben.
               </p>

@@ -14,3 +14,20 @@ body {
   margin: 0;
   min-height: 100svh;
 }
+
+/*
+ * Present to screen readers, invisible on screen. For headings whose text is
+ * already carried by a visible control — the heading structure has to survive
+ * even where the design shows the state as a dropdown instead of as prose.
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

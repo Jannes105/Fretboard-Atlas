@@ -46,6 +46,56 @@ describe('App — Grundzustand', () => {
   });
 });
 
+describe('App — Einstellungen', () => {
+  it('macht die Tonart selbst bedienbar, statt sie daneben noch einmal auszuschreiben', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    const rootSelect = container.querySelector<HTMLSelectElement>('[aria-label="Grundton"]')!;
+    await user.selectOptions(rootSelect, 'C');
+
+    // Die Überschrift bleibt für Screenreader und folgt der Auswahl.
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('C-Dur (Ionisch)');
+  });
+
+  it('hält den Kopf frei: über dem Hals stehen nur Grundton und Skala', () => {
+    const { container } = render(<App />);
+
+    // Vorher waren es acht gleichrangige Dropdowns in einem Block.
+    expect(container.querySelectorAll('.scale-strip select')).toHaveLength(2);
+    // Und das Setup steht als Text da, statt als Regler aufzuklappen.
+    expect(container.querySelectorAll('.setup-panel')).toHaveLength(0);
+  });
+
+  it('nennt Stimmung, Kapo und Bünde im Auslöser, ohne dass man ihn öffnen muss', () => {
+    window.history.replaceState(null, '', '/?tuning=drop-d&capo=3&frets=12');
+    const { container } = render(<App />);
+
+    expect(container.querySelector('.setup-trigger span')?.textContent).toBe(
+      'Drop D · Kapo 3. Bund · 12 Bünde',
+    );
+  });
+
+  it('schweigt über den Kapo, solange keiner drauf ist — der Normalfall ist keine Meldung wert', () => {
+    const { container } = render(<App />);
+
+    expect(container.querySelector('.setup-trigger span')?.textContent).toBe(
+      'Standard · 24 Bünde',
+    );
+  });
+
+  it('öffnet das Setup und schließt es mit Escape', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
+    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(3);
+
+    await user.keyboard('{Escape}');
+    expect(container.querySelectorAll('.setup-panel')).toHaveLength(0);
+  });
+});
+
 describe('App — Hervorhebung', () => {
   it('hebt beim Klick auf einen Stufen-Chip genau diese Tonklasse hervor', async () => {
     const user = userEvent.setup();
@@ -147,9 +197,9 @@ describe('App — Lage', () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    const selects = container.querySelectorAll<HTMLSelectElement>('.toolbar select');
-    // Reihenfolge: Grundton, Skala, Lage, ...
-    await user.selectOptions(selects[2], '1');
+    // Über das Label statt über die Position: ein Layout-Umbau darf diesen Test
+    // nicht brechen — genau das ist hier schon einmal passiert.
+    await user.selectOptions(container.querySelector<HTMLSelectElement>('[aria-label="Lage"]')!, '1');
 
     const all = container.querySelectorAll('.note-dot').length;
     const dimmed = container.querySelectorAll('.note-dot.is-dimmed').length;
