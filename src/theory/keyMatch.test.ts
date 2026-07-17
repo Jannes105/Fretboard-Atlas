@@ -83,4 +83,21 @@ describe('matchKeys — echte Songs', () => {
   it('leere Eingabe ergibt keine Kandidaten', () => {
     expect(matchKeys([])).toEqual([]);
   });
+
+  it('erkennt Powerchords und Suspensions als leitereigen', () => {
+    // C5 sind C+G, beide in C-Dur — ein Powerchord ist tonartneutral, aber er passt.
+    const cMajor = find('C G Am F C5', 'C-Dur');
+    expect(cMajor.outsiders).toHaveLength(0);
+    expect(cMajor.degrees[4]).toBe(0); // C5 sitzt auf der I
+
+    // Dsus4 (D G A) liegt komplett in G-Dur.
+    const gMajor = find('Em C G D Dsus4', 'G-Dur');
+    expect(gMajor.outsiders).toHaveLength(0);
+  });
+
+  it('verwirft einen Powerchord, dessen Quinte gegen die Tonart läuft', () => {
+    // B5 ist B+F#; in C-Dur gibt es kein F#, also gehört B5 nicht hinein.
+    const cMajor = find('C F G B5', 'C-Dur');
+    expect(cMajor.outsiders.map((c) => c.name())).toEqual(['B5']);
+  });
 });

@@ -179,4 +179,31 @@ describe('Chord.parse', () => {
     // Bekannter Grundton, aber ein Typ, den die App nicht führt.
     expect(() => Chord.parse('Cm7b9')).toThrow(/Cm7b9/);
   });
+
+  it('liest Powerchords und Suspensions aus echten Tabs', () => {
+    const e5 = Chord.parse('E5');
+    expect(e5.quality?.id).toBe('power');
+    expect(e5.name()).toBe('E5');
+    expect(e5.notes.map((n) => n.name())).toEqual(['E', 'B']); // Grundton + Quinte, keine Terz
+
+    expect(Chord.parse('Dsus4').notes.map((n) => n.name())).toEqual(['D', 'G', 'A']);
+    expect(Chord.parse('Asus2').notes.map((n) => n.name())).toEqual(['A', 'B', 'E']);
+    expect(Chord.parse('Csus').quality?.id).toBe('sus4'); // sus allein = sus4
+    expect(Chord.parse('C6').notes.map((n) => n.name())).toEqual(['C', 'E', 'G', 'A']);
+    expect(Chord.parse('Am6').quality?.id).toBe('minor6');
+  });
+
+  it('buchstabiert die Quinte als Quinte, nicht als dreifaches Kreuz', () => {
+    // Der Beweis, dass die Terz-Annahme wirklich weg ist: ein terzgeschichtetes
+    // Modell hätte die Quinte von E5 vier Halbtöne über der (nicht vorhandenen)
+    // Terz gestapelt und E### geschrieben — Tonhöhe richtig, Schreibung absurd.
+    for (const symbol of ['E5', 'F#5', 'Bb5', 'C5']) {
+      const chord = Chord.parse(symbol);
+      const fifth = chord.notes[1];
+      // Die Quinte liegt immer vier Buchstaben über dem Grundton, mit höchstens
+      // einem einfachen Vorzeichen.
+      expect(Math.abs(fifth.alter), symbol).toBeLessThanOrEqual(1);
+    }
+    expect(Chord.parse('E5').notes[1].name()).toBe('B');
+  });
 });

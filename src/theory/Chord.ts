@@ -12,28 +12,39 @@ export interface ChordQuality {
   readonly symbol: string;
   /** Semitones from the root. */
   readonly semitones: readonly number[];
+  /**
+   * Letter steps from the root, one per tone. Tertian chords stack thirds, so
+   * theirs is [0, 2, 4, ...] — but a power chord's fifth is four letters up, not
+   * two, and a sus4 reaches a fourth. Spelling the fifth of E5 as B rather than
+   * E### needs this per-tone, exactly as ScaleType carries its own diatonicSteps.
+   */
+  readonly diatonicSteps: readonly number[];
   /** Roman numerals are uppercase for major-ish chords, lowercase for minor-ish. */
   readonly uppercase: boolean;
   /** Appended to the roman numeral, e.g. "°" for diminished. */
   readonly romanSuffix: string;
 }
 
+/** Letter steps for a chord built by stacking thirds: root, third, fifth, seventh. */
+const TERTIAN = [0, 2, 4, 6] as const;
+
 const QUALITIES: readonly ChordQuality[] = [
   // Triads
-  { id: 'major', symbol: '', semitones: [0, 4, 7], uppercase: true, romanSuffix: '' },
-  { id: 'minor', symbol: 'm', semitones: [0, 3, 7], uppercase: false, romanSuffix: '' },
-  { id: 'diminished', symbol: 'dim', semitones: [0, 3, 6], uppercase: false, romanSuffix: '°' },
-  { id: 'augmented', symbol: 'aug', semitones: [0, 4, 8], uppercase: true, romanSuffix: '+' },
+  { id: 'major', symbol: '', semitones: [0, 4, 7], diatonicSteps: TERTIAN, uppercase: true, romanSuffix: '' },
+  { id: 'minor', symbol: 'm', semitones: [0, 3, 7], diatonicSteps: TERTIAN, uppercase: false, romanSuffix: '' },
+  { id: 'diminished', symbol: 'dim', semitones: [0, 3, 6], diatonicSteps: TERTIAN, uppercase: false, romanSuffix: '°' },
+  { id: 'augmented', symbol: 'aug', semitones: [0, 4, 8], diatonicSteps: TERTIAN, uppercase: true, romanSuffix: '+' },
 
   // Sevenths
-  { id: 'major7', symbol: 'maj7', semitones: [0, 4, 7, 11], uppercase: true, romanSuffix: 'maj7' },
-  { id: 'dominant7', symbol: '7', semitones: [0, 4, 7, 10], uppercase: true, romanSuffix: '7' },
-  { id: 'minor7', symbol: 'm7', semitones: [0, 3, 7, 10], uppercase: false, romanSuffix: '7' },
-  { id: 'minor7b5', symbol: 'm7b5', semitones: [0, 3, 6, 10], uppercase: false, romanSuffix: 'ø7' },
+  { id: 'major7', symbol: 'maj7', semitones: [0, 4, 7, 11], diatonicSteps: TERTIAN, uppercase: true, romanSuffix: 'maj7' },
+  { id: 'dominant7', symbol: '7', semitones: [0, 4, 7, 10], diatonicSteps: TERTIAN, uppercase: true, romanSuffix: '7' },
+  { id: 'minor7', symbol: 'm7', semitones: [0, 3, 7, 10], diatonicSteps: TERTIAN, uppercase: false, romanSuffix: '7' },
+  { id: 'minor7b5', symbol: 'm7b5', semitones: [0, 3, 6, 10], diatonicSteps: TERTIAN, uppercase: false, romanSuffix: 'ø7' },
   {
     id: 'diminished7',
     symbol: 'dim7',
     semitones: [0, 3, 6, 9],
+    diatonicSteps: TERTIAN,
     uppercase: false,
     romanSuffix: '°7',
   },
@@ -41,6 +52,7 @@ const QUALITIES: readonly ChordQuality[] = [
     id: 'minorMajor7',
     symbol: 'mMaj7',
     semitones: [0, 3, 7, 11],
+    diatonicSteps: TERTIAN,
     uppercase: false,
     romanSuffix: 'maj7',
   },
@@ -48,9 +60,17 @@ const QUALITIES: readonly ChordQuality[] = [
     id: 'augmentedMajor7',
     symbol: 'maj7#5',
     semitones: [0, 4, 8, 11],
+    diatonicSteps: TERTIAN,
     uppercase: true,
     romanSuffix: '+maj7',
   },
+
+  // Non-tertian: no third, or a suspended one, so each carries its own letter steps.
+  { id: 'power', symbol: '5', semitones: [0, 7], diatonicSteps: [0, 4], uppercase: true, romanSuffix: '5' },
+  { id: 'sus2', symbol: 'sus2', semitones: [0, 2, 7], diatonicSteps: [0, 1, 4], uppercase: true, romanSuffix: 'sus2' },
+  { id: 'sus4', symbol: 'sus4', semitones: [0, 5, 7], diatonicSteps: [0, 3, 4], uppercase: true, romanSuffix: 'sus4' },
+  { id: 'sixth', symbol: '6', semitones: [0, 4, 7, 9], diatonicSteps: [0, 2, 4, 5], uppercase: true, romanSuffix: '6' },
+  { id: 'minor6', symbol: 'm6', semitones: [0, 3, 7, 9], diatonicSteps: [0, 2, 4, 5], uppercase: false, romanSuffix: '6' },
 ];
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'] as const;
@@ -81,6 +101,13 @@ const SUFFIX_ALIASES: Record<string, string> = {
   'ø7': 'minor7b5',
   dim7: 'diminished7',
   '°7': 'diminished7',
+  // Power chord and suspensions — the staples of real tabs.
+  '5': 'power',
+  sus: 'sus4',
+  sus4: 'sus4',
+  sus2: 'sus2',
+  '6': 'sixth',
+  m6: 'minor6',
 };
 
 /** Finds the quality whose semitone signature matches, or null for exotic stacks. */
@@ -165,8 +192,11 @@ export class Chord {
     const quality = QUALITIES.find((q) => q.id === qualityId);
     if (!quality) throw new Error(`Unbekannte Akkordqualität: "${qualityId}"`);
 
-    // Third, fifth and seventh are 2, 4 and 6 letters above the root.
-    const notes = quality.semitones.map((semitones, i) => root.transpose(semitones, i * 2));
+    // Each tone's letter distance comes from the quality — thirds for a tertian
+    // chord, but a fourth or a bare fifth for sus and power chords.
+    const notes = quality.semitones.map((semitones, i) =>
+      root.transpose(semitones, quality.diatonicSteps[i]),
+    );
     return new Chord(root, notes);
   }
 

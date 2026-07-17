@@ -60,6 +60,16 @@ const STANDARD_SHAPES: readonly ChordShape[] = [
   { qualityId: 'diminished7', name: 'A-Form', rootString: 1, frets: [-1, 0, 1, 2, 1, 2] },
   { qualityId: 'augmented', name: 'A-Form', rootString: 1, frets: [-1, 0, 3, 2, 2, -1] },
   { qualityId: 'minorMajor7', name: 'A-Form', rootString: 1, frets: [-1, 0, 2, 1, 1, 0] },
+
+  // Power chords: root, fifth, octave — no third, so nothing to make major or minor.
+  { qualityId: 'power', name: 'E-Form', rootString: 0, frets: [0, 2, 2, -1, -1, -1] },
+  { qualityId: 'power', name: 'A-Form', rootString: 1, frets: [-1, 0, 2, 2, -1, -1] },
+
+  // Suspensions: the third is replaced by the second (sus2) or the fourth (sus4).
+  { qualityId: 'sus4', name: 'E-Form', rootString: 0, frets: [0, 2, 2, 2, 0, 0] },
+  { qualityId: 'sus4', name: 'A-Form', rootString: 1, frets: [-1, 0, 2, 2, 3, 0] },
+  // sus2 has no comfortable root-on-low-E grip, so it lives on the A-form only.
+  { qualityId: 'sus2', name: 'A-Form', rootString: 1, frets: [-1, 0, 2, 2, 0, 0] },
 ];
 
 /**
@@ -97,7 +107,16 @@ const DROP_D_SHAPES: readonly ChordShape[] = [
   { qualityId: 'minor7', name: 'D-Form', rootString: 0, frets: [0, 0, 0, 2, 1, 1] },
   { qualityId: 'major7', name: 'D-Form', rootString: 0, frets: [0, 0, 0, 2, 2, 2] },
 
-  // Untouched — these never sound the low string.
+  // The one-finger power chord Drop D exists for: the low three strings are tuned
+  // to root, fifth, octave, so barring them is already a power chord. The adapted
+  // E-form would mute those strings and so never start on relative fret 0.
+  { qualityId: 'power', name: 'D-Form', rootString: 0, frets: [0, 0, 0, -1, -1, -1] },
+
+  // sus4 carries over as an adapted E-form: the low string two frets higher, the
+  // rest of the grip unchanged because those strings are still tuned like standard.
+  { qualityId: 'sus4', name: 'E-Form', rootString: 0, frets: [2, 2, 2, 2, 0, 0] },
+
+  // Untouched — these never sound the low string (power, sus2 and sus4 A-forms too).
   ...STANDARD_SHAPES.filter((shape) => shape.rootString === 1),
 ];
 

@@ -1,4 +1,4 @@
-import { type Chord, diatonicChords } from './Chord';
+import type { Chord } from './Chord';
 import { Note } from './Note';
 import { ROOT_CHOICES, Scale } from './Scale';
 import { MAJOR, NATURAL_MINOR } from './ScaleType';
@@ -36,36 +36,28 @@ const MAX_RESULTS = 4;
 /**
  * The degree an input chord occupies in a key, or null if it is foreign.
  *
- * A chord matches by root pitch class AND quality, compared against the diatonic
- * chords of the same size (a seventh against the seventh-chord degrees, a triad
- * against the triads).
+ * The rule is "every tone belongs to the scale": that covers a diatonic triad, a
+ * diatonic seventh AND a power chord or suspension in one stroke — for a tertian
+ * chord it is equivalent to matching the diatonic quality, since a chord whose
+ * root is a scale degree and whose stacked thirds are all in the scale IS that
+ * degree's chord. The degree is simply where the root sits in the scale.
  */
-function degreeOf(
-  chord: Chord,
-  scale: Scale,
-  isMinor: boolean,
-  triads: readonly Chord[],
-  sevenths: readonly Chord[],
-): number | null {
-  const qualityId = chord.quality?.id;
-  if (qualityId === undefined) return null;
+function degreeOf(chord: Chord, scale: Scale, isMinor: boolean): number | null {
+  const rootPitchClass = chord.root.pitchClass;
+  const degree = scale.degreeIndexOf(rootPitchClass);
 
-  const pitchClass = chord.root.pitchClass;
-  const set = chord.notes.length === 4 ? sevenths : triads;
-
-  for (let degree = 0; degree < 7; degree++) {
-    if (set[degree].root.pitchClass === pitchClass && set[degree].quality?.id === qualityId) {
-      return degree;
-    }
+  if (degree !== null && chord.pitchClasses.every((pitchClass) => scale.contains(pitchClass))) {
+    return degree;
   }
 
   // In a minor key the V is played major or dominant far more often than the
-  // minor v that natural minor spells (Am Dm E7). Count that one deviation as
-  // belonging — the same kind of justified exception Progression.forceQuality
-  // makes for the blues.
+  // minor v that natural minor spells (Am Dm E7). Its raised leading tone is not
+  // in the scale, so the test above rejects it — but it belongs. The same kind of
+  // justified exception Progression.forceQuality makes for the blues.
+  const qualityId = chord.quality?.id;
   if (
     isMinor &&
-    pitchClass === scale.pitchClasses[4] &&
+    rootPitchClass === scale.pitchClasses[4] &&
     (qualityId === 'major' || qualityId === 'dominant7')
   ) {
     return 4;
@@ -75,10 +67,7 @@ function degreeOf(
 }
 
 function matchOneKey(chords: readonly Chord[], scale: Scale, isMinor: boolean): KeyMatch {
-  const triads = diatonicChords(scale, 3);
-  const sevenths = diatonicChords(scale, 4);
-
-  const degrees = chords.map((chord) => degreeOf(chord, scale, isMinor, triads, sevenths));
+  const degrees = chords.map((chord) => degreeOf(chord, scale, isMinor));
 
   const outsiders: Chord[] = [];
   const seenOutsiders = new Set<string>();
