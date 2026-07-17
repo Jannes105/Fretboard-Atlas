@@ -75,6 +75,7 @@ export default function App() {
     bpm,
     loop,
     sound,
+    beatsPerBar,
   } = state;
 
   // Replace rather than push, so the back button does not walk through every
@@ -337,8 +338,8 @@ export default function App() {
     });
 
     transportRef.current = player().startProgression(chordNotes, {
-      // One chord is one bar of 4/4.
-      secondsPerChord: (4 * 60) / bpm,
+      // One chord is one bar; a bar is beatsPerBar beats at the current tempo.
+      secondsPerChord: (beatsPerBar * 60) / bpm,
       loop,
       onChord: (index) => {
         setPlayingStep(index);
@@ -367,7 +368,7 @@ export default function App() {
   restartRef.current = startProgression;
   useEffect(() => {
     if (transportRef.current) restartRef.current();
-  }, [bpm, loop]);
+  }, [bpm, loop, beatsPerBar]);
 
   return (
     <main className="app">
@@ -736,7 +737,19 @@ export default function App() {
                 <span>Wiederholen</span>
               </label>
 
-              <span className="transport-note">Ein Akkord = ein Takt</span>
+              <label className="field field--inline">
+                <span>Takt</span>
+                <select
+                  aria-label="Taktart"
+                  value={beatsPerBar}
+                  onChange={(e) => update('beatsPerBar', Number(e.target.value))}
+                >
+                  <option value={4}>4/4</option>
+                  <option value={3}>3/4</option>
+                  <option value={6}>6/8</option>
+                  <option value={2}>2/4</option>
+                </select>
+              </label>
             </div>
 
             <ol className="progression">

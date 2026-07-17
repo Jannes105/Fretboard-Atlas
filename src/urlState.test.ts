@@ -101,6 +101,18 @@ describe('Eigene Stimmung in der URL', () => {
   });
 });
 
+describe('Taktart in der URL', () => {
+  it('liest und schreibt die Taktart, lässt 4/4 aber weg', () => {
+    expect(readState('?sig=3').beatsPerBar).toBe(3);
+    expect(readState('?sig=6').beatsPerBar).toBe(6);
+    expect(readState('').beatsPerBar).toBe(4);
+    // Ungültige Taktart fällt zurück.
+    expect(readState('?sig=5').beatsPerBar).toBe(4);
+    expect(writeState({ ...DEFAULT_STATE, beatsPerBar: 4 })).toBe('');
+    expect(writeState({ ...DEFAULT_STATE, beatsPerBar: 3 })).toBe('?sig=3');
+  });
+});
+
 describe('Klang in der URL', () => {
   it('liest und schreibt den Sound, lässt den Default aber weg', () => {
     expect(readState('?sound=electric').sound).toBe('electric');

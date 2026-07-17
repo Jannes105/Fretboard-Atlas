@@ -21,11 +21,13 @@ export interface AppState {
   progressionId: string;
   /** 0 = whole neck. */
   boxNumber: number;
-  /** Tempo of the progression, in beats per minute. One chord lasts one bar. */
+  /** Tempo of the progression, in beats per minute. */
   bpm: number;
   loop: boolean;
   /** The instrument's voice. */
   sound: Timbre;
+  /** Beats per bar — the time signature's feel (4 = 4/4, 3 = 3/4, 6 = 6/8, 2 = 2/4). */
+  beatsPerBar: number;
 }
 
 export const DEFAULT_STATE: AppState = {
@@ -41,10 +43,12 @@ export const DEFAULT_STATE: AppState = {
   bpm: 90,
   loop: true,
   sound: 'soft',
+  beatsPerBar: 4,
 };
 
 const FRET_COUNTS = [12, 15, 24];
 const SOUNDS: readonly Timbre[] = ['soft', 'clean', 'electric'];
+const BEATS_PER_BAR = [2, 3, 4, 6];
 const MAX_CAPO = 7;
 export const MIN_BPM = 40;
 export const MAX_BPM = 200;
@@ -129,6 +133,11 @@ export function readState(search: string): AppState {
     bpm: pickInt(params.get('bpm'), (v) => v >= MIN_BPM && v <= MAX_BPM, DEFAULT_STATE.bpm),
     loop: params.get('loop') === null ? DEFAULT_STATE.loop : params.get('loop') !== '0',
     sound: pickFrom(params.get('sound'), SOUNDS, DEFAULT_STATE.sound),
+    beatsPerBar: pickInt(
+      params.get('sig'),
+      (v) => BEATS_PER_BAR.includes(v),
+      DEFAULT_STATE.beatsPerBar,
+    ),
   };
 }
 
@@ -152,6 +161,7 @@ export function writeState(state: AppState): string {
   add('bpm', state.bpm, DEFAULT_STATE.bpm);
   if (state.loop !== DEFAULT_STATE.loop) params.set('loop', state.loop ? '1' : '0');
   add('sound', state.sound, DEFAULT_STATE.sound);
+  add('sig', state.beatsPerBar, DEFAULT_STATE.beatsPerBar);
 
   const query = params.toString();
   return query === '' ? '' : `?${query}`;
