@@ -1,25 +1,30 @@
 import { useState } from 'react';
 import { Chord } from '../theory';
+import type { CustomStep } from '../urlState';
 import './ProgressionBuilder.css';
+
+/** One chord may be held up to this many bars. */
+const MAX_BARS = 4;
 
 interface ProgressionBuilderProps {
   /** The seven diatonic chords of the key, for one-tap adding. */
   diatonic: readonly Chord[];
-  /** The current sequence as chord symbols. */
-  symbols: readonly string[];
-  onChange: (symbols: string[]) => void;
+  /** The current sequence: each chord and how many bars it is held. */
+  steps: readonly CustomStep[];
+  onChange: (steps: CustomStep[]) => void;
 }
 
 /**
  * Build a chord sequence by hand: tap the diatonic chords, or type anything —
- * including the power chords and suspensions the vocabulary now knows. The result
- * is what the transport above plays, closing the loop the key finder opened.
+ * including the power chords and suspensions the vocabulary now knows. Each chord
+ * carries how many bars it is held. The result is what the transport above plays,
+ * closing the loop the key finder opened.
  */
-export function ProgressionBuilder({ diatonic, symbols, onChange }: ProgressionBuilderProps) {
+export function ProgressionBuilder({ diatonic, steps, onChange }: ProgressionBuilderProps) {
   const [typed, setTyped] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const add = (symbol: string) => onChange([...symbols, symbol]);
+  const add = (symbol: string) => onChange([...steps, { symbol, bars: 1 }]);
 
   const addTyped = () => {
     const text = typed.trim();
@@ -34,22 +39,39 @@ export function ProgressionBuilder({ diatonic, symbols, onChange }: ProgressionB
     }
   };
 
-  const removeAt = (index: number) => onChange(symbols.filter((_, i) => i !== index));
+  const removeAt = (index: number) => onChange(steps.filter((_, i) => i !== index));
+
+  // Click cycles the bar count 1 → 2 → 3 → 4 → 1.
+  const cycleBars = (index: number) =>
+    onChange(
+      steps.map((step, i) =>
+        i === index ? { ...step, bars: (step.bars % MAX_BARS) + 1 } : step,
+      ),
+    );
 
   return (
     <div className="builder">
       <div className="builder-sequence" aria-label="Deine Akkordfolge">
-        {symbols.length === 0 ? (
+        {steps.length === 0 ? (
           <span className="builder-empty">Noch leer — tippe Akkorde an oder gib welche ein.</span>
         ) : (
-          symbols.map((symbol, i) => (
-            <span key={`${symbol}#${i}`} className="builder-chip">
-              {symbol}
+          steps.map((step, i) => (
+            <span key={`${step.symbol}#${i}`} className="builder-chip">
+              {step.symbol}
+              <button
+                type="button"
+                className="builder-bars"
+                onClick={() => cycleBars(i)}
+                aria-label={`${step.symbol}: Länge ${step.bars} ${step.bars === 1 ? 'Takt' : 'Takte'}`}
+                title="Länge in Takten"
+              >
+                {step.bars}×
+              </button>
               <button
                 type="button"
                 className="builder-remove"
                 onClick={() => removeAt(i)}
-                aria-label={`${symbol} entfernen`}
+                aria-label={`${step.symbol} entfernen`}
               >
                 ×
               </button>
@@ -57,7 +79,7 @@ export function ProgressionBuilder({ diatonic, symbols, onChange }: ProgressionB
           ))
         )}
 
-        {symbols.length > 0 ? (
+        {steps.length > 0 ? (
           <button type="button" className="builder-clear" onClick={() => onChange([])}>
             Leeren
           </button>

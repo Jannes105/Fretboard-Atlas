@@ -83,8 +83,10 @@ function voicePeak(simultaneous: number): number {
 }
 
 export interface ProgressionOptions {
-  /** How long each chord gets. One chord is one bar, so this comes from the tempo. */
-  secondsPerChord: number;
+  /** How long one bar lasts — beatsPerBar beats at the current tempo. */
+  secondsPerBar: number;
+  /** Bars each chord is held; defaults to one bar each. Aligned with `chords`. */
+  chordBars?: readonly number[];
   loop?: boolean;
   /** Seconds between the strings of one chord. */
   strumGap?: number;
@@ -320,9 +322,8 @@ export function createAudioPlayer(): AudioPlayer {
 
     stop(); // a timed run replaces whatever was going on
 
-    const { secondsPerChord, loop = false, strumGap = 0.035, onChord } = options;
-    // Let a chord ring almost to the next one, but never absurdly long at slow tempi.
-    const ring = Math.min(secondsPerChord * 0.98, 2.4);
+    const { secondsPerBar, chordBars, loop = false, strumGap = 0.035, onChord } = options;
+    const barsOf = (index: number) => Math.max(1, chordBars?.[index] ?? 1);
 
     const ctx = ensureContext();
     progressionCancelled = false;
@@ -337,20 +338,28 @@ export function createAudioPlayer(): AudioPlayer {
       );
     };
 
+    // Total span, so the loop knows where to rejoin — chords may differ in length.
+    const totalSeconds = voiced.reduce((sum, _, index) => sum + barsOf(index) * secondsPerBar, 0);
+
     const schedulePass = (startAt: number) => {
       if (progressionCancelled) return;
 
+      let offset = 0;
       voiced.forEach((chord, index) => {
-        const at = startAt + index * secondsPerChord;
+        const at = startAt + offset;
+        const held = barsOf(index) * secondsPerBar;
+        // Ring almost to the next chord, but never absurdly long at slow tempi.
+        const ring = Math.min(held * 0.98, 2.4);
         const peak = voicePeak(chord.length);
         chord.forEach((midi, string) => {
           voice(ctx, midiToFrequency(midi), at + string * strumGap, ring, peak);
         });
         // The audio is scheduled sample-accurately; the marker just follows along.
         if (onChord) after(at, () => onChord(index));
+        offset += held;
       });
 
-      const endAt = startAt + voiced.length * secondsPerChord;
+      const endAt = startAt + totalSeconds;
 
       if (loop) {
         // Arm the next pass slightly early so the loop joins without a gap.

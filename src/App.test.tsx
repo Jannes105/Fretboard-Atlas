@@ -165,6 +165,22 @@ describe('App — Eigene Akkordfolge', () => {
     expect(chords[0][0]).toBe(Math.min(...chords[0]));
     expect(chords[0][0] % 12).toBe(7); // G
   });
+
+  it('lässt die Länge je Akkord in Takten einstellen', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?prog=custom:C,G');
+    const { container } = render(<App />);
+
+    // Ein Klick auf den Takt-Knopf des ersten Akkords: 1 → 2 Takte.
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.builder-bars')[0]);
+
+    // Steht in der URL und geht an den Transport.
+    expect(window.location.search).toContain('prog=custom%3AC*2%2CG');
+
+    await user.click(container.querySelector<HTMLButtonElement>('.transport .play-button')!);
+    const [, options] = player.startProgression.mock.calls[0];
+    expect(options.chordBars).toEqual([2, 1]);
+  });
 });
 
 describe('App — Einstellungen', () => {
@@ -495,10 +511,10 @@ describe('App — Transport der Akkordfolge', () => {
 
     await user.click(transportButton(container));
     const [, options] = player.startProgression.mock.calls[0];
-    expect(options.secondsPerChord).toBeCloseTo((4 * 60) / 92, 5);
+    expect(options.secondsPerBar).toBeCloseTo((4 * 60) / 92, 5);
   });
 
-  it('leitet das Tempo als ein Takt pro Akkord ab', async () => {
+  it('leitet die Taktlänge aus Tempo und Taktart ab', async () => {
     const user = userEvent.setup();
     window.history.replaceState(null, '', '/?bpm=120');
     const { container } = render(<App />);
@@ -506,8 +522,8 @@ describe('App — Transport der Akkordfolge', () => {
     await user.click(transportButton(container));
 
     const [, options] = player.startProgression.mock.calls[0];
-    // 120 BPM, 4 Schläge je Takt => 2 s pro Akkord.
-    expect(options.secondsPerChord).toBeCloseTo(2, 5);
+    // 120 BPM, 4 Schläge je Takt => 2 s pro Takt.
+    expect(options.secondsPerBar).toBeCloseTo(2, 5);
     expect(options.loop).toBe(true);
   });
 
@@ -536,7 +552,7 @@ describe('App — Transport der Akkordfolge', () => {
 
     // Neu gestartet — mit dem neuen Tempo, nicht gestoppt.
     expect(player.startProgression).toHaveBeenCalledTimes(2);
-    expect(player.startProgression.mock.calls[1][1].secondsPerChord).toBeCloseTo(4, 5);
+    expect(player.startProgression.mock.calls[1][1].secondsPerBar).toBeCloseTo(4, 5);
   });
 
   it('startet nichts, wenn nach einem beendeten Durchlauf das Tempo verstellt wird', async () => {

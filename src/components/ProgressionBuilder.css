@@ -32,6 +32,24 @@
   font-size: 0.9rem;
 }
 
+/* The bar count — click to cycle 1×→2×→3×→4×. Muted so a plain 1× is quiet. */
+.builder-bars {
+  padding: 0.05rem 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.builder-bars:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 .builder-remove {
   display: inline-flex;
   align-items: center;

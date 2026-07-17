@@ -30,7 +30,7 @@ import {
 import {
   type AppState,
   customProgId,
-  customProgSymbols,
+  customProgSteps,
   customTuningId,
   customTuningNotes,
   MAX_BPM,
@@ -172,29 +172,34 @@ export default function App() {
   const progressions = useMemo(() => progressionsFor(scale), [scale]);
 
   // A self-built progression rides in the same slot, marked by a "custom:" prefix.
-  const customChordSymbols = customProgSymbols(progressionId);
-  const isCustom = customChordSymbols !== null;
+  const customChordSteps = customProgSteps(progressionId);
+  const isCustom = customChordSteps !== null;
 
   // The selected preset may not exist in this key — fall back to the first.
   const preset = isCustom
     ? null
     : (progressions.find((p) => p.id === progressionId) ?? progressions[0] ?? null);
 
-  const steps = useMemo(() => {
-    const symbols = customProgSymbols(progressionId);
-    if (symbols !== null) {
-      // Skip anything unparseable, so a mistyped URL degrades rather than throws.
-      const parsed = symbols.flatMap((symbol) => {
+  // steps and their bar counts are built together, so skipping an unparseable
+  // custom chord drops its duration too and the two stay aligned.
+  const { steps, chordBars } = useMemo(() => {
+    const custom = customProgSteps(progressionId);
+    if (custom !== null) {
+      const chords: Chord[] = [];
+      const bars: number[] = [];
+      for (const entry of custom) {
         try {
-          return [Chord.parse(symbol)];
+          chords.push(Chord.parse(entry.symbol)); // a mistyped URL degrades, not throws
+          bars.push(entry.bars);
         } catch {
-          return [];
+          // skip
         }
-      });
-      return customSteps(scale, parsed);
+      }
+      return { steps: customSteps(scale, chords), chordBars: bars };
     }
     const chosen = progressions.find((p) => p.id === progressionId) ?? progressions[0] ?? null;
-    return chosen ? buildProgression(scale, chosen, chordSize) : [];
+    const built = chosen ? buildProgression(scale, chosen, chordSize) : [];
+    return { steps: built, chordBars: built.map(() => 1) };
   }, [progressionId, progressions, scale, chordSize]);
 
   /**
@@ -338,8 +343,9 @@ export default function App() {
     });
 
     transportRef.current = player().startProgression(chordNotes, {
-      // One chord is one bar; a bar is beatsPerBar beats at the current tempo.
-      secondsPerChord: (beatsPerBar * 60) / bpm,
+      // A bar is beatsPerBar beats at the current tempo; each chord holds its bars.
+      secondsPerBar: (beatsPerBar * 60) / bpm,
+      chordBars,
       loop,
       onChord: (index) => {
         setPlayingStep(index);
@@ -552,7 +558,8 @@ export default function App() {
                 ...previous,
                 root: pickedRoot,
                 scaleTypeId: pickedScaleTypeId,
-                progressionId: customProgId(symbols),
+                // Adopted chords start at one bar each.
+                progressionId: customProgId(symbols.map((symbol) => ({ symbol, bars: 1 }))),
               }))
             }
           />
@@ -676,8 +683,12 @@ export default function App() {
                 value={isCustom ? 'custom' : (preset?.id ?? '')}
                 onChange={(e) => {
                   if (e.target.value === 'custom') {
-                    // Seed the builder with what is on screen, so it is never blank.
-                    update('progressionId', customProgId(steps.map((s) => s.chord.name())));
+                    // Seed the builder with what is on screen (one bar each), so it
+                    // is never blank.
+                    update(
+                      'progressionId',
+                      customProgId(steps.map((s) => ({ symbol: s.chord.name(), bars: 1 }))),
+                    );
                   } else {
                     update('progressionId', e.target.value);
                   }
@@ -695,8 +706,8 @@ export default function App() {
             {isCustom ? (
               <ProgressionBuilder
                 diatonic={chords}
-                symbols={customChordSymbols ?? []}
-                onChange={(symbols) => update('progressionId', customProgId(symbols))}
+                steps={customChordSteps ?? []}
+                onChange={(next) => update('progressionId', customProgId(next))}
               />
             ) : preset?.hint ? (
               <p className="hint">{preset.hint}</p>

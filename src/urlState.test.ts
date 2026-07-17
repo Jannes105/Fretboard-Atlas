@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   customProgId,
-  customProgSymbols,
+  customProgSteps,
   customTuningId,
   customTuningNotes,
   DEFAULT_STATE,
@@ -59,19 +59,35 @@ describe('readState', () => {
 });
 
 describe('Eigene Akkordfolge in der URL', () => {
-  it('kodiert und liest eine Symbolliste verlustfrei — auch mit Vorzeichen', () => {
-    const id = customProgId(['C', 'G', 'Am', 'F#5']);
-    expect(customProgSymbols(id)).toEqual(['C', 'G', 'Am', 'F#5']);
+  const step = (symbol: string, bars = 1) => ({ symbol, bars });
+
+  it('kodiert und liest Akkorde mit Taktlängen verlustfrei — auch mit Vorzeichen', () => {
+    const steps = [step('C', 2), step('G'), step('Am'), step('F#5', 3)];
+    const id = customProgId(steps);
+    expect(id).toBe('custom:C*2,G,Am,F#5*3'); // 1 Takt wird weggelassen
+    expect(customProgSteps(id)).toEqual(steps);
   });
 
   it('unterscheidet eine Custom-Folge von einer Vorlage', () => {
-    expect(customProgSymbols('I-V-vi-IV')).toBeNull();
-    expect(customProgSymbols('custom:C,G')).toEqual(['C', 'G']);
+    expect(customProgSteps('I-V-vi-IV')).toBeNull();
+    expect(customProgSteps('custom:C,G')).toEqual([step('C'), step('G')]);
   });
 
-  it('übersteht eine Rundreise durch die URL, Vorzeichen inklusive', () => {
-    // Das # in F#5 muss die Query-Kodierung heil überstehen.
-    const state = { ...DEFAULT_STATE, progressionId: customProgId(['G', 'D', 'Em', 'C', 'F#5']) };
+  it('bleibt abwärtskompatibel: ein alter Link ohne Takte heißt je 1 Takt', () => {
+    expect(customProgSteps('custom:C,G,Am,F')).toEqual([
+      step('C'),
+      step('G'),
+      step('Am'),
+      step('F'),
+    ]);
+  });
+
+  it('übersteht eine Rundreise durch die URL, Vorzeichen und Taktlängen inklusive', () => {
+    // Das # in F#5 und die *2-Länge müssen die Query-Kodierung heil überstehen.
+    const state = {
+      ...DEFAULT_STATE,
+      progressionId: customProgId([step('G', 2), step('D'), step('Em'), step('C'), step('F#5', 4)]),
+    };
     expect(readState(writeState(state))).toEqual(state);
   });
 });

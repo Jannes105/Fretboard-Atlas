@@ -57,17 +57,41 @@ export const MAX_BPM = 200;
  * A self-built progression rides in the same `prog` slot as the presets, marked
  * off by this prefix: `custom:C,G,Am,F`. The chords are absolute (not scale
  * degrees), so the sequence survives a key change — only its roman numerals move.
+ * Each chord may carry a duration in bars, `C*2`; a bare symbol means one bar, so
+ * older links stay valid.
  */
 const CUSTOM_PROG_PREFIX = 'custom:';
+const MAX_BARS = 8;
 
-export function customProgId(symbols: readonly string[]): string {
-  return CUSTOM_PROG_PREFIX + symbols.join(',');
+/** One chord of a self-built progression: what to play, and for how many bars. */
+export interface CustomStep {
+  readonly symbol: string;
+  readonly bars: number;
 }
 
-/** The chord symbols of a custom progression id, or null if it is a preset. */
-export function customProgSymbols(progressionId: string): string[] | null {
+export function customProgId(steps: readonly CustomStep[]): string {
+  return (
+    CUSTOM_PROG_PREFIX +
+    steps.map((step) => (step.bars > 1 ? `${step.symbol}*${step.bars}` : step.symbol)).join(',')
+  );
+}
+
+/** The chords of a custom progression id, with bar counts, or null if it is a preset. */
+export function customProgSteps(progressionId: string): CustomStep[] | null {
   if (!progressionId.startsWith(CUSTOM_PROG_PREFIX)) return null;
-  return progressionId.slice(CUSTOM_PROG_PREFIX.length).split(',').filter(Boolean);
+  return progressionId
+    .slice(CUSTOM_PROG_PREFIX.length)
+    .split(',')
+    .filter(Boolean)
+    .map((token) => {
+      const star = token.indexOf('*');
+      if (star < 0) return { symbol: token, bars: 1 };
+      const bars = Number(token.slice(star + 1));
+      return {
+        symbol: token.slice(0, star),
+        bars: Number.isInteger(bars) && bars >= 1 && bars <= MAX_BARS ? bars : 1,
+      };
+    });
 }
 
 /**
