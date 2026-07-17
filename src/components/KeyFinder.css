@@ -1,0 +1,152 @@
+.keyfinder {
+  position: relative;
+}
+
+/* Same quiet, bordered look as the setup trigger — one control idiom, not two. */
+.keyfinder-trigger {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.keyfinder-trigger:hover,
+.keyfinder-trigger.is-open {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+.keyfinder-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 20;
+  width: min(22rem, 88vw);
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
+}
+
+.keyfinder-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.keyfinder-field > span {
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.keyfinder-field input {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-sunken);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.keyfinder-field input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.keyfinder-note {
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.keyfinder-note--warn {
+  color: var(--accent);
+}
+
+.keyfinder-results {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.keyfinder-result {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-sunken);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.keyfinder-result:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.keyfinder-key {
+  flex: none;
+  font-weight: 650;
+}
+
+.keyfinder-degrees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.55rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+/* A chord that does not belong to the key: named, not numbered, and dimmed. */
+.keyfinder-degree.is-outsider {
+  color: var(--accent);
+  opacity: 0.85;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/*
+ * On a phone the trigger sits mid-row, so a panel anchored to it and 22rem wide
+ * runs off the right edge. Anchor it to the key row instead (which starts at the
+ * page margin) and cap the width to the viewport, so it always fits.
+ */
+@media (max-width: 700px) {
+  .keyfinder {
+    position: static;
+  }
+
+  .scale-title {
+    position: relative;
+  }
+
+  .keyfinder-panel {
+    left: 0;
+    width: min(22rem, calc(100vw - 2rem));
+  }
+}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type AudioPlayer, createAudioPlayer, type ProgressionHandle } from './audio';
 import { FretboardView, type LabelMode } from './components/FretboardView';
+import { KeyFinder } from './components/KeyFinder';
 import { ProgressionChord } from './components/ProgressionChord';
 import {
   buildProgression,
@@ -436,6 +437,16 @@ export default function App() {
           >
             ▶
           </button>
+
+          <KeyFinder
+            onPick={(pickedRoot, pickedScaleTypeId) =>
+              setState((previous) => ({
+                ...previous,
+                root: pickedRoot,
+                scaleTypeId: pickedScaleTypeId,
+              }))
+            }
+          />
         </div>
 
         <ul className="degree-chips">

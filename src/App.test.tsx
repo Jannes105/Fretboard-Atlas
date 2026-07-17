@@ -46,6 +46,38 @@ describe('App — Grundzustand', () => {
   });
 });
 
+describe('App — Tonart finden', () => {
+  it('setzt Grundton und Skala aus den eingegebenen Akkorden', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.keyfinder-trigger')!);
+    await user.type(container.querySelector<HTMLInputElement>('.keyfinder-field input')!, 'Am F C G');
+
+    // Am F C G ist mehrdeutig — es müssen mehrere Kandidaten erscheinen.
+    const results = [...container.querySelectorAll<HTMLButtonElement>('.keyfinder-result')];
+    expect(results.length).toBeGreaterThan(1);
+
+    const cMajor = results.find((r) => r.textContent?.startsWith('C-Dur'))!;
+    await user.click(cMajor);
+
+    // Der Klick stellt die ganze App auf C-Dur und schließt das Panel.
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('C-Dur (Ionisch)');
+    expect(container.querySelectorAll('.keyfinder-panel')).toHaveLength(0);
+  });
+
+  it('meldet ein nicht erkanntes Token, statt still zu schlucken', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.keyfinder-trigger')!);
+    // H gibt es in der internationalen Notation nicht.
+    await user.type(container.querySelector<HTMLInputElement>('.keyfinder-field input')!, 'G H');
+
+    expect(container.querySelector('.keyfinder-note--warn')?.textContent).toContain('H');
+  });
+});
+
 describe('App — Einstellungen', () => {
   it('macht die Tonart selbst bedienbar, statt sie daneben noch einmal auszuschreiben', async () => {
     const user = userEvent.setup();

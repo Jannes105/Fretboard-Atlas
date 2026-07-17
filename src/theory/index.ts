@@ -28,6 +28,7 @@ export {
   type ScalePosition,
 } from './Fretboard';
 export { Chord, diatonicChords, type ChordQuality, type ChordSize } from './Chord';
+export { matchKeys, type KeyMatch } from './keyMatch';
 export {
   SHAPE_SETS,
   shapeSetFor,

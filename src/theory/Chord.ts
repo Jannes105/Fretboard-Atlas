@@ -55,6 +55,34 @@ const QUALITIES: readonly ChordQuality[] = [
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'] as const;
 
+/**
+ * Chord-symbol suffixes as written in tabs and lead sheets, mapped to a quality
+ * id. Matched exactly against the whole suffix — not as a prefix — so "m7b5" can
+ * never be mis-read as "m" plus leftovers. Case matters: "M7" is major 7, "m7"
+ * is minor 7.
+ */
+const SUFFIX_ALIASES: Record<string, string> = {
+  '': 'major',
+  maj: 'major',
+  m: 'minor',
+  min: 'minor',
+  '-': 'minor',
+  dim: 'diminished',
+  '°': 'diminished',
+  aug: 'augmented',
+  '+': 'augmented',
+  maj7: 'major7',
+  M7: 'major7',
+  '7': 'dominant7',
+  m7: 'minor7',
+  min7: 'minor7',
+  m7b5: 'minor7b5',
+  ø: 'minor7b5',
+  'ø7': 'minor7b5',
+  dim7: 'diminished7',
+  '°7': 'diminished7',
+};
+
 /** Finds the quality whose semitone signature matches, or null for exotic stacks. */
 function identifyQuality(root: Note, notes: readonly Note[]): ChordQuality | null {
   const signature = notes.map((note) => mod(note.pitchClass - root.pitchClass, 12));
@@ -105,6 +133,31 @@ export class Chord {
     );
 
     return new Chord(notes[0], notes);
+  }
+
+  /**
+   * Parses a chord symbol the way it appears in a tab: "Em", "Bbmaj7", "F#m7b5",
+   * "C". The counterpart to Note.parse and Scale.parse — it throws on anything it
+   * does not recognise, so a caller can report exactly which token was bad.
+   */
+  static parse(input: string): Chord {
+    const text = input.trim();
+    // The root grabs its accidentals greedily, so "Ebm" splits as "Eb" + "m",
+    // never "E" + "bm". Whatever is left is the quality suffix.
+    const match = /^([A-Ga-g][#b]*)(.*)$/.exec(text);
+    if (!match) {
+      throw new Error(`Kein gültiger Akkord: "${input}"`);
+    }
+
+    const root = Note.parse(match[1]);
+    const suffix = match[2].trim();
+
+    const qualityId = SUFFIX_ALIASES[suffix];
+    if (qualityId === undefined) {
+      throw new Error(`Unbekannter Akkordtyp: "${suffix}" in "${input}"`);
+    }
+
+    return Chord.fromQuality(root, qualityId);
   }
 
   /** Builds a chord from a root and an explicit quality, e.g. a dominant 7 in a blues. */

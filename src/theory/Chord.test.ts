@@ -144,3 +144,39 @@ describe('Erkennung der Akkordqualität', () => {
     expect(nonsense.name()).toBe('C?');
   });
 });
+
+describe('Chord.parse', () => {
+  it('liest die geläufigen Symbole aus einem Tab', () => {
+    expect(Chord.parse('C').name()).toBe('C');
+    expect(Chord.parse('Em').name()).toBe('Em');
+    expect(Chord.parse('G7').name()).toBe('G7');
+    expect(Chord.parse('Bbmaj7').name()).toBe('Bbmaj7');
+    expect(Chord.parse('F#m7b5').name()).toBe('F#m7b5');
+  });
+
+  it('trennt Grundton und Typ auch bei mehreren Vorzeichen richtig', () => {
+    // Das b gehört zum Grundton (Eb), nicht zum Typ — "Eb" + "m", nie "E" + "bm".
+    const ebm = Chord.parse('Ebm');
+    expect(ebm.root.name()).toBe('Eb');
+    expect(ebm.quality?.id).toBe('minor');
+  });
+
+  it('akzeptiert verschiedene Schreibweisen desselben Typs', () => {
+    expect(Chord.parse('Am').quality?.id).toBe('minor');
+    expect(Chord.parse('Amin').quality?.id).toBe('minor');
+    expect(Chord.parse('A-').quality?.id).toBe('minor');
+    expect(Chord.parse('Adim').quality?.id).toBe('diminished');
+    expect(Chord.parse('A°').quality?.id).toBe('diminished');
+    // Groß-/Kleinschreibung entscheidet: M7 ist Dur7, m7 ist Moll7.
+    expect(Chord.parse('CM7').quality?.id).toBe('major7');
+    expect(Chord.parse('Cm7').quality?.id).toBe('minor7');
+  });
+
+  it('wirft mit klarer Meldung bei Unbekanntem', () => {
+    // H gibt es in der internationalen Notation nicht (das ist B).
+    expect(() => Chord.parse('H')).toThrow();
+    expect(() => Chord.parse('Xm')).toThrow();
+    // Bekannter Grundton, aber ein Typ, den die App nicht führt.
+    expect(() => Chord.parse('Cm7b9')).toThrow(/Cm7b9/);
+  });
+});
