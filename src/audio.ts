@@ -32,6 +32,21 @@ const DEFAULTS: Record<PlayMode, { gap: number; duration: number }> = {
   strum: { gap: 0.035, duration: 1.9 }, // a chord, strings brushed — left to ring out
 };
 
+/** Amplitude of a note sounding on its own. */
+const PEAK = 0.5;
+
+/**
+ * How loud each voice may be when `simultaneous` of them ring together.
+ *
+ * Without this every voice was equally loud, so a lone note sat six times below a
+ * six-string chord — and a chord spanning the whole neck summed past 1.0 and
+ * clipped. Loudness roughly follows the square root of the voice count, so
+ * dividing by it puts a single note and a full chord in the same ballpark.
+ */
+function voicePeak(simultaneous: number): number {
+  return PEAK / Math.sqrt(Math.max(1, simultaneous));
+}
+
 export interface ProgressionOptions {
   /** How long each chord gets. One chord is one bar, so this comes from the tempo. */
   secondsPerChord: number;
@@ -93,6 +108,8 @@ export function createAudioPlayer(): AudioPlayer {
   // Created lazily on the first play: a browser only lets audio start from a user
   // gesture, and on iOS a context made earlier stays suspended until resumed.
   let context: AudioContext | null = null;
+  /** Everything goes through here, so nothing can hit the output raw. */
+  let master: GainNode | null = null;
   let live: OscillatorNode[] = [];
 
   /** Timers of the running progression — its loop keeps arming new ones. */
@@ -101,7 +118,24 @@ export function createAudioPlayer(): AudioPlayer {
   let progressionOnChord: ProgressionOptions['onChord'] = undefined;
 
   const ensureContext = (): AudioContext => {
-    context ??= new Ctor();
+    if (!context) {
+      context = new Ctor();
+
+      // A limiter catches whatever the per-voice maths does not: a chord spanning
+      // the whole neck is a dozen voices at once, and summing those straight into
+      // the output clipped audibly.
+      const limiter = context.createDynamicsCompressor();
+      limiter.threshold.value = -6;
+      limiter.knee.value = 4;
+      limiter.ratio.value = 12;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.15;
+
+      master = context.createGain();
+      master.gain.value = 0.9;
+      master.connect(limiter).connect(context.destination);
+    }
+
     if (context.state === 'suspended') void context.resume();
     return context;
   };
@@ -139,7 +173,13 @@ export function createAudioPlayer(): AudioPlayer {
     stopVoices();
   };
 
-  const voice = (ctx: AudioContext, frequency: number, at: number, duration: number) => {
+  const voice = (
+    ctx: AudioContext,
+    frequency: number,
+    at: number,
+    duration: number,
+    peak: number,
+  ) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
@@ -148,12 +188,11 @@ export function createAudioPlayer(): AudioPlayer {
     osc.frequency.value = frequency;
 
     // A short attack and an exponential decay — no click on start or end.
-    const peak = 0.22;
     gain.gain.setValueAtTime(0.0001, at);
     gain.gain.exponentialRampToValueAtTime(peak, at + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
 
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(master!);
     osc.start(at);
     osc.stop(at + duration + 0.05);
 
@@ -178,14 +217,19 @@ export function createAudioPlayer(): AudioPlayer {
     const ctx = ensureContext();
     const start = ctx.currentTime + 0.03;
 
+    // A strum lands all at once, so every note shares the room. A scale run only
+    // ever overlaps its neighbour, which is why it may sound near full strength.
+    const peak = voicePeak(mode === 'strum' ? midiNotes.length : 2);
+
     midiNotes.forEach((midi, i) => {
-      voice(ctx, midiToFrequency(midi), start + i * step, ring);
+      voice(ctx, midiToFrequency(midi), start + i * step, ring, peak);
     });
   };
 
   const playNote = (midi: number) => {
     const ctx = ensureContext();
-    voice(ctx, midiToFrequency(midi), ctx.currentTime + 0.02, 1);
+    // On its own, and so at full strength.
+    voice(ctx, midiToFrequency(midi), ctx.currentTime + 0.02, 1, voicePeak(1));
   };
 
   const startProgression = (
@@ -219,8 +263,9 @@ export function createAudioPlayer(): AudioPlayer {
 
       voiced.forEach((chord, index) => {
         const at = startAt + index * secondsPerChord;
+        const peak = voicePeak(chord.length);
         chord.forEach((midi, string) => {
-          voice(ctx, midiToFrequency(midi), at + string * strumGap, ring);
+          voice(ctx, midiToFrequency(midi), at + string * strumGap, ring, peak);
         });
         // The audio is scheduled sample-accurately; the marker just follows along.
         if (onChord) after(at, () => onChord(index));
