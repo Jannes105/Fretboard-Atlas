@@ -23,7 +23,7 @@ export type Timbre = 'soft' | 'clean' | 'electric';
  * Per-timbre loudness trim, so switching voice does not jump in volume: a
  * sawtooth carries far more energy than a triangle, and overdrive adds more still.
  */
-const TIMBRE_GAIN: Record<Timbre, number> = { soft: 1, clean: 0.6, electric: 0.5 };
+const TIMBRE_GAIN: Record<Timbre, number> = { soft: 1, clean: 0.6, electric: 0.38 };
 
 /**
  * A soft-clipping curve for the overdrive — tanh rounds the peaks off rather than
@@ -35,7 +35,10 @@ const DRIVE_CURVE = (() => {
   // Backed by an explicit ArrayBuffer so the type matches WaveShaperNode.curve
   // (which rejects the ArrayBufferLike a bare `new Float32Array(n)` infers).
   const curve = new Float32Array(new ArrayBuffer(samples * Float32Array.BYTES_PER_ELEMENT));
-  const amount = 2.5;
+  // A steep tanh so the sawtooth's ramp gets squashed toward a square — that hard
+  // edge is the overdrive. Gentle amounts are inaudible on a wave that already has
+  // every harmonic; this has to bite.
+  const amount = 6;
   for (let i = 0; i < samples; i++) {
     const x = (i / (samples - 1)) * 2 - 1;
     curve[i] = Math.tanh(amount * x);
@@ -240,19 +243,31 @@ export function createAudioPlayer(): AudioPlayer {
 
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.Q.value = timbre === 'electric' ? 6 : 3;
-      const open = Math.min(frequency * 6 + 1500, 8000);
-      const close = Math.min(frequency * 2 + 400, 4000);
-      filter.frequency.setValueAtTime(open, at);
-      filter.frequency.exponentialRampToValueAtTime(close, at + duration);
 
       if (timbre === 'electric') {
-        // Overdrive: round the wave's peaks off before the filter tames the fizz.
+        // Overdrive: drive the wave hard into the shaper, then keep the filter
+        // wide open — the whole point is to HEAR the harmonics the distortion
+        // adds, so this must stay much brighter than clean.
+        filter.Q.value = 4;
+        filter.frequency.setValueAtTime(Math.min(frequency * 10 + 3500, 12000), at);
+        filter.frequency.exponentialRampToValueAtTime(
+          Math.min(frequency * 5 + 1800, 7000),
+          at + duration,
+        );
+
         const shaper = ctx.createWaveShaper();
         shaper.curve = DRIVE_CURVE;
-        shaper.oversample = '2x';
+        shaper.oversample = '4x';
         osc.connect(shaper).connect(filter).connect(gain).connect(master!);
       } else {
+        // Clean: a filtered sawtooth, no drive — clear and a touch bright, but
+        // deliberately darker and smoother than the overdrive above.
+        filter.Q.value = 2;
+        filter.frequency.setValueAtTime(Math.min(frequency * 4 + 1000, 5000), at);
+        filter.frequency.exponentialRampToValueAtTime(
+          Math.min(frequency * 1.5 + 300, 2200),
+          at + duration,
+        );
         osc.connect(filter).connect(gain).connect(master!);
       }
     }
