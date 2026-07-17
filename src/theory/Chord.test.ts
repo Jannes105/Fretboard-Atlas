@@ -193,6 +193,29 @@ describe('Chord.parse', () => {
     expect(Chord.parse('Am6').quality?.id).toBe('minor6');
   });
 
+  it('liest Slash-Akkorde mit abweichendem Bass', () => {
+    const cOverG = Chord.parse('C/G');
+    expect(cOverG.name()).toBe('C/G');
+    expect(cOverG.quality?.id).toBe('major'); // der Bass ändert die Qualität nicht
+    expect(cOverG.bass?.name()).toBe('G');
+
+    expect(Chord.parse('D/F#').bass?.name()).toBe('F#');
+    expect(Chord.parse('Am/C').name()).toBe('Am/C');
+    // Der Bass fließt in die klingenden Tonklassen ein, auch wenn er kein Akkordton ist.
+    expect(Chord.parse('C/D').pitchClasses).toContain(Note.parse('D').pitchClass);
+  });
+
+  it('behandelt einen Bass gleich dem Grundton nicht als Slash', () => {
+    const c = Chord.parse('C/C');
+    expect(c.bass).toBeNull();
+    expect(c.name()).toBe('C');
+  });
+
+  it('wirft bei leerem oder unsinnigem Bass', () => {
+    expect(() => Chord.parse('C/')).toThrow();
+    expect(() => Chord.parse('C/H')).toThrow();
+  });
+
   it('buchstabiert die Quinte als Quinte, nicht als dreifaches Kreuz', () => {
     // Der Beweis, dass die Terz-Annahme wirklich weg ist: ein terzgeschichtetes
     // Modell hätte die Quinte von E5 vier Halbtöne über der (nicht vorhandenen)

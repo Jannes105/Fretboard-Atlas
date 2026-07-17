@@ -132,11 +132,19 @@ export class Chord {
   readonly notes: readonly Note[];
   /** null when the stack does not match any known quality. */
   readonly quality: ChordQuality | null;
+  /**
+   * A slash bass — the note under the chord when it differs from the root, as in
+   * C/G. null for an ordinary root-position chord. It changes what sounds and how
+   * the chord is named, but not its quality: C/G is still a major chord.
+   */
+  readonly bass: Note | null;
 
-  constructor(root: Note, notes: readonly Note[]) {
+  constructor(root: Note, notes: readonly Note[], bass: Note | null = null) {
     this.root = root;
     this.notes = notes;
     this.quality = identifyQuality(root, notes);
+    // A bass equal to the root is no slash at all — "C/C" is just C.
+    this.bass = bass && bass.pitchClass !== root.pitchClass ? bass : null;
   }
 
   /**
@@ -164,14 +172,22 @@ export class Chord {
 
   /**
    * Parses a chord symbol the way it appears in a tab: "Em", "Bbmaj7", "F#m7b5",
-   * "C". The counterpart to Note.parse and Scale.parse — it throws on anything it
-   * does not recognise, so a caller can report exactly which token was bad.
+   * "C", and a slash bass like "C/G" or "D/F#". The counterpart to Note.parse and
+   * Scale.parse — it throws on anything it does not recognise, so a caller can
+   * report exactly which token was bad.
    */
   static parse(input: string): Chord {
     const text = input.trim();
+
+    // A slash splits the chord from its bass: "C/G" is C over a G bass. Everything
+    // before the slash is an ordinary chord symbol.
+    const slash = text.indexOf('/');
+    const symbolText = slash < 0 ? text : text.slice(0, slash);
+    const bassText = slash < 0 ? null : text.slice(slash + 1).trim();
+
     // The root grabs its accidentals greedily, so "Ebm" splits as "Eb" + "m",
     // never "E" + "bm". Whatever is left is the quality suffix.
-    const match = /^([A-Ga-g][#b]*)(.*)$/.exec(text);
+    const match = /^([A-Ga-g][#b]*)(.*)$/.exec(symbolText);
     if (!match) {
       throw new Error(`Kein gültiger Akkord: "${input}"`);
     }
@@ -184,11 +200,13 @@ export class Chord {
       throw new Error(`Unbekannter Akkordtyp: "${suffix}" in "${input}"`);
     }
 
-    return Chord.fromQuality(root, qualityId);
+    // An empty bass ("C/") is malformed — Note.parse rejects it.
+    const bass = bassText === null ? null : Note.parse(bassText);
+    return Chord.fromQuality(root, qualityId, bass);
   }
 
   /** Builds a chord from a root and an explicit quality, e.g. a dominant 7 in a blues. */
-  static fromQuality(root: Note, qualityId: string): Chord {
+  static fromQuality(root: Note, qualityId: string, bass: Note | null = null): Chord {
     const quality = QUALITIES.find((q) => q.id === qualityId);
     if (!quality) throw new Error(`Unbekannte Akkordqualität: "${qualityId}"`);
 
@@ -197,16 +215,22 @@ export class Chord {
     const notes = quality.semitones.map((semitones, i) =>
       root.transpose(semitones, quality.diatonicSteps[i]),
     );
-    return new Chord(root, notes);
+    return new Chord(root, notes, bass);
   }
 
+  /** Pitch classes that sound, chord tones first, the slash bass added if it is a new one. */
   get pitchClasses(): number[] {
-    return this.notes.map((note) => note.pitchClass);
+    const classes = this.notes.map((note) => note.pitchClass);
+    if (this.bass && !classes.includes(this.bass.pitchClass)) {
+      classes.push(this.bass.pitchClass);
+    }
+    return classes;
   }
 
-  /** Chord symbol, e.g. "Am7", "Bbmaj7", "F#dim". */
+  /** Chord symbol, e.g. "Am7", "Bbmaj7", "F#dim", "C/G". */
   name(): string {
-    return this.root.name() + (this.quality?.symbol ?? '?');
+    const symbol = this.root.name() + (this.quality?.symbol ?? '?');
+    return this.bass ? `${symbol}/${this.bass.name()}` : symbol;
   }
 
   /**

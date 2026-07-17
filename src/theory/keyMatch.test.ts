@@ -100,4 +100,15 @@ describe('matchKeys — echte Songs', () => {
     const cMajor = find('C F G B5', 'C-Dur');
     expect(cMajor.outsiders.map((c) => c.name())).toEqual(['B5']);
   });
+
+  it('nimmt einen Slash-Akkord auf, solange sein Bass in der Tonart liegt', () => {
+    // C/G und Am/C haben Bässe (G, C), die zu C-Dur gehören.
+    const cMajor = find('C G/B Am/C F', 'C-Dur');
+    expect(cMajor.outsiders).toHaveLength(0);
+    expect(cMajor.degrees[1]).toBe(4); // G/B sitzt harmonisch auf der V (Grundton G)
+
+    // Ein Bass außerhalb der Tonart macht den Akkord tonartfremd: C/F# hat F#.
+    const withOutsider = find('C F G C/F#', 'C-Dur');
+    expect(withOutsider.outsiders.map((c) => c.name())).toEqual(['C/F#']);
+  });
 });

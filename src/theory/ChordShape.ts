@@ -184,6 +184,11 @@ export function voicingsFor(chord: Chord, options: VoicingOptions = {}): Voicing
 
   if (!chord.quality) return [];
 
+  // A slash chord has no dedicated grip here: the movable shapes all put the root
+  // in the bass, so drawing one under a "C/G" would show the wrong bass. The chord
+  // is still named and sounded correctly (with the bass) — just not diagrammed.
+  if (chord.bass) return [];
+
   const shapeSet = shapeSetFor(tuning);
   if (!shapeSet) return [];
 

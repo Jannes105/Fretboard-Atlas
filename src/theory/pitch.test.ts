@@ -109,6 +109,17 @@ describe('chordMidiTones', () => {
     const tones = chordMidiTones(a, 57);
     expect(tones.map((m) => m % 12)).toEqual([...a.pitchClasses]);
   });
+
+  it('setzt den Slash-Bass unter den Akkord', () => {
+    const cOverG = Chord.parse('C/G');
+    const tones = chordMidiTones(cOverG, 60); // Grundton C auf 60
+
+    // Der Bass G klingt tiefer als jeder Akkordton — so hört man C/G als solches.
+    expect(tones[0] % 12).toBe(Note.parse('G').pitchClass);
+    expect(tones[0]).toBeLessThan(Math.min(...tones.slice(1)));
+    // Die Akkordtöne selbst bleiben die von C-Dur.
+    expect(tones.slice(1)).toEqual([60, 64, 67]);
+  });
 });
 
 describe('positionsToMidi', () => {

@@ -147,6 +147,23 @@ describe('App — Eigene Akkordfolge', () => {
     const [chords] = player.startProgression.mock.calls[0];
     expect(chords).toHaveLength(4); // C G Am F, nicht die vierteilige Default-Vorlage zufällig
   });
+
+  it('spielt einen Slash-Akkord mit dem Bass unter dem Akkord', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?prog=custom:C/G');
+    const { container } = render(<App />);
+
+    // Der Slash-Akkord bekommt keinen Griff, klingt aber trotzdem.
+    expect(container.querySelector('.no-shape')).not.toBeNull();
+
+    await user.click(container.querySelector<HTMLButtonElement>('.transport .play-button')!);
+
+    const [chords] = player.startProgression.mock.calls[0];
+    // C/G: Bass G plus Dreiklang C E G — vier Töne, der Bass ganz unten.
+    expect(chords[0]).toHaveLength(4);
+    expect(chords[0][0]).toBe(Math.min(...chords[0]));
+    expect(chords[0][0] % 12).toBe(7); // G
+  });
 });
 
 describe('App — Einstellungen', () => {

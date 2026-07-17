@@ -50,11 +50,17 @@ export function scaleMidiSequence(scale: Scale, options: ScaleSequenceOptions = 
 
 /**
  * The chord as a close, ascending voicing from its root — root, third, fifth and
- * (for a seventh chord) the seventh, all within one octave.
+ * (for a seventh chord) the seventh, all within one octave. A slash bass is added
+ * an octave below, the way a bass player would take it, so C/G is heard as such.
  */
 export function chordMidiTones(chord: Chord, baseMidi: number = DEFAULT_BASE_MIDI): number[] {
   const root = midiForPitchClass(chord.root.pitchClass, baseMidi);
-  return chord.pitchClasses.map((pitchClass) => root + mod(pitchClass - chord.root.pitchClass, 12));
+  const tones = chord.notes.map(
+    (note) => root + mod(note.pitchClass - chord.root.pitchClass, 12),
+  );
+
+  if (!chord.bass) return tones;
+  return [midiForPitchClass(chord.bass.pitchClass, baseMidi) - 12, ...tones];
 }
 
 /** Just enough of a fretboard note to sound it: its actual pitch and pitch class. */
