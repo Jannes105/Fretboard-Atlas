@@ -20,6 +20,7 @@ const { player, transport } = vi.hoisted(() => {
       ),
       stop: vi.fn(),
       setTimbre: vi.fn(),
+      setRoom: vi.fn(),
       available: true,
     },
   };
@@ -264,8 +265,8 @@ describe('App — Einstellungen', () => {
     const { container } = render(<App />);
 
     await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
-    // Stimmung, Kapo, Bünde, Klang.
-    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(4);
+    // Stimmung, Kapo, Bünde, Klang, Raum.
+    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(5);
 
     await user.keyboard('{Escape}');
     expect(container.querySelectorAll('.setup-panel')).toHaveLength(0);
@@ -309,7 +310,7 @@ describe('App — Klang', () => {
     const { container } = render(<App />);
 
     // Beim Start wird der Default gesetzt.
-    expect(player.setTimbre).toHaveBeenCalledWith('soft');
+    expect(player.setTimbre).toHaveBeenCalledWith('clean');
 
     await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
     const soundSelect = [...container.querySelectorAll<HTMLSelectElement>('.setup-panel select')].find(
@@ -319,6 +320,22 @@ describe('App — Klang', () => {
 
     expect(player.setTimbre).toHaveBeenCalledWith('electric');
     expect(window.location.search).toContain('sound=electric');
+  });
+
+  it('gibt den gewählten Raum an den Player weiter', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    expect(player.setRoom).toHaveBeenCalledWith('room');
+
+    await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
+    const roomSelect = [...container.querySelectorAll<HTMLSelectElement>('.setup-panel select')].find(
+      (select) => [...select.options].some((option) => option.value === 'hall'),
+    )!;
+    await user.selectOptions(roomSelect, 'hall');
+
+    expect(player.setRoom).toHaveBeenCalledWith('hall');
+    expect(window.location.search).toContain('reverb=hall');
   });
 });
 

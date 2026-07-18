@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Timbre } from '../audio';
+import type { RoomId } from '../synth/reverb';
 import { pitchClassName, Tuning } from '../theory';
 import { customTuningId } from '../urlState';
 
@@ -15,10 +16,12 @@ interface SetupPanelProps {
   capo: number;
   fretCount: number;
   sound: Timbre;
+  reverb: RoomId;
   onTuningIdChange: (tuningId: string) => void;
   onCapoChange: (capo: number) => void;
   onFretCountChange: (fretCount: number) => void;
   onSoundChange: (sound: Timbre) => void;
+  onReverbChange: (reverb: RoomId) => void;
 }
 
 /**
@@ -33,10 +36,12 @@ export function SetupPanel({
   capo,
   fretCount,
   sound,
+  reverb,
   onTuningIdChange,
   onCapoChange,
   onFretCountChange,
   onSoundChange,
+  onReverbChange,
 }: SetupPanelProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -156,11 +161,17 @@ export function SetupPanel({
           <label className="field">
             <span>Klang</span>
             <select value={sound} onChange={(e) => onSoundChange(e.target.value as Timbre)}>
-              {/* The values are what shared links carry, so they stay put even
-                  though "soft" now means an acoustic string. */}
-              <option value="soft">Akustik</option>
               <option value="clean">Clean</option>
               <option value="electric">Overdrive</option>
+            </select>
+          </label>
+
+          <label className="field">
+            <span>Raum</span>
+            <select value={reverb} onChange={(e) => onReverbChange(e.target.value as RoomId)}>
+              <option value="off">trocken</option>
+              <option value="room">Zimmer</option>
+              <option value="hall">Halle</option>
             </select>
           </label>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type AudioPlayer, createAudioPlayer, prefetchSamples, STRUM_SPEEDS } from './audio';
+import { type AudioPlayer, createAudioPlayer, LOOSE_ARPEGGIO_GAP, prefetchSamples } from './audio';
 import { FretboardView, type LabelMode } from './components/FretboardView';
 import { KeyFinder } from './components/KeyFinder';
 import { ProgressionPanel } from './components/ProgressionPanel';
@@ -17,6 +17,7 @@ import {
   diatonicChords,
   Fretboard,
   serializePattern,
+  STANDARD_STRUM_GAP,
   Note,
   positionsToMidi,
   progressionsFor,
@@ -65,6 +66,7 @@ export default function App() {
     beatsPerBar,
     rhythm,
     strum,
+    reverb,
   } = state;
 
   const scale = useMemo(() => {
@@ -220,6 +222,14 @@ export default function App() {
     player().setTimbre(sound);
   }, [sound]);
 
+  useEffect(() => {
+    player().setRoom(reverb);
+  }, [reverb]);
+
+  // A one-off chord has no bar to spread across, so an arpeggio there just walks the
+  // strings at a leisurely pace.
+  const strumGapNow = strum === 'arpeggio' ? LOOSE_ARPEGGIO_GAP : STANDARD_STRUM_GAP;
+
   // Start pulling the guitar recordings down as soon as the app is on screen. A
   // fetch needs neither a gesture nor an AudioContext, so by the first click the
   // ~380 KB is usually already there and only needs decoding.
@@ -255,7 +265,7 @@ export default function App() {
       player().play(positionsToMidi(visiblePositions, chord.pitchClasses), {
         mode: 'strum',
         stack: true,
-        gap: STRUM_SPEEDS[strum],
+        gap: strumGapNow,
       });
     }
   };
@@ -267,14 +277,14 @@ export default function App() {
       player().play(positionsToMidi(visiblePositions, [note.pitchClass]), {
         mode: 'strum',
         stack: true,
-        gap: STRUM_SPEEDS[strum],
+        gap: strumGapNow,
       });
     }
   };
 
   /** Sound a grip exactly as drawn — the real strings under the fingers. */
   const hearVoicing = (voicing: Voicing) =>
-    player().play(voicingMidi(voicing, chordTuning), { mode: 'strum', stack: true, gap: STRUM_SPEEDS[strum] });
+    player().play(voicingMidi(voicing, chordTuning), { mode: 'strum', stack: true, gap: strumGapNow });
 
   // ---- Progression transport ----
 
@@ -291,7 +301,7 @@ export default function App() {
     bpm,
     beatsPerBar,
     rhythm,
-    strumGap: STRUM_SPEEDS[strum],
+    style: strum,
     loop,
     player,
     material: [steps, chordTuning, chosenVoicings],
@@ -314,10 +324,12 @@ export default function App() {
           capo={capo}
           fretCount={fretCount}
           sound={sound}
+          reverb={reverb}
           onTuningIdChange={(next) => update('tuningId', next)}
           onCapoChange={(next) => update('capo', next)}
           onFretCountChange={(next) => update('fretCount', next)}
           onSoundChange={(next) => update('sound', next)}
+          onReverbChange={(next) => update('reverb', next)}
         />
       </header>
 

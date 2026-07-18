@@ -4,6 +4,8 @@ import {
   isDefaultPattern,
   parsePattern,
   PATTERN_PRESETS,
+  strumOffsets,
+  strumRing,
   serializePattern,
 } from './rhythm';
 
@@ -43,5 +45,55 @@ describe('rhythm — Muster ⇄ String', () => {
     // Gehalten = ein Abschlag, dann Pausen.
     const held = PATTERN_PRESETS.find((p) => p.id === 'held')!;
     expect(serializePattern(held.build(4))).toBe('d-------');
+  });
+});
+
+describe('strumOffsets', () => {
+  it('bürstet die Saiten beim normalen Anschlag fast gleichzeitig', () => {
+    const offsets = strumOffsets(6, 'standard', 2.67);
+
+    expect(offsets).toHaveLength(6);
+    expect(offsets[0]).toBe(0);
+    // Ein Griff ist in unter 100 ms durch — ein echter Anschlag liegt bei 30–90 ms.
+    expect(offsets[5]).toBeLessThan(0.1);
+    // Und er hängt nicht am Tempo: ein Anschlag ist eine Handbewegung, kein Notenwert.
+    expect(strumOffsets(6, 'standard', 1.2)).toEqual(offsets);
+  });
+
+  it('zieht das Arpeggio über genau einen Takt', () => {
+    const secondsPerBar = 2.67;
+    const offsets = strumOffsets(6, 'arpeggio', secondsPerBar);
+
+    expect(offsets[0]).toBe(0);
+    // Der letzte Ton bekommt seinen eigenen Anteil und fällt nicht auf die Eins des
+    // nächsten Taktes.
+    expect(offsets[5]).toBeCloseTo(secondsPerBar * (5 / 6), 6);
+    expect(offsets[5]).toBeLessThan(secondsPerBar);
+  });
+
+  it('passt das Arpeggio an Tempo und Tonanzahl an', () => {
+    // Halbe Taktlänge → halbe Abstände.
+    expect(strumOffsets(4, 'arpeggio', 1)[1]).toBeCloseTo(0.25, 6);
+    expect(strumOffsets(4, 'arpeggio', 2)[1]).toBeCloseTo(0.5, 6);
+    // Mehr Töne → engere Abstände, aber derselbe Takt.
+    expect(strumOffsets(8, 'arpeggio', 2)[7]).toBeCloseTo(1.75, 6);
+  });
+
+  it('kommt mit einem leeren Akkord klar', () => {
+    expect(strumOffsets(0, 'arpeggio', 2)).toEqual([]);
+  });
+});
+
+describe('strumRing', () => {
+  it('lässt Arpeggio-Töne mindestens bis zum Taktende stehen', () => {
+    // Sonst ist der erste Ton verstummt, bevor der letzte kommt — dann hört man
+    // eine Tonfolge und nie einen Akkord.
+    expect(strumRing('arpeggio', 2.67, 0.9)).toBe(2.67);
+    // Klingt er ohnehin länger, bleibt es dabei.
+    expect(strumRing('arpeggio', 2.67, 3)).toBe(3);
+  });
+
+  it('lässt den normalen Anschlag unangetastet', () => {
+    expect(strumRing('standard', 2.67, 0.9)).toBe(0.9);
   });
 });

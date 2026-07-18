@@ -1,6 +1,14 @@
 import { pluck, type PluckOptions } from './synth/pluck';
+import { impulseResponse, ROOMS, type RoomId } from './synth/reverb';
 import { sampleFor, type SampleSet } from './synth/sampleSet';
-import { midiToFrequency, type StrumSlot } from './theory';
+import {
+  midiToFrequency,
+  STANDARD_STRUM_GAP,
+  type StrumSlot,
+  strumOffsets,
+  strumRing,
+  type StrumStyle,
+} from './theory';
 
 /**
  * A thin wrapper over the Web Audio API — the one place in the app that makes
@@ -21,20 +29,15 @@ import { midiToFrequency, type StrumSlot } from './theory';
 export type PlayMode = 'sequence' | 'strum';
 
 /**
- * The instrument's voice.
+ * The instrument's voice: a recorded archtop guitar through its magnetic pickup
+ * (`clean`), and that same pickup driven into an overdrive (`electric`).
  *
- * All three are recordings of one archtop guitar from the CC0 Karoryfer Shinyguitar
- * library, captured two ways at once: `soft` is the microphone in front of the body,
- * `clean` the magnetic pickup, and `electric` that same pickup driven into an
- * overdrive — which is what an amplifier does to it.
- *
- * That two of them are genuinely different takes matters. An earlier version derived
- * all three from one synthesised string by nudging numbers, and they measured 3.7 dB
- * apart across third-octave bands, which is to say indistinguishable.
- *
- * The names are the ones already in shared links, so they stay as they are.
+ * There was a third, `soft`, fed by the microphone take of the same guitar. It
+ * measured 6.7 dB away across third-octave bands and still did not sound like a
+ * second instrument — because it was not one. Two voices that differ beat three that
+ * blur. `soft` now falls back to `clean` so old links keep working.
  */
-export type Timbre = 'soft' | 'clean' | 'electric';
+export type Timbre = 'clean' | 'electric';
 
 /** One resonance: where, how narrow, how much. */
 interface Resonance {
@@ -56,15 +59,18 @@ const VOICES: Record<
   Timbre,
   {
     /** Which recorded set feeds it, keyed as in public/samples/manifest.json. */
-    readonly recording: 'acoustic' | 'electric';
+    readonly recording: 'electric';
     /**
      * How hard the note is pushed into the overdrive, or null for none.
      *
-     * This has to be well above 1 to do anything worth hearing. A plucked note spends
-     * almost all of its life quiet, and down there a soft-clipper is very nearly a
-     * straight line — driving it at unity left the overdrive measuring 2.0 dB from
-     * clean, which is to say identical. Pushing it 10× puts the decay into the bend
-     * too, which is exactly what an amplifier's preamp is for.
+     * Kept modest on purpose. An earlier version drove this at 10× because that
+     * maximised how far the overdrive measured from clean — but "different" is not
+     * "better", and maximum distortion is maximally different. What it actually did
+     * was flatten the note's decay into a wall: 84 % of its opening level still there
+     * after 1.5 s, where a plucked note is down to about 20 %. A note that does not
+     * decay is exactly what a synthesiser sounds like.
+     *
+     * So the number that matters here is the envelope, not the distance from clean.
      */
     readonly drive: number | null;
     readonly tone: readonly Resonance[];
@@ -72,18 +78,17 @@ const VOICES: Record<
     readonly gain: number;
   }
 > = {
-  soft: { recording: 'acoustic', drive: null, tone: [], gain: 1 },
   clean: {
     recording: 'electric',
     drive: null,
     tone: [{ frequency: 2600, q: 0.8, gain: 2 }],
-    gain: 1.23,
+    gain: 1,
   },
   electric: {
     recording: 'electric',
-    drive: 10,
-    tone: [{ frequency: 6000, q: 0.7, gain: -4 }],
-    gain: 0.1375,
+    drive: 2.5,
+    tone: [{ frequency: 6000, q: 0.7, gain: -3 }],
+    gain: 0.28,
   },
 };
 
@@ -92,11 +97,9 @@ const TONE_FILTERS = 2;
 
 /**
  * Fallback string settings, used only until the recordings finish loading or if they
- * fail outright. Deliberately three distinguishable models rather than three shades
- * of one.
+ * fail outright.
  */
 const STRINGS: Record<Timbre, Omit<PluckOptions, 'random'>> = {
-  soft: { damping: 0.3, pickPosition: 0.3, pickNoise: 0.04, sustainSeconds: 3.5 },
   clean: { damping: 0.08, pickPosition: 0.19, pickNoise: 0.07, sustainSeconds: 6 },
   electric: { damping: 0.02, pickPosition: 0.1, pickNoise: 0.05, sustainSeconds: 8 },
 };
@@ -114,26 +117,44 @@ const CACHE_LIMIT = 64;
 /** Where the recordings live, relative to the app's base URL. */
 const SAMPLES = 'samples';
 
-/**
- * A soft-clipping curve for the overdrive — tanh rounds the peaks off rather than
- * chopping them square, which is the difference between warm and harsh. Built once
- * and shared by every voice's WaveShaper.
- */
-const DRIVE_CURVE = (() => {
+/** A curve for a WaveShaper: `shape` sampled across inputs from -1 to 1. */
+function shaperCurve(shape: (x: number) => number): Float32Array<ArrayBuffer> {
   const samples = 1024;
   // Backed by an explicit ArrayBuffer so the type matches WaveShaperNode.curve
   // (which rejects the ArrayBufferLike a bare `new Float32Array(n)` infers).
   const curve = new Float32Array(new ArrayBuffer(samples * Float32Array.BYTES_PER_ELEMENT));
-  // Enough to bite without swamping the string underneath. This now shapes a
-  // plucked string rather than a raw waveform, which is what an amplifier actually
-  // does — so it needs far less brute force than it did to colour a sawtooth.
-  const amount = 3.2;
-  for (let i = 0; i < samples; i++) {
-    const x = (i / (samples - 1)) * 2 - 1;
-    curve[i] = Math.tanh(amount * x);
-  }
+  for (let i = 0; i < samples; i++) curve[i] = shape((i / (samples - 1)) * 2 - 1);
   return curve;
-})();
+}
+
+/**
+ * The overdrive: tanh rounds the peaks off rather than chopping them square, which
+ * is the difference between warm and harsh.
+ */
+const DRIVE_CURVE = shaperCurve((x) => Math.tanh(3.2 * x));
+
+/** Below this the safety net is a straight wire; above it, it bends. */
+const CEILING_KNEE = 0.7;
+
+/**
+ * The last thing before the output: a soft ceiling.
+ *
+ * This replaced a DynamicsCompressor, which was the wrong tool and provably so —
+ * measured over a looping progression it took the peak from 0.637 to 0.80. It was
+ * *raising* the level it was meant to hold down: a 3 ms attack lets every transient
+ * straight through, and the 150 ms release then pumps the level in time with the
+ * strumming. That pumping is what "it distorts" actually sounded like.
+ *
+ * A shaper has no time constants, so it cannot pump and cannot overshoot. Below the
+ * knee it is exactly a straight line — normal playing passes untouched — and above
+ * it bends smoothly to a ceiling it can never cross.
+ */
+const CEILING_CURVE = shaperCurve((x) => {
+  const magnitude = Math.abs(x);
+  if (magnitude <= CEILING_KNEE) return x;
+  const over = (magnitude - CEILING_KNEE) / (1 - CEILING_KNEE);
+  return Math.sign(x) * (CEILING_KNEE + (1 - CEILING_KNEE) * Math.tanh(over));
+});
 
 export interface PlayOptions {
   mode?: PlayMode;
@@ -151,39 +172,35 @@ export interface PlayOptions {
   stack?: boolean;
 }
 
-/**
- * How fast the hand crosses the strings, in seconds between one string and the next.
- *
- * The old fixed 35 ms meant 175 ms to cross six strings, which is a slow drag rather
- * than a strum — a real one lands in 30–90 ms. Which of these feels right is taste,
- * so it is a setting rather than a number picked here.
- */
-export const STRUM_SPEEDS = {
-  fast: 0.006,
-  medium: 0.012,
-  plucked: 0.026,
-} as const;
-
-export type StrumSpeed = keyof typeof STRUM_SPEEDS;
-
 const DEFAULTS: Record<PlayMode, { gap: number; duration: number }> = {
   sequence: { gap: 0.28, duration: 0.42 }, // a scale, one note after another
-  strum: { gap: STRUM_SPEEDS.medium, duration: 1.9 }, // strings brushed, left to ring
+  strum: { gap: STANDARD_STRUM_GAP, duration: 1.9 }, // strings brushed, left to ring
 };
 
+/**
+ * Seconds between notes when a chord is arpeggiated outside the transport — a click
+ * on a chord card, where there is no bar to spread across.
+ */
+export const LOOSE_ARPEGGIO_GAP = 0.14;
+
 /** Amplitude of a note sounding on its own. */
-const PEAK = 0.5;
+const PEAK = 0.55;
 
 /**
  * How loud each voice may be when `simultaneous` of them ring together.
  *
  * Without this every voice was equally loud, so a lone note sat six times below a
- * six-string chord — and a chord spanning the whole neck summed past 1.0 and
- * clipped. Loudness roughly follows the square root of the voice count, so
- * dividing by it puts a single note and a full chord in the same ballpark.
+ * six-string chord, and a chord spanning the whole neck summed past 1.0 and clipped.
+ *
+ * The exponent sits between the two honest extremes. Loudness follows the square
+ * root of the voice count when the voices are unrelated, and that is fair enough
+ * once a chord is ringing — but the *attacks* of one strum land within a few
+ * milliseconds of each other and add much more directly than that. Leaning past 0.5
+ * buys headroom exactly where the peaks are, at the cost of a chord sitting a shade
+ * below a single note.
  */
 function voicePeak(simultaneous: number): number {
-  return PEAK / Math.sqrt(Math.max(1, simultaneous));
+  return PEAK / Math.pow(Math.max(1, simultaneous), 0.65);
 }
 
 export interface ProgressionOptions {
@@ -196,8 +213,8 @@ export interface ProgressionOptions {
   /** Bars each chord is held; defaults to one bar each. Aligned with `chords`. */
   chordBars?: readonly number[];
   loop?: boolean;
-  /** Seconds between the strings of one chord. */
-  strumGap?: number;
+  /** Brushed together, or walked across the whole bar. */
+  style?: StrumStyle;
   /** Fires as each chord starts, and with null when playback ends — drives the marker. */
   onChord?: (index: number | null) => void;
 }
@@ -224,6 +241,8 @@ export interface AudioPlayer {
   stop(): void;
   /** Switch the voice. Takes effect on the next note; no AudioContext is created. */
   setTimbre(timbre: Timbre): void;
+  /** Switch the room. Takes effect immediately, including on notes already ringing. */
+  setRoom(room: RoomId): void;
   /** Whether this browser can make sound at all. */
   readonly available: boolean;
 }
@@ -292,6 +311,7 @@ export function createAudioPlayer(): AudioPlayer {
       startProgression: () => NO_OP_HANDLE,
       stop: () => {},
       setTimbre: () => {},
+      setRoom: () => {},
       available: false,
     };
   }
@@ -304,8 +324,12 @@ export function createAudioPlayer(): AudioPlayer {
   /** Tone shaping, in the sum rather than per note — see VOICES. */
   let tone: BiquadFilterNode[] | null = null;
   let live: AudioScheduledSourceNode[] = [];
+  /** The room: a convolver on a send, with its share set by wetGain. */
+  let convolver: ConvolverNode | null = null;
+  let wetGain: GainNode | null = null;
   /** The current voice — changed by setTimbre, read when each note is built. */
-  let timbre: Timbre = 'soft';
+  let timbre: Timbre = 'clean';
+  let room: RoomId = 'room';
 
   /** Decoded audio, once an AudioContext has existed long enough to decode it. */
   const recordings = new Map<string, AudioBuffer>();
@@ -333,6 +357,21 @@ export function createAudioPlayer(): AudioPlayer {
     });
   };
 
+  /** Builds the room and sets how much of it is heard. */
+  const applyRoom = (ctx: AudioContext) => {
+    if (!convolver || !wetGain) return;
+
+    const { seconds, decay, wet } = ROOMS[room];
+    if (wet > 0) {
+      const channels = impulseResponse(ctx.sampleRate, { seconds, decay });
+      const buffer = ctx.createBuffer(channels.length, channels[0].length, ctx.sampleRate);
+      channels.forEach((channel, i) => buffer.copyToChannel(channel, i));
+      convolver.buffer = buffer;
+    }
+    // A short ramp rather than a jump: switching rooms mid-chord would otherwise click.
+    wetGain.gain.setTargetAtTime(wet, ctx.currentTime, 0.02);
+  };
+
   const decodeAll = async (ctx: AudioContext) => {
     const bytes = await prefetchSamples();
     await Promise.all(
@@ -352,16 +391,6 @@ export function createAudioPlayer(): AudioPlayer {
     if (!context) {
       context = new Ctor();
 
-      // A limiter catches whatever the per-voice maths does not: a chord spanning
-      // the whole neck is a dozen voices at once, and summing those straight into
-      // the output clipped audibly.
-      const limiter = context.createDynamicsCompressor();
-      limiter.threshold.value = -6;
-      limiter.knee.value = 4;
-      limiter.ratio.value = 12;
-      limiter.attack.value = 0.003;
-      limiter.release.value = 0.15;
-
       // Tone shaping belongs to the instrument, not to any one note, so it sits in
       // the sum: two filters in total rather than two per pluck.
       tone = Array.from({ length: TONE_FILTERS }, () => {
@@ -370,12 +399,27 @@ export function createAudioPlayer(): AudioPlayer {
         return filter;
       });
 
+      // The safety net, and the last thing anything passes through.
+      const ceiling = context.createWaveShaper();
+      ceiling.curve = CEILING_CURVE;
+      ceiling.oversample = '4x';
+      ceiling.connect(context.destination);
+
       master = context.createGain();
       master.gain.value = 0.9;
-      tone.reduce<AudioNode>((node, filter) => node.connect(filter), master).connect(limiter);
-      limiter.connect(context.destination);
+      const shaped = tone.reduce<AudioNode>((node, filter) => node.connect(filter), master);
+
+      // The room hangs off a send, so the dry signal reaches the output untouched
+      // whether or not there is any reverb — "off" is genuinely off, not a mix at
+      // zero that still colours things.
+      convolver = context.createConvolver();
+      wetGain = context.createGain();
+      wetGain.gain.value = 0;
+      shaped.connect(convolver).connect(wetGain).connect(ceiling);
+      shaped.connect(ceiling);
 
       applyTone();
+      applyRoom(context);
       // First gesture: the bytes are usually already here, so this only decodes.
       void decodeAll(context);
     }
@@ -541,7 +585,7 @@ export function createAudioPlayer(): AudioPlayer {
       pattern,
       chordBars,
       loop = false,
-      strumGap = STRUM_SPEEDS.medium,
+      style = 'standard',
       onChord,
     } = options;
     const barsOf = (index: number) => Math.max(1, chordBars?.[index] ?? 1);
@@ -549,8 +593,9 @@ export function createAudioPlayer(): AudioPlayer {
     const secondsPerBeat = secondsPerBar / beatsPerBar;
     const slotSeconds = secondsPerBeat / 2; // eighth-note grid: two slots per beat
     // A strum rings a beat or so, overlapping the next a little the way real
-    // strumming sustains; the limiter keeps the stack from clipping.
-    const strumRing = Math.min(secondsPerBeat * 1.3, 2);
+    // strumming sustains. An arpeggio has to hold its notes until the bar is out, or
+    // the chord is never heard as a chord.
+    const ring = strumRing(style, secondsPerBar, Math.min(secondsPerBeat * 1.3, 2));
 
     const ctx = ensureContext();
     progressionCancelled = false;
@@ -569,9 +614,23 @@ export function createAudioPlayer(): AudioPlayer {
     const strum = (chord: readonly number[], at: number, slot: StrumSlot, peak: number) => {
       if (slot === null) return;
       const order = slot === 'up' ? [...chord].reverse() : chord;
+      const offsets = strumOffsets(order.length, style, secondsPerBar);
       order.forEach((midi, i) => {
-        voice(ctx, midi, at + i * strumGap, strumRing, peak);
+        voice(ctx, midi, at + offsets[i], ring, peak);
       });
+    };
+
+    /**
+     * One bar of one chord. An arpeggio ignores the strum pattern: spreading the
+     * chord across the whole bar IS the pattern, and laying a second one over it
+     * would just restart the arpeggio on every eighth.
+     */
+    const scheduleBar = (chord: readonly number[], barAt: number, peak: number) => {
+      if (style === 'arpeggio') {
+        strum(chord, barAt, 'down', peak);
+        return;
+      }
+      pattern.forEach((slot, s) => strum(chord, barAt + s * slotSeconds, slot, peak));
     };
 
     // Total span, so the loop knows where to rejoin — chords may differ in length.
@@ -585,10 +644,9 @@ export function createAudioPlayer(): AudioPlayer {
         const at = startAt + offset;
         const bars = barsOf(index);
         const peak = voicePeak(chord.length);
-        // Lay the one-bar pattern across each bar the chord is held.
+        // Lay one bar's worth across each bar the chord is held.
         for (let bar = 0; bar < bars; bar++) {
-          const barAt = at + bar * secondsPerBar;
-          pattern.forEach((slot, s) => strum(chord, barAt + s * slotSeconds, slot, peak));
+          scheduleBar(chord, at + bar * secondsPerBar, peak);
         }
         // The audio is scheduled sample-accurately; the marker just follows along.
         if (onChord) after(at, () => onChord(index));
@@ -621,12 +679,19 @@ export function createAudioPlayer(): AudioPlayer {
     applyTone();
   };
 
+  const setRoom = (next: RoomId) => {
+    room = next;
+    // Only if a context exists — this must not start audio before a gesture.
+    if (context) applyRoom(context);
+  };
+
   return {
     play,
     playNote,
     startProgression,
     stop,
     setTimbre,
+    setRoom,
     available: true,
   };
 }

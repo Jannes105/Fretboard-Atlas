@@ -20,14 +20,14 @@ const WORK = '.samples-src/Shinyguitar';
 const OUT = 'public/samples';
 
 /**
- * Which recording feeds which voice. The same archtop guitar, captured two ways —
- * so "clean" and "acoustic" are genuinely different takes rather than one take with
- * the tone knob moved, which is exactly the failure this replaces.
+ * The magnetic pickup take, and only that.
+ *
+ * The library also holds a microphone take of the same guitar, and it shipped for a
+ * while as a separate "acoustic" voice. It measured 6.7 dB away across third-octave
+ * bands, but it never sounded like a second instrument — because it is not one. It
+ * is the same archtop, the same performance, one microphone further away.
  */
-const VOICES = [
-  { id: 'electric', program: 'electric_one.sfz', folder: 'electric' },
-  { id: 'acoustic', program: 'acoustic_one.sfz', folder: 'acoustic' },
-];
+const VOICES = [{ id: 'electric', program: 'electric_one.sfz', folder: 'electric' }];
 
 /** Velocity layer 3 of 4 — a firm pick, the way you strum a chord. */
 const VELOCITY = { lo: 65, hi: 96 };

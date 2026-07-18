@@ -1,4 +1,6 @@
-import { STRUM_SPEEDS, type StrumSpeed, type Timbre } from './audio';
+import type { Timbre } from './audio';
+import type { RoomId } from './synth/reverb';
+import { ROOMS } from './synth/reverb';
 import type { LabelMode } from './components/FretboardView';
 import {
   ROOT_CHOICES,
@@ -7,6 +9,7 @@ import {
   isDefaultPattern,
   serializePattern,
   defaultPattern,
+  type StrumStyle,
   Tuning,
 } from './theory';
 
@@ -38,8 +41,10 @@ export interface AppState {
   beatsPerBar: number;
   /** Strum pattern for one bar as a d/u/- string; length follows beatsPerBar. */
   rhythm: string;
-  /** How fast the hand crosses the strings. */
-  strum: StrumSpeed;
+  /** Brushed together, or walked across the whole bar. */
+  strum: StrumStyle;
+  /** How much room the guitar is played in. */
+  reverb: RoomId;
 }
 
 export const DEFAULT_STATE: AppState = {
@@ -54,15 +59,17 @@ export const DEFAULT_STATE: AppState = {
   boxNumber: 0,
   bpm: 90,
   loop: true,
-  sound: 'soft',
+  sound: 'clean',
   beatsPerBar: 4,
   rhythm: serializePattern(defaultPattern(4)),
-  strum: 'medium',
+  strum: 'standard',
+  reverb: 'room',
 };
 
 const FRET_COUNTS = [12, 15, 24];
-const SOUNDS: readonly Timbre[] = ['soft', 'clean', 'electric'];
-const STRUMS = Object.keys(STRUM_SPEEDS) as readonly StrumSpeed[];
+const SOUNDS: readonly Timbre[] = ['clean', 'electric'];
+const STRUMS: readonly StrumStyle[] = ['standard', 'arpeggio'];
+const ROOM_IDS = Object.keys(ROOMS) as readonly RoomId[];
 const BEATS_PER_BAR = [2, 3, 4, 6];
 const MAX_CAPO = 7;
 export const MIN_BPM = 40;
@@ -186,6 +193,7 @@ export function readState(search: string): AppState {
     loop: params.get('loop') === null ? DEFAULT_STATE.loop : params.get('loop') !== '0',
     sound: pickFrom(params.get('sound'), SOUNDS, DEFAULT_STATE.sound),
     strum: pickFrom(params.get('strum'), STRUMS, DEFAULT_STATE.strum),
+    reverb: pickFrom(params.get('reverb'), ROOM_IDS, DEFAULT_STATE.reverb),
     beatsPerBar,
     rhythm,
   };
@@ -212,6 +220,7 @@ export function writeState(state: AppState): string {
   if (state.loop !== DEFAULT_STATE.loop) params.set('loop', state.loop ? '1' : '0');
   add('sound', state.sound, DEFAULT_STATE.sound);
   add('strum', state.strum, DEFAULT_STATE.strum);
+  add('reverb', state.reverb, DEFAULT_STATE.reverb);
   add('sig', state.beatsPerBar, DEFAULT_STATE.beatsPerBar);
   // Only a real, meter-matching pattern is worth a link; a wrong-length leftover
   // would be reset on read anyway.

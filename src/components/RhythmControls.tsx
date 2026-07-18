@@ -1,23 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import type { StrumSpeed } from '../audio';
-import { PATTERN_PRESETS, serializePattern } from '../theory';
+import { PATTERN_PRESETS, serializePattern, type StrumStyle } from '../theory';
 import { RhythmEditor } from './RhythmEditor';
 import './RhythmControls.css';
 
 interface RhythmControlsProps {
   beatsPerBar: number;
   rhythm: string;
-  strum: StrumSpeed;
+  strum: StrumStyle;
   onBeatsPerBarChange: (beatsPerBar: number) => void;
   onRhythmChange: (rhythm: string) => void;
-  onStrumChange: (strum: StrumSpeed) => void;
+  onStrumChange: (strum: StrumStyle) => void;
 }
 
-/** How fast the hand crosses the strings, named for what it feels like. */
-const STRUMS: readonly { value: StrumSpeed; label: string }[] = [
-  { value: 'fast', label: 'schnell' },
-  { value: 'medium', label: 'mittel' },
-  { value: 'plucked', label: 'gezupft' },
+/**
+ * How the hand crosses the strings.
+ *
+ * This replaced three speeds — 36, 72 and 156 ms across six strings. Measured they
+ * were three shades of one gesture, and the first two were not tellable apart. Strum
+ * against arpeggio is a musical difference instead of a slider.
+ */
+const STRUMS: readonly { value: StrumStyle; label: string }[] = [
+  { value: 'standard', label: 'Anschlag' },
+  { value: 'arpeggio', label: 'Arpeggio' },
 ];
 
 const METERS: readonly { value: number; label: string }[] = [
@@ -79,8 +83,9 @@ export function RhythmControls({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
+        {/* Naming the pattern would be a lie under an arpeggio, which has none. */}
         <span>
-          {meter} · {patternName(rhythm, beatsPerBar)}
+          {meter} · {strum === 'arpeggio' ? 'Arpeggio' : patternName(rhythm, beatsPerBar)}
         </span>
         <span className="rhythm-caret" aria-hidden="true">
           ▾
@@ -105,11 +110,11 @@ export function RhythmControls({
           </label>
 
           <label className="field field--inline">
-            <span>Anschlag</span>
+            <span>Spielweise</span>
             <select
-              aria-label="Anschlaggeschwindigkeit"
+              aria-label="Spielweise"
               value={strum}
-              onChange={(event) => onStrumChange(event.target.value as StrumSpeed)}
+              onChange={(event) => onStrumChange(event.target.value as StrumStyle)}
             >
               {STRUMS.map((entry) => (
                 <option key={entry.value} value={entry.value}>
@@ -119,7 +124,13 @@ export function RhythmControls({
             </select>
           </label>
 
-          <RhythmEditor rhythm={rhythm} beatsPerBar={beatsPerBar} onChange={onRhythmChange} />
+          {strum === 'arpeggio' ? (
+            // The pattern grid is meaningless here — an arpeggio spread across the
+            // whole bar IS the pattern. Saying so beats leaving a dead control.
+            <p className="hint">Die Töne verteilen sich über den ganzen Takt — ohne Schlagmuster.</p>
+          ) : (
+            <RhythmEditor rhythm={rhythm} beatsPerBar={beatsPerBar} onChange={onRhythmChange} />
+          )}
         </div>
       ) : null}
     </div>

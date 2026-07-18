@@ -50,6 +50,10 @@ export {
   isDefaultPattern,
   PATTERN_PRESETS,
   type PatternPreset,
+  type StrumStyle,
+  STANDARD_STRUM_GAP,
+  strumOffsets,
+  strumRing,
 } from './rhythm';
 export {
   PROGRESSIONS,

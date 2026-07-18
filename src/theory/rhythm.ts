@@ -41,6 +41,55 @@ export function isDefaultPattern(text: string, beatsPerBar: number): boolean {
   return text === serializePattern(defaultPattern(beatsPerBar));
 }
 
+/**
+ * How the hand crosses the strings.
+ *
+ * `standard` brushes them, near enough to together that the chord arrives as one
+ * sound. `arpeggio` walks them, one note at a time across the whole bar, so the
+ * chord is heard as its parts.
+ *
+ * This replaced three speeds — fast, medium, plucked. Measured, they were 36, 72 and
+ * 156 ms across six strings, which is three shades of the same gesture; the first
+ * two were indistinguishable by ear. Strum against arpeggio is a musical
+ * distinction rather than a slider.
+ */
+export type StrumStyle = 'standard' | 'arpeggio';
+
+/** Seconds between one string and the next in an ordinary strum. */
+export const STANDARD_STRUM_GAP = 0.01;
+
+/**
+ * When each string of a chord is struck, in seconds from the start of the bar.
+ *
+ * An arpeggio is spread to fill the bar exactly, so it always resolves on the next
+ * chord no matter the tempo or the meter. That is also why it ignores the strum
+ * pattern: spreading the notes across the bar IS the pattern.
+ */
+export function strumOffsets(
+  noteCount: number,
+  style: StrumStyle,
+  secondsPerBar: number,
+): number[] {
+  if (noteCount <= 0) return [];
+
+  const gap =
+    style === 'arpeggio'
+      ? // Divided by the note count, not by count-1, so the last note still gets its
+        // own share of the bar instead of landing on the downbeat of the next one.
+        secondsPerBar / noteCount
+      : STANDARD_STRUM_GAP;
+
+  return Array.from({ length: noteCount }, (_, i) => i * gap);
+}
+
+/**
+ * How long each note should ring. An arpeggio has to hold its notes at least until
+ * the bar is out, or the chord is never heard as a chord — only as a queue of notes.
+ */
+export function strumRing(style: StrumStyle, secondsPerBar: number, ringing: number): number {
+  return style === 'arpeggio' ? Math.max(ringing, secondsPerBar) : ringing;
+}
+
 export interface PatternPreset {
   readonly id: string;
   readonly name: string;

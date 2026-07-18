@@ -146,26 +146,36 @@ describe('Schlagmuster in der URL', () => {
 describe('Klang in der URL', () => {
   it('liest und schreibt den Sound, lässt den Default aber weg', () => {
     expect(readState('?sound=electric').sound).toBe('electric');
-    expect(readState('?sound=clean').sound).toBe('clean');
-    expect(readState('').sound).toBe('soft');
-    // Unbekannter Wert fällt zurück.
-    expect(readState('?sound=laut').sound).toBe('soft');
+    expect(readState('').sound).toBe('clean');
+    // Unbekannter Wert fällt zurück - auch das abgeschaffte 'soft' aus alten Links.
+    expect(readState('?sound=laut').sound).toBe('clean');
+    expect(readState('?sound=soft').sound).toBe('clean');
     // Default steht nicht im Link.
-    expect(writeState({ ...DEFAULT_STATE, sound: 'soft' })).toBe('');
+    expect(writeState({ ...DEFAULT_STATE, sound: 'clean' })).toBe('');
     expect(writeState({ ...DEFAULT_STATE, sound: 'electric' })).toBe('?sound=electric');
   });
 });
 
-describe('Anschlaggeschwindigkeit in der URL', () => {
-  it('liest und schreibt den Anschlag, lässt den Default aber weg', () => {
-    expect(readState('?strum=fast').strum).toBe('fast');
-    expect(readState('?strum=plucked').strum).toBe('plucked');
-    expect(readState('').strum).toBe('medium');
-    // Unbekannter Wert fällt zurück.
-    expect(readState('?strum=hektisch').strum).toBe('medium');
+describe('Spielweise in der URL', () => {
+  it('liest und schreibt die Spielweise, lässt den Default aber weg', () => {
+    expect(readState('?strum=arpeggio').strum).toBe('arpeggio');
+    expect(readState('').strum).toBe('standard');
+    // Unbekannter Wert fällt zurück - auch die abgeschafften Geschwindigkeitsstufen.
+    expect(readState('?strum=medium').strum).toBe('standard');
     // Default steht nicht im Link.
-    expect(writeState({ ...DEFAULT_STATE, strum: 'medium' })).toBe('');
-    expect(writeState({ ...DEFAULT_STATE, strum: 'fast' })).toBe('?strum=fast');
+    expect(writeState({ ...DEFAULT_STATE, strum: 'standard' })).toBe('');
+    expect(writeState({ ...DEFAULT_STATE, strum: 'arpeggio' })).toBe('?strum=arpeggio');
+  });
+});
+
+describe('Raum in der URL', () => {
+  it('liest und schreibt den Nachklang, lässt den Default aber weg', () => {
+    expect(readState('?reverb=hall').reverb).toBe('hall');
+    expect(readState('?reverb=off').reverb).toBe('off');
+    expect(readState('').reverb).toBe('room');
+    expect(readState('?reverb=kathedrale').reverb).toBe('room');
+    expect(writeState({ ...DEFAULT_STATE, reverb: 'room' })).toBe('');
+    expect(writeState({ ...DEFAULT_STATE, reverb: 'hall' })).toBe('?reverb=hall');
   });
 });
 

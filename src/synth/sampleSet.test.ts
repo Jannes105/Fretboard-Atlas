@@ -7,10 +7,7 @@ import { sampleFor, stretchSemitones, type SampleSet } from './sampleSet';
  * "the maths is wrong" — it is "the shipped set has a hole in it", and only the real
  * file can catch that. Rebuilding the samples with a coarser grid should break these.
  */
-const VOICES: readonly (readonly [string, SampleSet])[] = [
-  ['electric', manifest.electric],
-  ['acoustic', manifest.acoustic],
-];
+const VOICES: readonly (readonly [string, SampleSet])[] = [['electric', manifest.electric]];
 
 /** Low E open (40) to the 24th fret of the high E (88) — everything the app can play. */
 const LOWEST = 40;
