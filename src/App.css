@@ -593,6 +593,42 @@ button:focus-visible {
   padding: 0;
 }
 
+/* Holds the card plus its "add to progression" badge. */
+.chord-slot {
+  position: relative;
+  display: flex;
+}
+
+/* Only shown while a self-built progression is open — the card itself still
+   means "hear it and show it on the neck". */
+.chord-add {
+  position: absolute;
+  top: -0.4rem;
+  right: -0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    transform 0.08s ease;
+}
+
+.chord-add:hover {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  transform: scale(1.1);
+}
+
 .chord-card {
   display: flex;
   flex-direction: column;

@@ -178,14 +178,24 @@ describe('App — Eigene Akkordfolge', () => {
     expect(options.pattern).toEqual(['down', 'up', 'down', null, 'down', 'up']);
   });
 
-  it('lässt ein Schlagmuster-Preset wählen und schreibt es in die URL', async () => {
+  it('hält Takt und Schlagmuster hinter einem Auslöser, der ihren Wert nennt', async () => {
     const user = userEvent.setup();
     window.history.replaceState(null, '', '/?prog=custom:C,G');
     const { container } = render(<App />);
 
+    // Zugeklappt: der Auslöser spricht den Wert aus, das Gitter liegt nicht offen.
+    const trigger = container.querySelector<HTMLButtonElement>('.rhythm-trigger')!;
+    expect(trigger.textContent).toContain('4/4');
+    expect(trigger.textContent).toContain('Viertel');
+    expect(container.querySelectorAll('.rhythm-cell')).toHaveLength(0);
+
+    await user.click(trigger);
+
     // Slot 1 (erster Abschlag) auf Aufschlag klicken: d → u.
     await user.click(container.querySelectorAll<HTMLButtonElement>('.rhythm-cell')[0]);
     expect(window.location.search).toContain('rhythm=u-d-d-d-');
+    // Der Auslöser meldet jetzt ein eigenes Muster statt eines Presets.
+    expect(container.querySelector('.rhythm-trigger')?.textContent).toContain('Eigenes');
   });
 
   it('lässt die Länge je Akkord in Takten einstellen', async () => {

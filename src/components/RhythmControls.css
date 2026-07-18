@@ -1,0 +1,82 @@
+.rhythm-controls {
+  position: relative;
+}
+
+/* States its value ("4/4 · Viertel") so the setting is readable without opening —
+   the same quiet, bordered idiom as the setup trigger in the header. */
+.rhythm-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.rhythm-trigger:hover,
+.rhythm-trigger.is-open {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+.rhythm-caret {
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.rhythm-trigger.is-open .rhythm-caret {
+  transform: rotate(180deg);
+}
+
+.rhythm-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  /* The trigger sits at the right of the transport row, so the panel opens
+     leftward — anchored left it ran off the screen edge. */
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 0.8rem;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
+}
+
+/* Inside the panel the editor is the content, not a floating row. */
+.rhythm-panel .rhythm {
+  margin-bottom: 0;
+}
+
+/*
+ * On a phone the trigger sits mid-row, so a panel anchored to it hangs off the
+ * left edge — clipped, not scrollable, simply unreachable. Anchor it to the
+ * transport row instead, which starts at the page margin.
+ */
+@media (max-width: 700px) {
+  .rhythm-controls {
+    position: static;
+  }
+
+  .transport {
+    position: relative;
+  }
+
+  .rhythm-panel {
+    left: 0;
+    right: auto;
+    max-width: calc(100vw - 2rem);
+  }
+}

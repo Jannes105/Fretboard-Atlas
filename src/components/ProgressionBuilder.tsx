@@ -7,20 +7,17 @@ import './ProgressionBuilder.css';
 const MAX_BARS = 4;
 
 interface ProgressionBuilderProps {
-  /** The seven diatonic chords of the key, for one-tap adding. */
-  diatonic: readonly Chord[];
   /** The current sequence: each chord and how many bars it is held. */
   steps: readonly CustomStep[];
   onChange: (steps: CustomStep[]) => void;
 }
 
 /**
- * Build a chord sequence by hand: tap the diatonic chords, or type anything —
- * including the power chords and suspensions the vocabulary now knows. Each chord
- * carries how many bars it is held. The result is what the transport above plays,
- * closing the loop the key finder opened.
+ * The sequence itself: reorderable chips with their bar counts, plus a field for
+ * anything the vocabulary knows (power chords, suspensions, slash chords). The
+ * diatonic chords are added from their cards above — they are not drawn twice.
  */
-export function ProgressionBuilder({ diatonic, steps, onChange }: ProgressionBuilderProps) {
+export function ProgressionBuilder({ steps, onChange }: ProgressionBuilderProps) {
   const [typed, setTyped] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -87,22 +84,8 @@ export function ProgressionBuilder({ diatonic, steps, onChange }: ProgressionBui
       </div>
 
       <div className="builder-add">
-        <ul className="builder-diatonic">
-          {diatonic.map((chord, i) => (
-            <li key={chord.name()}>
-              <button
-                type="button"
-                className="builder-diatonic-btn"
-                onClick={() => add(chord.name())}
-                title={`${chord.name()} anhängen`}
-              >
-                <span className="builder-roman">{chord.romanNumeral(i)}</span>
-                <span className="builder-name">{chord.name()}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-
+        {/* The seven diatonic chords are NOT repeated here — they already sit
+            above as cards, each with a "+" that appends. One set, not two. */}
         <form
           className="builder-type"
           onSubmit={(event) => {

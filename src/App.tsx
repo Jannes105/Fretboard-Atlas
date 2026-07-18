@@ -4,7 +4,7 @@ import { FretboardView, type LabelMode } from './components/FretboardView';
 import { KeyFinder } from './components/KeyFinder';
 import { ProgressionBuilder } from './components/ProgressionBuilder';
 import { ProgressionChord } from './components/ProgressionChord';
-import { RhythmEditor } from './components/RhythmEditor';
+import { RhythmControls } from './components/RhythmControls';
 import {
   buildProgression,
   Chord,
@@ -664,7 +664,7 @@ export default function App() {
 
             <ol className="chord-row">
               {chords.map((chord, i) => (
-                <li key={chord.name()}>
+                <li key={chord.name()} className="chord-slot">
                   <button
                     type="button"
                     className={isChordActive(i) ? 'chord-card is-active' : 'chord-card'}
@@ -677,6 +677,28 @@ export default function App() {
                       {chord.notes.map((note) => note.name()).join(' ')}
                     </span>
                   </button>
+
+                  {/* These seven chords used to be drawn a second time inside the
+                      builder just to add them. One set, two actions instead. */}
+                  {isCustom ? (
+                    <button
+                      type="button"
+                      className="chord-add"
+                      aria-label={`${chord.name()} an die Folge anhängen`}
+                      title="An die Folge anhängen"
+                      onClick={() =>
+                        update(
+                          'progressionId',
+                          customProgId([
+                            ...(customChordSteps ?? []),
+                            { symbol: chord.name(), bars: 1 },
+                          ]),
+                        )
+                      }
+                    >
+                      +
+                    </button>
+                  ) : null}
                 </li>
               ))}
             </ol>
@@ -712,7 +734,6 @@ export default function App() {
 
             {isCustom ? (
               <ProgressionBuilder
-                diatonic={chords}
                 steps={customChordSteps ?? []}
                 onChange={(next) => update('progressionId', customProgId(next))}
               />
@@ -755,34 +776,20 @@ export default function App() {
                 <span>Wiederholen</span>
               </label>
 
-              <label className="field field--inline">
-                <span>Takt</span>
-                <select
-                  aria-label="Taktart"
-                  value={beatsPerBar}
-                  onChange={(e) => {
-                    // The pattern length follows the meter, so a new meter resets it.
-                    const nextBeats = Number(e.target.value);
-                    setState((previous) => ({
-                      ...previous,
-                      beatsPerBar: nextBeats,
-                      rhythm: serializePattern(defaultPattern(nextBeats)),
-                    }));
-                  }}
-                >
-                  <option value={4}>4/4</option>
-                  <option value={3}>3/4</option>
-                  <option value={6}>6/8</option>
-                  <option value={2}>2/4</option>
-                </select>
-              </label>
+              <RhythmControls
+                beatsPerBar={beatsPerBar}
+                rhythm={rhythm}
+                onBeatsPerBarChange={(nextBeats) =>
+                  // The pattern length follows the meter, so a new meter resets it.
+                  setState((previous) => ({
+                    ...previous,
+                    beatsPerBar: nextBeats,
+                    rhythm: serializePattern(defaultPattern(nextBeats)),
+                  }))
+                }
+                onRhythmChange={(next) => update('rhythm', next)}
+              />
             </div>
-
-            <RhythmEditor
-              rhythm={rhythm}
-              beatsPerBar={beatsPerBar}
-              onChange={(next) => update('rhythm', next)}
-            />
 
             <ol className="progression">
               {steps.map((step, i) => (
