@@ -156,7 +156,9 @@ export function SetupPanel({
           <label className="field">
             <span>Klang</span>
             <select value={sound} onChange={(e) => onSoundChange(e.target.value as Timbre)}>
-              <option value="soft">Weich</option>
+              {/* The values are what shared links carry, so they stay put even
+                  though "soft" now means an acoustic string. */}
+              <option value="soft">Akustik</option>
               <option value="clean">Clean</option>
               <option value="electric">Overdrive</option>
             </select>

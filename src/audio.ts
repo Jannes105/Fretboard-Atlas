@@ -1,9 +1,11 @@
+import { pluck, type PluckOptions } from './synth/pluck';
 import { midiToFrequency, type StrumSlot } from './theory';
 
 /**
  * A thin wrapper over the Web Audio API — the one place in the app that makes
- * sound. Everything about which notes to play is computed in src/theory/pitch.ts;
- * this file only knows about oscillators and timing.
+ * sound. Everything about which notes to play is computed in src/theory/pitch.ts,
+ * and what a single plucked note looks like in src/synth/pluck.ts; this file only
+ * wires those together and handles timing.
  *
  * No dependencies: Web Audio is built into the browser. If it is somehow missing,
  * every method is a harmless no-op.
@@ -12,18 +14,42 @@ import { midiToFrequency, type StrumSlot } from './theory';
 export type PlayMode = 'sequence' | 'strum';
 
 /**
- * The instrument's voice. `soft` is the mellow triangle the app started with;
- * `clean` and `electric` are a filtered sawtooth — brighter, more like an electric
- * guitar — with `electric` adding a touch of overdrive on top. Only the timbre
- * changes; the pitches played are identical.
+ * The instrument's voice — three strings rather than three waveforms. `soft` is a
+ * nylon-ish acoustic, `clean` a brighter steel string, `electric` the same string
+ * put through an overdrive. Only the timbre changes; the pitches played are
+ * identical.
+ *
+ * The names are the ones already in shared links, so they stay as they are even
+ * though "soft" now means "acoustic".
  */
 export type Timbre = 'soft' | 'clean' | 'electric';
 
 /**
- * Per-timbre loudness trim, so switching voice does not jump in volume: a
- * sawtooth carries far more energy than a triangle, and overdrive adds more still.
+ * How each voice's string is strung. Heavier damping eats the highs faster, which
+ * is the difference between nylon and steel; the pick runs from a thumb to a
+ * plectrum.
  */
-const TIMBRE_GAIN: Record<Timbre, number> = { soft: 1, clean: 0.6, electric: 0.38 };
+const STRINGS: Record<Timbre, Omit<PluckOptions, 'random'>> = {
+  soft: { damping: 0.55, pick: 0.62, sustainSeconds: 4 },
+  clean: { damping: 0.22, pick: 0.22, sustainSeconds: 6 },
+  electric: { damping: 0.14, pick: 0.14, sustainSeconds: 8 },
+};
+
+/**
+ * Per-timbre loudness trim, so switching voice does not jump in volume. Set from
+ * the measured RMS of the rendered strings, not by ear.
+ */
+const TIMBRE_GAIN: Record<Timbre, number> = { soft: 1, clean: 0.85, electric: 0.3 };
+
+/** How much of a note is rendered; longer than anything the app actually holds. */
+const RENDER_SECONDS = 2.4;
+
+/**
+ * How many rendered strings to keep. A looping progression schedules a couple of
+ * hundred plucks per pass, and rendering each one on the spot would stutter — but
+ * only a few dozen distinct pitches are ever in play, so a small cache covers it.
+ */
+const CACHE_LIMIT = 64;
 
 /**
  * A soft-clipping curve for the overdrive — tanh rounds the peaks off rather than
@@ -35,10 +61,10 @@ const DRIVE_CURVE = (() => {
   // Backed by an explicit ArrayBuffer so the type matches WaveShaperNode.curve
   // (which rejects the ArrayBufferLike a bare `new Float32Array(n)` infers).
   const curve = new Float32Array(new ArrayBuffer(samples * Float32Array.BYTES_PER_ELEMENT));
-  // A steep tanh so the sawtooth's ramp gets squashed toward a square — that hard
-  // edge is the overdrive. Gentle amounts are inaudible on a wave that already has
-  // every harmonic; this has to bite.
-  const amount = 6;
+  // Enough to bite without swamping the string underneath. This now shapes a
+  // plucked string rather than a raw waveform, which is what an amplifier actually
+  // does — so it needs far less brute force than it did to colour a sawtooth.
+  const amount = 3.2;
   for (let i = 0; i < samples; i++) {
     const x = (i / (samples - 1)) * 2 - 1;
     curve[i] = Math.tanh(amount * x);
@@ -154,9 +180,13 @@ export function createAudioPlayer(): AudioPlayer {
   let context: AudioContext | null = null;
   /** Everything goes through here, so nothing can hit the output raw. */
   let master: GainNode | null = null;
-  let live: OscillatorNode[] = [];
+  let live: AudioScheduledSourceNode[] = [];
   /** The current voice — changed by setTimbre, read when each note is built. */
   let timbre: Timbre = 'soft';
+
+  /** Rendered strings, keyed by voice and pitch. Insertion-ordered, so the oldest
+   *  entry is simply the first key when the cache has to make room. */
+  const strings = new Map<string, AudioBuffer>();
 
   /** Timers of the running progression — its loop keeps arming new ones. */
   let progressionTimers: number[] = [];
@@ -219,6 +249,25 @@ export function createAudioPlayer(): AudioPlayer {
     stopVoices();
   };
 
+  /** The rendered string for this pitch and voice, from cache or freshly plucked. */
+  const stringFor = (ctx: AudioContext, frequency: number): AudioBuffer => {
+    // Rounded, because a cache keyed on raw floats would never hit twice.
+    const key = `${timbre}:${frequency.toFixed(2)}`;
+    const cached = strings.get(key);
+    if (cached) return cached;
+
+    const samples = pluck(frequency, ctx.sampleRate, RENDER_SECONDS, STRINGS[timbre]);
+    const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+    buffer.copyToChannel(samples, 0);
+
+    if (strings.size >= CACHE_LIMIT) {
+      const oldest = strings.keys().next().value;
+      if (oldest !== undefined) strings.delete(oldest);
+    }
+    strings.set(key, buffer);
+    return buffer;
+  };
+
   const voice = (
     ctx: AudioContext,
     frequency: number,
@@ -226,65 +275,44 @@ export function createAudioPlayer(): AudioPlayer {
     duration: number,
     peak: number,
   ) => {
-    const osc = ctx.createOscillator();
+    const source = ctx.createBufferSource();
+    source.buffer = stringFor(ctx, frequency);
+
+    // The decay lives in the buffer now — the string dies away on its own, and the
+    // highs go before the fundamental. So this gain only sets the level and takes
+    // the note away cleanly when its time is up; an envelope shaped like the old one
+    // would decay a second time on top and choke the note.
     const gain = ctx.createGain();
-    osc.frequency.value = frequency;
-
-    // A short attack and an exponential decay — no click on start or end. The
-    // per-timbre trim keeps the loudness even when the voice changes.
     const scaledPeak = peak * TIMBRE_GAIN[timbre];
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(scaledPeak, at + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+    const fade = Math.min(0.08, duration / 2);
+    gain.gain.setValueAtTime(scaledPeak, at);
+    gain.gain.setValueAtTime(scaledPeak, at + duration - fade);
+    gain.gain.linearRampToValueAtTime(0.0001, at + duration);
 
-    if (timbre === 'soft') {
-      // A triangle wave is softer and a touch closer to a plucked string than a sine.
-      osc.type = 'triangle';
-      osc.connect(gain).connect(master!);
-    } else {
-      // A sawtooth is bright and buzzy like an electric pickup; a lowpass that
-      // opens on the attack and closes as the note decays gives it a plucked edge
-      // that softens, instead of a static drone.
-      osc.type = 'sawtooth';
+    if (timbre === 'electric') {
+      // Overdrive: the shaper squashes the string's peaks, and a lowpass shaves the
+      // fizz the shaper adds right at the top without touching what makes it bite.
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = DRIVE_CURVE;
+      shaper.oversample = '4x';
 
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
+      filter.frequency.value = 5200;
+      filter.Q.value = 0.7;
 
-      if (timbre === 'electric') {
-        // Overdrive: drive the wave hard into the shaper, then keep the filter
-        // wide open — the whole point is to HEAR the harmonics the distortion
-        // adds, so this must stay much brighter than clean.
-        filter.Q.value = 4;
-        filter.frequency.setValueAtTime(Math.min(frequency * 10 + 3500, 12000), at);
-        filter.frequency.exponentialRampToValueAtTime(
-          Math.min(frequency * 5 + 1800, 7000),
-          at + duration,
-        );
-
-        const shaper = ctx.createWaveShaper();
-        shaper.curve = DRIVE_CURVE;
-        shaper.oversample = '4x';
-        osc.connect(shaper).connect(filter).connect(gain).connect(master!);
-      } else {
-        // Clean: a filtered sawtooth, no drive — clear and a touch bright, but
-        // deliberately darker and smoother than the overdrive above.
-        filter.Q.value = 2;
-        filter.frequency.setValueAtTime(Math.min(frequency * 4 + 1000, 5000), at);
-        filter.frequency.exponentialRampToValueAtTime(
-          Math.min(frequency * 1.5 + 300, 2200),
-          at + duration,
-        );
-        osc.connect(filter).connect(gain).connect(master!);
-      }
+      source.connect(shaper).connect(filter).connect(gain).connect(master!);
+    } else {
+      source.connect(gain).connect(master!);
     }
 
-    osc.start(at);
-    osc.stop(at + duration + 0.05);
+    source.start(at);
+    source.stop(at + duration + 0.02);
 
-    osc.addEventListener('ended', () => {
-      live = live.filter((other) => other !== osc);
+    source.addEventListener('ended', () => {
+      live = live.filter((other) => other !== source);
     });
-    live.push(osc);
+    live.push(source);
   };
 
   const play = (midiNotes: readonly number[], options: PlayOptions = {}) => {
