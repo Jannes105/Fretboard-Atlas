@@ -7,7 +7,7 @@ import {
   arpeggioStringCount,
   dropHighest,
   strumOffsets,
-  strumRing,
+  noteSeconds,
   serializePattern,
 } from './rhythm';
 
@@ -86,17 +86,42 @@ describe('strumOffsets', () => {
   });
 });
 
-describe('strumRing', () => {
-  it('lässt Arpeggio-Töne mindestens bis zum Taktende stehen', () => {
-    // Sonst ist der erste Ton verstummt, bevor der letzte kommt — dann hört man
-    // eine Tonfolge und nie einen Akkord.
-    expect(strumRing('arpeggio', 2.67, 0.9)).toBe(2.67);
-    // Klingt er ohnehin länger, bleibt es dabei.
-    expect(strumRing('arpeggio', 2.67, 3)).toBe(3);
+describe('noteSeconds', () => {
+  const BAR = 2.67;      // ein 4/4-Takt bei 90 BPM
+  const SLOT = BAR / 8;  // eine Achtel
+
+  it('laesst Anschlaege ineinander klingen, wenn sie klingen sollen', () => {
+    const { seconds } = noteSeconds('standard', 'ring', BAR, SLOT);
+    // Laenger als der Abstand zum naechsten Schlag: sie ueberlappen.
+    expect(seconds).toBeGreaterThan(SLOT);
   });
 
-  it('lässt den normalen Anschlag unangetastet', () => {
-    expect(strumRing('standard', 2.67, 0.9)).toBe(0.9);
+  it('laesst beim Abstoppen eine hoerbare Luecke', () => {
+    const { seconds, release } = noteSeconds('standard', 'stopped', BAR, SLOT);
+    // Der Punkt ist nicht nur ein kuerzerer Ton, sondern Stille bis zum naechsten.
+    expect(seconds).toBeLessThan(SLOT * 0.6);
+    // Und er wird abgeschnitten, nicht ausgeblendet.
+    expect(release).toBeLessThan(0.02);
+  });
+
+  it('haelt Arpeggio-Toene beim Klingen bis zum Taktende', () => {
+    // Sonst ist der erste Ton verstummt, bevor der letzte kommt - dann hoert man
+    // eine Tonfolge und nie einen Akkord.
+    const gap = BAR / 5;
+    expect(noteSeconds('arpeggio', 'ring', BAR, gap).seconds).toBe(BAR);
+  });
+
+  it('trennt auch Arpeggio-Toene ab, wenn abgestoppt ist', () => {
+    const gap = BAR / 5;
+    const { seconds } = noteSeconds('arpeggio', 'stopped', BAR, gap);
+    expect(seconds).toBeLessThan(gap);
+  });
+
+  it('haengt am Tempo, nicht an festen Sekunden', () => {
+    // Doppeltes Tempo, halber Takt: alles halbiert sich mit.
+    const slow = noteSeconds('standard', 'stopped', BAR, SLOT).seconds;
+    const fast = noteSeconds('standard', 'stopped', BAR / 2, SLOT / 2).seconds;
+    expect(fast).toBeCloseTo(slow / 2, 6);
   });
 });
 

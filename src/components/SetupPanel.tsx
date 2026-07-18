@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Timbre } from '../audio';
-import type { RoomId } from '../synth/reverb';
 import { pitchClassName, Tuning } from '../theory';
 import { customTuningId } from '../urlState';
 
@@ -16,12 +15,10 @@ interface SetupPanelProps {
   capo: number;
   fretCount: number;
   sound: Timbre;
-  reverb: RoomId;
   onTuningIdChange: (tuningId: string) => void;
   onCapoChange: (capo: number) => void;
   onFretCountChange: (fretCount: number) => void;
   onSoundChange: (sound: Timbre) => void;
-  onReverbChange: (reverb: RoomId) => void;
 }
 
 /**
@@ -36,12 +33,10 @@ export function SetupPanel({
   capo,
   fretCount,
   sound,
-  reverb,
   onTuningIdChange,
   onCapoChange,
   onFretCountChange,
   onSoundChange,
-  onReverbChange,
 }: SetupPanelProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -163,14 +158,6 @@ export function SetupPanel({
             <select value={sound} onChange={(e) => onSoundChange(e.target.value as Timbre)}>
               <option value="clean">Clean</option>
               <option value="electric">Overdrive</option>
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Hall</span>
-            <select value={reverb} onChange={(e) => onReverbChange(e.target.value as RoomId)}>
-              <option value="on">an</option>
-              <option value="off">aus</option>
             </select>
           </label>
         </div>

@@ -1,6 +1,4 @@
 import type { Timbre } from './audio';
-import type { RoomId } from './synth/reverb';
-import { ROOMS } from './synth/reverb';
 import type { LabelMode } from './components/FretboardView';
 import {
   ROOT_CHOICES,
@@ -9,6 +7,7 @@ import {
   isDefaultPattern,
   serializePattern,
   defaultPattern,
+  type NoteLength,
   type StrumStyle,
   Tuning,
 } from './theory';
@@ -43,8 +42,8 @@ export interface AppState {
   rhythm: string;
   /** Brushed together, or walked across the whole bar. */
   strum: StrumStyle;
-  /** How much room the guitar is played in. */
-  reverb: RoomId;
+  /** Whether notes ring on or are cut off after each strum. */
+  sustain: NoteLength;
 }
 
 export const DEFAULT_STATE: AppState = {
@@ -63,13 +62,13 @@ export const DEFAULT_STATE: AppState = {
   beatsPerBar: 4,
   rhythm: serializePattern(defaultPattern(4)),
   strum: 'standard',
-  reverb: 'on',
+  sustain: 'ring',
 };
 
 const FRET_COUNTS = [12, 15, 24];
 const SOUNDS: readonly Timbre[] = ['clean', 'electric'];
 const STRUMS: readonly StrumStyle[] = ['standard', 'arpeggio'];
-const ROOM_IDS = Object.keys(ROOMS) as readonly RoomId[];
+const SUSTAINS: readonly NoteLength[] = ['ring', 'stopped'];
 const BEATS_PER_BAR = [2, 3, 4, 6];
 const MAX_CAPO = 7;
 export const MIN_BPM = 40;
@@ -193,7 +192,7 @@ export function readState(search: string): AppState {
     loop: params.get('loop') === null ? DEFAULT_STATE.loop : params.get('loop') !== '0',
     sound: pickFrom(params.get('sound'), SOUNDS, DEFAULT_STATE.sound),
     strum: pickFrom(params.get('strum'), STRUMS, DEFAULT_STATE.strum),
-    reverb: pickFrom(params.get('reverb'), ROOM_IDS, DEFAULT_STATE.reverb),
+    sustain: pickFrom(params.get('sustain'), SUSTAINS, DEFAULT_STATE.sustain),
     beatsPerBar,
     rhythm,
   };
@@ -220,7 +219,7 @@ export function writeState(state: AppState): string {
   if (state.loop !== DEFAULT_STATE.loop) params.set('loop', state.loop ? '1' : '0');
   add('sound', state.sound, DEFAULT_STATE.sound);
   add('strum', state.strum, DEFAULT_STATE.strum);
-  add('reverb', state.reverb, DEFAULT_STATE.reverb);
+  add('sustain', state.sustain, DEFAULT_STATE.sustain);
   add('sig', state.beatsPerBar, DEFAULT_STATE.beatsPerBar);
   // Only a real, meter-matching pattern is worth a link; a wrong-length leftover
   // would be reset on read anyway.

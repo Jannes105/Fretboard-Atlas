@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { PATTERN_PRESETS, serializePattern, type StrumStyle } from '../theory';
+import { type NoteLength, PATTERN_PRESETS, serializePattern, type StrumStyle } from '../theory';
 import { RhythmEditor } from './RhythmEditor';
 import './RhythmControls.css';
 
@@ -7,9 +7,11 @@ interface RhythmControlsProps {
   beatsPerBar: number;
   rhythm: string;
   strum: StrumStyle;
+  sustain: NoteLength;
   onBeatsPerBarChange: (beatsPerBar: number) => void;
   onRhythmChange: (rhythm: string) => void;
   onStrumChange: (strum: StrumStyle) => void;
+  onSustainChange: (sustain: NoteLength) => void;
 }
 
 /**
@@ -22,6 +24,15 @@ interface RhythmControlsProps {
 const STRUMS: readonly { value: StrumStyle; label: string }[] = [
   { value: 'standard', label: 'Anschlag' },
   { value: 'arpeggio', label: 'Arpeggio' },
+];
+
+/**
+ * How long a note lasts. Sits directly under the playing style because the two are
+ * one decision about the strumming hand: what it does, and whether it lets go.
+ */
+const LENGTHS: readonly { value: NoteLength; label: string }[] = [
+  { value: 'ring', label: 'ausklingen' },
+  { value: 'stopped', label: 'abgestoppt' },
 ];
 
 const METERS: readonly { value: number; label: string }[] = [
@@ -48,9 +59,11 @@ export function RhythmControls({
   beatsPerBar,
   rhythm,
   strum,
+  sustain,
   onBeatsPerBarChange,
   onRhythmChange,
   onStrumChange,
+  onSustainChange,
 }: RhythmControlsProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -117,6 +130,21 @@ export function RhythmControls({
               onChange={(event) => onStrumChange(event.target.value as StrumStyle)}
             >
               {STRUMS.map((entry) => (
+                <option key={entry.value} value={entry.value}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field field--inline">
+            <span>Ton</span>
+            <select
+              aria-label="Tonlänge"
+              value={sustain}
+              onChange={(event) => onSustainChange(event.target.value as NoteLength)}
+            >
+              {LENGTHS.map((entry) => (
                 <option key={entry.value} value={entry.value}>
                   {entry.label}
                 </option>

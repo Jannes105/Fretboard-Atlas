@@ -109,11 +109,49 @@ export function dropHighest<T>(notes: readonly T[], count: number): T[] {
 }
 
 /**
- * How long each note should ring. An arpeggio has to hold its notes at least until
- * the bar is out, or the chord is never heard as a chord — only as a queue of notes.
+ * Whether notes are left to ring into each other, or cut off after each strum.
+ *
+ * `stopped` is a damped, chopped chord: every strum stands on its own with silence
+ * before the next. That silence is the point, not a side effect — a note that merely
+ * ends a little sooner still runs into the following one and reads as ringing.
  */
-export function strumRing(style: StrumStyle, secondsPerBar: number, ringing: number): number {
-  return style === 'arpeggio' ? Math.max(ringing, secondsPerBar) : ringing;
+export type NoteLength = 'ring' | 'stopped';
+
+/** Share of the gap to the next strum that a stopped note actually sounds for. */
+const STOPPED_SHARE = 0.45;
+/** A stopped note is cut, not faded — this is short enough to hear as damping. */
+const HARD_RELEASE = 0.012;
+/** A ringing note fades out gently, so the tail does not end on an edge. */
+export const SOFT_RELEASE = 0.08;
+
+/**
+ * How long one note sounds, and how sharply it ends.
+ *
+ * The release belongs here rather than in the audio code, because half of what makes
+ * a strum sound damped is that it is cut off rather than faded away — splitting the
+ * two decisions across two files would hide that.
+ *
+ * @param nextNote Seconds until the next note of the same gesture: the strum grid's
+ *   slot, or the step of an arpeggio.
+ */
+export function noteSeconds(
+  style: StrumStyle,
+  length: NoteLength,
+  secondsPerBar: number,
+  nextNote: number,
+): { seconds: number; release: number } {
+  if (length === 'stopped') {
+    return { seconds: Math.max(0.05, nextNote * STOPPED_SHARE), release: HARD_RELEASE };
+  }
+
+  // Ringing: a strum hangs over into the next one the way real strumming sustains,
+  // and an arpeggio has to hold until the bar is out or the chord is never heard as
+  // a chord — only as a queue of notes.
+  const ringing = Math.min(nextNote * 2.6, 2);
+  return {
+    seconds: style === 'arpeggio' ? Math.max(ringing, secondsPerBar) : ringing,
+    release: SOFT_RELEASE,
+  };
 }
 
 export interface PatternPreset {

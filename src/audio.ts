@@ -1,5 +1,4 @@
 import { pluck, type PluckOptions } from './synth/pluck';
-import { impulseResponse, ROOMS, type RoomId } from './synth/reverb';
 import { sampleFor, type SampleSet } from './synth/sampleSet';
 import {
   arpeggioStringCount,
@@ -8,7 +7,9 @@ import {
   STANDARD_STRUM_GAP,
   type StrumSlot,
   strumOffsets,
-  strumRing,
+  noteSeconds,
+  type NoteLength,
+  SOFT_RELEASE,
   type StrumStyle,
 } from './theory';
 
@@ -205,6 +206,8 @@ export interface ProgressionOptions {
   loop?: boolean;
   /** Brushed together, or walked across the whole bar. */
   style?: StrumStyle;
+  /** Left to ring on, or cut off after each strum. */
+  length?: NoteLength;
   /** Fires as each chord starts, and with null when playback ends — drives the marker. */
   onChord?: (index: number | null) => void;
 }
@@ -231,8 +234,6 @@ export interface AudioPlayer {
   stop(): void;
   /** Switch the voice. Takes effect on the next note; no AudioContext is created. */
   setTimbre(timbre: Timbre): void;
-  /** Switch the room. Takes effect immediately, including on notes already ringing. */
-  setRoom(room: RoomId): void;
   /** Whether this browser can make sound at all. */
   readonly available: boolean;
 }
@@ -301,7 +302,6 @@ export function createAudioPlayer(): AudioPlayer {
       startProgression: () => NO_OP_HANDLE,
       stop: () => {},
       setTimbre: () => {},
-      setRoom: () => {},
       available: false,
     };
   }
@@ -314,12 +314,8 @@ export function createAudioPlayer(): AudioPlayer {
   /** Tone shaping, in the sum rather than per note — see VOICES. */
   let tone: BiquadFilterNode[] | null = null;
   let live: AudioScheduledSourceNode[] = [];
-  /** The room: a convolver on a send, with its share set by wetGain. */
-  let convolver: ConvolverNode | null = null;
-  let wetGain: GainNode | null = null;
   /** The current voice — changed by setTimbre, read when each note is built. */
   let timbre: Timbre = 'clean';
-  let room: RoomId = 'on';
 
   /** Decoded audio, once an AudioContext has existed long enough to decode it. */
   const recordings = new Map<string, AudioBuffer>();
@@ -345,21 +341,6 @@ export function createAudioPlayer(): AudioPlayer {
       filter.Q.value = resonance?.q ?? 1;
       filter.gain.value = resonance?.gain ?? 0;
     });
-  };
-
-  /** Builds the room and sets how much of it is heard. */
-  const applyRoom = (ctx: AudioContext) => {
-    if (!convolver || !wetGain) return;
-
-    const { seconds, decay, wet } = ROOMS[room];
-    if (wet > 0) {
-      const channels = impulseResponse(ctx.sampleRate, { seconds, decay });
-      const buffer = ctx.createBuffer(channels.length, channels[0].length, ctx.sampleRate);
-      channels.forEach((channel, i) => buffer.copyToChannel(channel, i));
-      convolver.buffer = buffer;
-    }
-    // A short ramp rather than a jump: switching rooms mid-chord would otherwise click.
-    wetGain.gain.setTargetAtTime(wet, ctx.currentTime, 0.02);
   };
 
   const decodeAll = async (ctx: AudioContext) => {
@@ -399,21 +380,9 @@ export function createAudioPlayer(): AudioPlayer {
       master.gain.value = 0.9;
       const shaped = tone.reduce<AudioNode>((node, filter) => node.connect(filter), master);
 
-      // The room hangs off a send, so the dry signal reaches the output untouched
-      // whether or not there is any reverb — "off" is genuinely off, not a mix at
-      // zero that still colours things.
-      convolver = context.createConvolver();
-      // Left on — the default — this scales the impulse response to unit gain, and
-      // for a long noisy tail that is a division by well over a hundred. Measured, it
-      // brought the reverb back at 4 % of the dry signal: audibly nothing.
-      convolver.normalize = false;
-      wetGain = context.createGain();
-      wetGain.gain.value = 0;
-      shaped.connect(convolver).connect(wetGain).connect(ceiling);
       shaped.connect(ceiling);
 
       applyTone();
-      applyRoom(context);
       // First gesture: the bytes are usually already here, so this only decodes.
       void decodeAll(context);
     }
@@ -484,7 +453,14 @@ export function createAudioPlayer(): AudioPlayer {
     return buffer;
   };
 
-  const voice = (ctx: AudioContext, midi: number, at: number, duration: number, peak: number) => {
+  const voice = (
+    ctx: AudioContext,
+    midi: number,
+    at: number,
+    duration: number,
+    peak: number,
+    release = SOFT_RELEASE,
+  ) => {
     const recorded = recordingFor(midi);
 
     const source = ctx.createBufferSource();
@@ -493,12 +469,14 @@ export function createAudioPlayer(): AudioPlayer {
     if (recorded) source.playbackRate.value = recorded.playbackRate;
 
     // The decay lives in the buffer — a real string dies away on its own, highs
-    // first. So this gain only sets the level and takes the note away cleanly when
-    // its time is up; an envelope with a decay of its own would fight that and choke
-    // the note.
+    // first. So this gain only sets the level and takes the note away when its time
+    // is up; an envelope with a decay of its own would fight that and choke the note.
+    //
+    // How sharply it is taken away is the caller's call, because that is what
+    // separates a note left to ring from one damped with the palm.
     const gain = ctx.createGain();
     const scaledPeak = peak * VOICES[timbre].gain;
-    const fade = Math.min(0.08, duration / 2);
+    const fade = Math.min(release, duration / 2);
     gain.gain.setValueAtTime(scaledPeak, at);
     gain.gain.setValueAtTime(scaledPeak, at + duration - fade);
     gain.gain.linearRampToValueAtTime(0.0001, at + duration);
@@ -562,16 +540,13 @@ export function createAudioPlayer(): AudioPlayer {
       chordBars,
       loop = false,
       style = 'standard',
+      length = 'ring',
       onChord,
     } = options;
     const barsOf = (index: number) => Math.max(1, chordBars?.[index] ?? 1);
 
     const secondsPerBeat = secondsPerBar / beatsPerBar;
     const slotSeconds = secondsPerBeat / 2; // eighth-note grid: two slots per beat
-    // A strum rings a beat or so, overlapping the next a little the way real
-    // strumming sustains. An arpeggio has to hold its notes until the bar is out, or
-    // the chord is never heard as a chord.
-    const ring = strumRing(style, secondsPerBar, Math.min(secondsPerBeat * 1.3, 2));
 
     const ctx = ensureContext();
     progressionCancelled = false;
@@ -591,6 +566,12 @@ export function createAudioPlayer(): AudioPlayer {
     // progression, which is why it lives here rather than inside one strum.
     const arpeggioStrings = style === 'arpeggio' ? arpeggioStringCount(voiced) : 0;
 
+    // How long a note has before its successor arrives: one slot of the strum grid,
+    // or one step of the arpeggio. That gap is what "stopped" is measured against.
+    const untilNext =
+      style === 'arpeggio' && arpeggioStrings > 0 ? secondsPerBar / arpeggioStrings : slotSeconds;
+    const { seconds: ring, release } = noteSeconds(style, length, secondsPerBar, untilNext);
+
     // One strum: the strings brushed low-to-high (down) or high-to-low (up).
     const strum = (chord: readonly number[], at: number, slot: StrumSlot, peak: number) => {
       if (slot === null) return;
@@ -598,7 +579,7 @@ export function createAudioPlayer(): AudioPlayer {
       const order = slot === 'up' ? [...played].reverse() : played;
       const offsets = strumOffsets(order.length, style, secondsPerBar);
       order.forEach((midi, i) => {
-        voice(ctx, midi, at + offsets[i], ring, peak);
+        voice(ctx, midi, at + offsets[i], ring, peak, release);
       });
     };
 
@@ -661,11 +642,6 @@ export function createAudioPlayer(): AudioPlayer {
     applyTone();
   };
 
-  const setRoom = (next: RoomId) => {
-    room = next;
-    // Only if a context exists — this must not start audio before a gesture.
-    if (context) applyRoom(context);
-  };
 
   return {
     play,
@@ -673,7 +649,6 @@ export function createAudioPlayer(): AudioPlayer {
     startProgression,
     stop,
     setTimbre,
-    setRoom,
     available: true,
   };
 }

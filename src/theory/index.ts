@@ -55,7 +55,9 @@ export {
   arpeggioStringCount,
   dropHighest,
   strumOffsets,
-  strumRing,
+  noteSeconds,
+  type NoteLength,
+  SOFT_RELEASE,
 } from './rhythm';
 export {
   PROGRESSIONS,

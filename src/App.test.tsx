@@ -20,7 +20,6 @@ const { player, transport } = vi.hoisted(() => {
       ),
       stop: vi.fn(),
       setTimbre: vi.fn(),
-      setRoom: vi.fn(),
       available: true,
     },
   };
@@ -265,8 +264,8 @@ describe('App — Einstellungen', () => {
     const { container } = render(<App />);
 
     await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
-    // Stimmung, Kapo, Bünde, Klang, Raum.
-    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(5);
+    // Stimmung, Kapo, Bünde, Klang.
+    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(4);
 
     await user.keyboard('{Escape}');
     expect(container.querySelectorAll('.setup-panel')).toHaveLength(0);
@@ -322,20 +321,27 @@ describe('App — Klang', () => {
     expect(window.location.search).toContain('sound=electric');
   });
 
-  it('gibt den gewählten Raum an den Player weiter', async () => {
+});
+
+describe('App — Tonlänge', () => {
+  it('gibt die gewählte Tonlänge an den Transport weiter', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    expect(player.setRoom).toHaveBeenCalledWith('on');
+    await user.click(container.querySelector<HTMLButtonElement>('.rhythm-trigger')!);
+    const lengthSelect = container.querySelector<HTMLSelectElement>('[aria-label="Tonlänge"]')!;
+    await user.selectOptions(lengthSelect, 'stopped');
 
-    await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
-    const roomSelect = [...container.querySelectorAll<HTMLSelectElement>('.setup-panel select')].find(
-      (select) => [...select.options].some((option) => option.value === 'off'),
+    expect(window.location.search).toContain('sustain=stopped');
+
+    // Und der Transport spielt danach wirklich abgestoppt. Der erste .play-button
+    // gehoert der Skala, deshalb ueber das Label.
+    const transport = [...container.querySelectorAll<HTMLButtonElement>('.play-button')].find(
+      (button) => /Akkordfolge/.test(button.getAttribute('aria-label') ?? ''),
     )!;
-    await user.selectOptions(roomSelect, 'off');
-
-    expect(player.setRoom).toHaveBeenCalledWith('off');
-    expect(window.location.search).toContain('reverb=off');
+    await user.click(transport);
+    const options = player.startProgression.mock.calls.at(-1)?.[1];
+    expect(options?.length).toBe('stopped');
   });
 });
 

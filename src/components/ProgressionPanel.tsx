@@ -1,4 +1,4 @@
-import type { Progression, ProgressionStep, StrumStyle, Voicing } from '../theory';
+import type { NoteLength, Progression, ProgressionStep, StrumStyle, Voicing } from '../theory';
 import { customProgId, type CustomStep, MAX_BPM, MIN_BPM } from '../urlState';
 import { ProgressionBuilder } from './ProgressionBuilder';
 import { ProgressionChord } from './ProgressionChord';
@@ -31,9 +31,11 @@ interface ProgressionPanelProps {
   beatsPerBar: number;
   rhythm: string;
   strum: StrumStyle;
+  sustain: NoteLength;
   onBeatsPerBarChange: (beatsPerBar: number) => void;
   onRhythmChange: (rhythm: string) => void;
   onStrumChange: (strum: StrumStyle) => void;
+  onSustainChange: (sustain: NoteLength) => void;
 }
 
 /**
@@ -64,9 +66,11 @@ export function ProgressionPanel({
   beatsPerBar,
   rhythm,
   strum,
+  sustain,
   onBeatsPerBarChange,
   onRhythmChange,
   onStrumChange,
+  onSustainChange,
 }: ProgressionPanelProps) {
   return (
     <section className="panel">
@@ -142,9 +146,11 @@ export function ProgressionPanel({
           beatsPerBar={beatsPerBar}
           rhythm={rhythm}
           strum={strum}
+          sustain={sustain}
           onBeatsPerBarChange={onBeatsPerBarChange}
           onRhythmChange={onRhythmChange}
           onStrumChange={onStrumChange}
+          onSustainChange={onSustainChange}
         />
       </div>
 

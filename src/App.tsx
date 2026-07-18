@@ -66,7 +66,7 @@ export default function App() {
     beatsPerBar,
     rhythm,
     strum,
-    reverb,
+    sustain,
   } = state;
 
   const scale = useMemo(() => {
@@ -222,13 +222,12 @@ export default function App() {
     player().setTimbre(sound);
   }, [sound]);
 
-  useEffect(() => {
-    player().setRoom(reverb);
-  }, [reverb]);
 
   // A one-off chord has no bar to spread across, so an arpeggio there just walks the
   // strings at a leisurely pace.
   const strumGapNow = strum === 'arpeggio' ? LOOSE_ARPEGGIO_GAP : STANDARD_STRUM_GAP;
+  // A one-off chord has no bar either, so "stopped" just means a short, cut note.
+  const chordSeconds = sustain === 'stopped' ? 0.3 : 1.9;
 
   // Start pulling the guitar recordings down as soon as the app is on screen. A
   // fetch needs neither a gesture nor an AudioContext, so by the first click the
@@ -265,7 +264,7 @@ export default function App() {
       player().play(positionsToMidi(visiblePositions, chord.pitchClasses), {
         mode: 'strum',
         stack: true,
-        gap: strumGapNow,
+        gap: strumGapNow, duration: chordSeconds,
       });
     }
   };
@@ -277,14 +276,14 @@ export default function App() {
       player().play(positionsToMidi(visiblePositions, [note.pitchClass]), {
         mode: 'strum',
         stack: true,
-        gap: strumGapNow,
+        gap: strumGapNow, duration: chordSeconds,
       });
     }
   };
 
   /** Sound a grip exactly as drawn — the real strings under the fingers. */
   const hearVoicing = (voicing: Voicing) =>
-    player().play(voicingMidi(voicing, chordTuning), { mode: 'strum', stack: true, gap: strumGapNow });
+    player().play(voicingMidi(voicing, chordTuning), { mode: 'strum', stack: true, gap: strumGapNow, duration: chordSeconds });
 
   // ---- Progression transport ----
 
@@ -302,6 +301,7 @@ export default function App() {
     beatsPerBar,
     rhythm,
     style: strum,
+    length: sustain,
     loop,
     player,
     material: [steps, chordTuning, chosenVoicings],
@@ -324,12 +324,10 @@ export default function App() {
           capo={capo}
           fretCount={fretCount}
           sound={sound}
-          reverb={reverb}
           onTuningIdChange={(next) => update('tuningId', next)}
           onCapoChange={(next) => update('capo', next)}
           onFretCountChange={(next) => update('fretCount', next)}
           onSoundChange={(next) => update('sound', next)}
-          onReverbChange={(next) => update('reverb', next)}
         />
       </header>
 
@@ -573,6 +571,7 @@ export default function App() {
             beatsPerBar={beatsPerBar}
             rhythm={rhythm}
             strum={strum}
+            sustain={sustain}
             onBeatsPerBarChange={(nextBeats) =>
               // The pattern length follows the meter, so a new meter resets it.
               patch((previous) => ({
@@ -583,6 +582,7 @@ export default function App() {
             }
             onRhythmChange={(next) => update('rhythm', next)}
             onStrumChange={(next) => update('strum', next)}
+            onSustainChange={(next) => update('sustain', next)}
           />
         </>
       ) : (
