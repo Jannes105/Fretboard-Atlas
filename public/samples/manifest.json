@@ -1,0 +1,102 @@
+{
+  "electric": [
+    {
+      "midi": 40,
+      "file": "electric-40.mp3"
+    },
+    {
+      "midi": 42,
+      "file": "electric-42.mp3"
+    },
+    {
+      "midi": 45,
+      "file": "electric-45.mp3"
+    },
+    {
+      "midi": 48,
+      "file": "electric-48.mp3"
+    },
+    {
+      "midi": 51,
+      "file": "electric-51.mp3"
+    },
+    {
+      "midi": 54,
+      "file": "electric-54.mp3"
+    },
+    {
+      "midi": 57,
+      "file": "electric-57.mp3"
+    },
+    {
+      "midi": 63,
+      "file": "electric-63.mp3"
+    },
+    {
+      "midi": 66,
+      "file": "electric-66.mp3"
+    },
+    {
+      "midi": 72,
+      "file": "electric-72.mp3"
+    },
+    {
+      "midi": 78,
+      "file": "electric-78.mp3"
+    },
+    {
+      "midi": 84,
+      "file": "electric-84.mp3"
+    }
+  ],
+  "acoustic": [
+    {
+      "midi": 40,
+      "file": "acoustic-40.mp3"
+    },
+    {
+      "midi": 42,
+      "file": "acoustic-42.mp3"
+    },
+    {
+      "midi": 45,
+      "file": "acoustic-45.mp3"
+    },
+    {
+      "midi": 48,
+      "file": "acoustic-48.mp3"
+    },
+    {
+      "midi": 51,
+      "file": "acoustic-51.mp3"
+    },
+    {
+      "midi": 54,
+      "file": "acoustic-54.mp3"
+    },
+    {
+      "midi": 57,
+      "file": "acoustic-57.mp3"
+    },
+    {
+      "midi": 63,
+      "file": "acoustic-63.mp3"
+    },
+    {
+      "midi": 66,
+      "file": "acoustic-66.mp3"
+    },
+    {
+      "midi": 72,
+      "file": "acoustic-72.mp3"
+    },
+    {
+      "midi": 78,
+      "file": "acoustic-78.mp3"
+    },
+    {
+      "midi": 84,
+      "file": "acoustic-84.mp3"
+    }
+  ]
+}

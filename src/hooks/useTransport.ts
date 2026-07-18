@@ -11,6 +11,8 @@ export interface TransportOptions {
   beatsPerBar: number;
   /** Strum pattern as a d/u/- string. */
   rhythm: string;
+  /** Seconds between one string and the next. */
+  strumGap: number;
   loop: boolean;
   /** Lazily built, so no AudioContext exists before the first gesture. */
   player: () => AudioPlayer;
@@ -41,6 +43,7 @@ export function useTransport({
   bpm,
   beatsPerBar,
   rhythm,
+  strumGap,
   loop,
   player,
   material,
@@ -61,6 +64,7 @@ export function useTransport({
       beatsPerBar,
       pattern: parsePattern(rhythm, beatsPerBar),
       chordBars,
+      strumGap,
       loop,
       onChord: (index) => {
         setPlayingStep(index);
@@ -87,7 +91,7 @@ export function useTransport({
   restartRef.current = start;
   useEffect(() => {
     if (handleRef.current) restartRef.current();
-  }, [bpm, loop, beatsPerBar, rhythm]);
+  }, [bpm, loop, beatsPerBar, rhythm, strumGap]);
 
   const isPlaying = playingStep !== null;
 

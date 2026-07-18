@@ -156,6 +156,19 @@ describe('Klang in der URL', () => {
   });
 });
 
+describe('Anschlaggeschwindigkeit in der URL', () => {
+  it('liest und schreibt den Anschlag, lässt den Default aber weg', () => {
+    expect(readState('?strum=fast').strum).toBe('fast');
+    expect(readState('?strum=plucked').strum).toBe('plucked');
+    expect(readState('').strum).toBe('medium');
+    // Unbekannter Wert fällt zurück.
+    expect(readState('?strum=hektisch').strum).toBe('medium');
+    // Default steht nicht im Link.
+    expect(writeState({ ...DEFAULT_STATE, strum: 'medium' })).toBe('');
+    expect(writeState({ ...DEFAULT_STATE, strum: 'fast' })).toBe('?strum=fast');
+  });
+});
+
 describe('writeState', () => {
   it('schreibt gar nichts, solange alles auf Default steht', () => {
     expect(writeState(DEFAULT_STATE)).toBe('');

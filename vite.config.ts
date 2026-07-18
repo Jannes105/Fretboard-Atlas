@@ -41,7 +41,9 @@ export default defineConfig({
       workbox: {
         // The whole app is a handful of static files and computes everything
         // client-side, so precaching it makes it work with no network at all.
-        globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
+        // mp3 and the manifest carry the guitar recordings — without them an offline
+        // visit would fall back to the synthesised string for good.
+        globPatterns: ['**/*.{js,css,html,png,svg,woff2,mp3}', 'samples/manifest.json'],
       },
     }),
   ],

@@ -1,43 +1,42 @@
 import { pluck, type PluckOptions } from './synth/pluck';
+import { sampleFor, type SampleSet } from './synth/sampleSet';
 import { midiToFrequency, type StrumSlot } from './theory';
 
 /**
  * A thin wrapper over the Web Audio API — the one place in the app that makes
- * sound. Everything about which notes to play is computed in src/theory/pitch.ts,
- * and what a single plucked note looks like in src/synth/pluck.ts; this file only
- * wires those together and handles timing.
+ * sound. Which notes to play is computed in src/theory/pitch.ts and which recording
+ * carries a note in src/synth/sampleSet.ts; this file only wires those together and
+ * handles timing.
  *
- * No dependencies: Web Audio is built into the browser. If it is somehow missing,
- * every method is a harmless no-op.
+ * The notes themselves are recordings of a real guitar (public/samples, built by
+ * scripts/build-samples.mjs from the CC0 Karoryfer Shinyguitar library). Three
+ * attempts at synthesising them came first, and each one measured better than the
+ * last while still not sounding like a guitar. src/synth/pluck.ts is what survives
+ * of that, kept as the fallback for when the recordings have not arrived.
+ *
+ * Web Audio is built into the browser. If it is somehow missing, every method is a
+ * harmless no-op.
  */
 
 export type PlayMode = 'sequence' | 'strum';
 
 /**
- * The instrument's voice — three strings rather than three waveforms. `soft` is a
- * nylon-ish acoustic, `clean` a brighter steel string, `electric` the same string
- * put through an overdrive. Only the timbre changes; the pitches played are
- * identical.
+ * The instrument's voice.
  *
- * The names are the ones already in shared links, so they stay as they are even
- * though "soft" now means "acoustic".
+ * All three are recordings of one archtop guitar from the CC0 Karoryfer Shinyguitar
+ * library, captured two ways at once: `soft` is the microphone in front of the body,
+ * `clean` the magnetic pickup, and `electric` that same pickup driven into an
+ * overdrive — which is what an amplifier does to it.
+ *
+ * That two of them are genuinely different takes matters. An earlier version derived
+ * all three from one synthesised string by nudging numbers, and they measured 3.7 dB
+ * apart across third-octave bands, which is to say indistinguishable.
+ *
+ * The names are the ones already in shared links, so they stay as they are.
  */
 export type Timbre = 'soft' | 'clean' | 'electric';
 
-/**
- * How each voice's string is strung. Heavier damping eats the highs faster, which
- * is the difference between nylon and steel; the pick runs from a thumb to a
- * plectrum.
- */
-const STRINGS: Record<Timbre, Omit<PluckOptions, 'random'>> = {
-  // Picked away from the bridge and damped the most: round and woody.
-  soft: { damping: 0.08, pickPosition: 0.26, pickNoise: 0.05, sustainSeconds: 4.5 },
-  clean: { damping: 0.06, pickPosition: 0.19, pickNoise: 0.07, sustainSeconds: 6 },
-  // Close to the bridge, which thins the low partials — that is the twang.
-  electric: { damping: 0.03, pickPosition: 0.13, pickNoise: 0.06, sustainSeconds: 8 },
-};
-
-/** One resonance of the instrument's body: where, how narrow, how much. */
+/** One resonance: where, how narrow, how much. */
 interface Resonance {
   frequency: number;
   q: number;
@@ -45,44 +44,75 @@ interface Resonance {
 }
 
 /**
- * The box the string is bolted to. An acoustic gets the air resonance of the sound
- * hole and the ring of the top plate, plus a dip where a bare model sounds glassy;
- * the electric gets the resonant peak of a pickup instead, which is what gives it
- * its bite.
+ * How each voice is put together.
+ *
+ * The tone shaping is deliberately light. A recorded guitar arrives with its own
+ * body and its own pickup, so there is nothing here to reconstruct — only the
+ * overdrive needs its fizz taken off up top, and the pickup take can use a touch of
+ * presence. The heavy resonances this once carried existed to give a bare string
+ * model the body it did not have.
  */
-const BODIES: Record<Timbre, readonly [Resonance, Resonance, Resonance]> = {
-  soft: [
-    { frequency: 100, q: 1.1, gain: 4.5 }, // Helmholtz — the sound hole breathing
-    { frequency: 210, q: 1.4, gain: 3 }, // the top plate
-    { frequency: 3000, q: 0.8, gain: -3 }, // takes the glassiness off
-  ],
-  clean: [
-    { frequency: 110, q: 1.1, gain: 4 },
-    { frequency: 230, q: 1.4, gain: 3 },
-    { frequency: 3200, q: 0.8, gain: -2 },
-  ],
-  electric: [
-    { frequency: 120, q: 1, gain: 2 },
-    { frequency: 2500, q: 1.2, gain: 5 }, // the pickup's own resonance
-    { frequency: 6500, q: 0.7, gain: -5 },
-  ],
+const VOICES: Record<
+  Timbre,
+  {
+    /** Which recorded set feeds it, keyed as in public/samples/manifest.json. */
+    readonly recording: 'acoustic' | 'electric';
+    /**
+     * How hard the note is pushed into the overdrive, or null for none.
+     *
+     * This has to be well above 1 to do anything worth hearing. A plucked note spends
+     * almost all of its life quiet, and down there a soft-clipper is very nearly a
+     * straight line — driving it at unity left the overdrive measuring 2.0 dB from
+     * clean, which is to say identical. Pushing it 10× puts the decay into the bend
+     * too, which is exactly what an amplifier's preamp is for.
+     */
+    readonly drive: number | null;
+    readonly tone: readonly Resonance[];
+    /** Loudness trim, measured — not set by ear. */
+    readonly gain: number;
+  }
+> = {
+  soft: { recording: 'acoustic', drive: null, tone: [], gain: 1 },
+  clean: {
+    recording: 'electric',
+    drive: null,
+    tone: [{ frequency: 2600, q: 0.8, gain: 2 }],
+    gain: 1.23,
+  },
+  electric: {
+    recording: 'electric',
+    drive: 10,
+    tone: [{ frequency: 6000, q: 0.7, gain: -4 }],
+    gain: 0.1375,
+  },
 };
 
-/**
- * Per-timbre loudness trim, so switching voice does not jump in volume. Set from
- * the measured RMS of the rendered strings, not by ear.
- */
-const TIMBRE_GAIN: Record<Timbre, number> = { soft: 1, clean: 0.92, electric: 0.6 };
+/** Filters kept in the sum for tone shaping. Unused ones sit flat and pass through. */
+const TONE_FILTERS = 2;
 
-/** How much of a note is rendered; longer than anything the app actually holds. */
+/**
+ * Fallback string settings, used only until the recordings finish loading or if they
+ * fail outright. Deliberately three distinguishable models rather than three shades
+ * of one.
+ */
+const STRINGS: Record<Timbre, Omit<PluckOptions, 'random'>> = {
+  soft: { damping: 0.3, pickPosition: 0.3, pickNoise: 0.04, sustainSeconds: 3.5 },
+  clean: { damping: 0.08, pickPosition: 0.19, pickNoise: 0.07, sustainSeconds: 6 },
+  electric: { damping: 0.02, pickPosition: 0.1, pickNoise: 0.05, sustainSeconds: 8 },
+};
+
+/** How much of a fallback note is rendered; longer than anything the app holds. */
 const RENDER_SECONDS = 2.4;
 
 /**
- * How many rendered strings to keep. A looping progression schedules a couple of
- * hundred plucks per pass, and rendering each one on the spot would stutter — but
- * only a few dozen distinct pitches are ever in play, so a small cache covers it.
+ * How many rendered fallback strings to keep. A looping progression schedules a
+ * couple of hundred plucks per pass and rendering each on the spot would stutter,
+ * but only a few dozen distinct pitches are ever in play.
  */
 const CACHE_LIMIT = 64;
+
+/** Where the recordings live, relative to the app's base URL. */
+const SAMPLES = 'samples';
 
 /**
  * A soft-clipping curve for the overdrive — tanh rounds the peaks off rather than
@@ -121,9 +151,24 @@ export interface PlayOptions {
   stack?: boolean;
 }
 
+/**
+ * How fast the hand crosses the strings, in seconds between one string and the next.
+ *
+ * The old fixed 35 ms meant 175 ms to cross six strings, which is a slow drag rather
+ * than a strum — a real one lands in 30–90 ms. Which of these feels right is taste,
+ * so it is a setting rather than a number picked here.
+ */
+export const STRUM_SPEEDS = {
+  fast: 0.006,
+  medium: 0.012,
+  plucked: 0.026,
+} as const;
+
+export type StrumSpeed = keyof typeof STRUM_SPEEDS;
+
 const DEFAULTS: Record<PlayMode, { gap: number; duration: number }> = {
   sequence: { gap: 0.28, duration: 0.42 }, // a scale, one note after another
-  strum: { gap: 0.035, duration: 1.9 }, // a chord, strings brushed — left to ring out
+  strum: { gap: STRUM_SPEEDS.medium, duration: 1.9 }, // strings brushed, left to ring
 };
 
 /** Amplitude of a note sounding on its own. */
@@ -194,6 +239,49 @@ function audioContextCtor(): Ctor | null {
 
 const NO_OP_HANDLE: ProgressionHandle = { stop: () => {} };
 
+/** Which recordings exist. Static data, so it is shared rather than per player. */
+let manifest: Record<string, SampleSet> | null = null;
+let downloaded: Promise<Map<string, ArrayBuffer>> | null = null;
+
+/**
+ * Pulls the recordings down, once per page.
+ *
+ * Worth calling as soon as the app has rendered: a fetch needs no AudioContext and
+ * no user gesture, so the ~380 KB can be on its way long before anyone clicks a
+ * chord. Decoding still waits for the first gesture, because that needs a context.
+ */
+export function prefetchSamples(): Promise<Map<string, ArrayBuffer>> {
+  downloaded ??= (async () => {
+    const bytes = new Map<string, ArrayBuffer>();
+    const base = `${import.meta.env.BASE_URL}${SAMPLES}`;
+
+    const response = await fetch(`${base}/manifest.json`);
+    if (!response.ok) throw new Error(`manifest.json: ${response.status}`);
+    const loaded = (await response.json()) as Record<string, SampleSet>;
+
+    await Promise.all(
+      Object.values(loaded)
+        .flat()
+        .map(async (entry) => {
+          const file = await fetch(`${base}/${entry.file}`);
+          if (!file.ok) throw new Error(`${entry.file}: ${file.status}`);
+          bytes.set(entry.file, await file.arrayBuffer());
+        }),
+    );
+
+    manifest = loaded;
+    return bytes;
+  })().catch((error: unknown) => {
+    // Offline on a first visit, or a bad deploy. The synthesised string takes over —
+    // for a tool whose whole point is "click it and hear it", worse beats silent.
+    console.warn('Gitarren-Aufnahmen nicht ladbar, weiche auf das Modell aus:', error);
+    manifest = null;
+    return new Map<string, ArrayBuffer>();
+  });
+
+  return downloaded;
+}
+
 export function createAudioPlayer(): AudioPlayer {
   const Ctor = audioContextCtor();
 
@@ -213,14 +301,17 @@ export function createAudioPlayer(): AudioPlayer {
   let context: AudioContext | null = null;
   /** Everything goes through here, so nothing can hit the output raw. */
   let master: GainNode | null = null;
-  /** The instrument's body, in the sum — see BODIES. */
-  let body: BiquadFilterNode[] | null = null;
+  /** Tone shaping, in the sum rather than per note — see VOICES. */
+  let tone: BiquadFilterNode[] | null = null;
   let live: AudioScheduledSourceNode[] = [];
   /** The current voice — changed by setTimbre, read when each note is built. */
   let timbre: Timbre = 'soft';
 
-  /** Rendered strings, keyed by voice and pitch. Insertion-ordered, so the oldest
-   *  entry is simply the first key when the cache has to make room. */
+  /** Decoded audio, once an AudioContext has existed long enough to decode it. */
+  const recordings = new Map<string, AudioBuffer>();
+
+  /** Rendered fallback strings, keyed by voice and pitch. Insertion-ordered, so the
+   *  oldest entry is simply the first key when the cache has to make room. */
   const strings = new Map<string, AudioBuffer>();
 
   /** Timers of the running progression — its loop keeps arming new ones. */
@@ -228,14 +319,33 @@ export function createAudioPlayer(): AudioPlayer {
   let progressionCancelled = true;
   let progressionOnChord: ProgressionOptions['onChord'] = undefined;
 
-  /** Points the body filters at the current voice. Cheap — three parameter sets. */
-  const applyBody = () => {
-    if (!body) return;
-    BODIES[timbre].forEach((resonance, i) => {
-      body![i].frequency.value = resonance.frequency;
-      body![i].Q.value = resonance.q;
-      body![i].gain.value = resonance.gain;
+  /** Points the tone filters at the current voice. */
+  const applyTone = () => {
+    if (!tone) return;
+    const wanted = VOICES[timbre].tone;
+    tone.forEach((filter, i) => {
+      const resonance = wanted[i];
+      // A peaking filter at 0 dB is transparent, so unused slots simply pass through
+      // rather than needing the graph rewired every time the voice changes.
+      filter.frequency.value = resonance?.frequency ?? 1000;
+      filter.Q.value = resonance?.q ?? 1;
+      filter.gain.value = resonance?.gain ?? 0;
     });
+  };
+
+  const decodeAll = async (ctx: AudioContext) => {
+    const bytes = await prefetchSamples();
+    await Promise.all(
+      [...bytes].map(async ([file, data]) => {
+        try {
+          // decodeAudioData detaches the buffer it is given, so hand it a copy —
+          // otherwise a second context would find nothing left to decode.
+          recordings.set(file, await ctx.decodeAudioData(data.slice(0)));
+        } catch {
+          // One bad file falls back per note; the rest still play.
+        }
+      }),
+    );
   };
 
   const ensureContext = (): AudioContext => {
@@ -252,19 +362,22 @@ export function createAudioPlayer(): AudioPlayer {
       limiter.attack.value = 0.003;
       limiter.release.value = 0.15;
 
-      // The body. A bare string model sounds like wire, because that is all it is —
-      // an instrument is a string plus the box it is bolted to. These three filters
-      // are that box, and they belong to the instrument rather than to any one note,
-      // so they sit in the sum: three filters in total instead of three per pluck.
-      body = [context.createBiquadFilter(), context.createBiquadFilter(), context.createBiquadFilter()];
-      for (const filter of body) filter.type = 'peaking';
+      // Tone shaping belongs to the instrument, not to any one note, so it sits in
+      // the sum: two filters in total rather than two per pluck.
+      tone = Array.from({ length: TONE_FILTERS }, () => {
+        const filter = context!.createBiquadFilter();
+        filter.type = 'peaking';
+        return filter;
+      });
 
       master = context.createGain();
       master.gain.value = 0.9;
-      master.connect(body[0]).connect(body[1]).connect(body[2]).connect(limiter);
+      tone.reduce<AudioNode>((node, filter) => node.connect(filter), master).connect(limiter);
       limiter.connect(context.destination);
 
-      applyBody();
+      applyTone();
+      // First gesture: the bytes are usually already here, so this only decodes.
+      void decodeAll(context);
     }
 
     if (context.state === 'suspended') void context.resume();
@@ -305,13 +418,23 @@ export function createAudioPlayer(): AudioPlayer {
   };
 
   /** The rendered string for this pitch and voice, from cache or freshly plucked. */
-  const stringFor = (ctx: AudioContext, frequency: number): AudioBuffer => {
-    // Rounded, because a cache keyed on raw floats would never hit twice.
-    const key = `${timbre}:${frequency.toFixed(2)}`;
+  /** The recording for this note, and how far off its own pitch it has to be played. */
+  const recordingFor = (midi: number): { buffer: AudioBuffer; playbackRate: number } | null => {
+    const set = manifest?.[VOICES[timbre].recording];
+    if (!set) return null;
+
+    const choice = sampleFor(midi, set);
+    const buffer = choice && recordings.get(choice.file);
+    return buffer ? { buffer, playbackRate: choice.playbackRate } : null;
+  };
+
+  /** The synthesised stand-in, used until the recordings arrive or if they never do. */
+  const modelledFor = (ctx: AudioContext, midi: number): AudioBuffer => {
+    const key = `${timbre}:${midi}`;
     const cached = strings.get(key);
     if (cached) return cached;
 
-    const samples = pluck(frequency, ctx.sampleRate, RENDER_SECONDS, STRINGS[timbre]);
+    const samples = pluck(midiToFrequency(midi), ctx.sampleRate, RENDER_SECONDS, STRINGS[timbre]);
     const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
     buffer.copyToChannel(samples, 0);
 
@@ -323,40 +446,43 @@ export function createAudioPlayer(): AudioPlayer {
     return buffer;
   };
 
-  const voice = (
-    ctx: AudioContext,
-    frequency: number,
-    at: number,
-    duration: number,
-    peak: number,
-  ) => {
-    const source = ctx.createBufferSource();
-    source.buffer = stringFor(ctx, frequency);
+  const voice = (ctx: AudioContext, midi: number, at: number, duration: number, peak: number) => {
+    const recorded = recordingFor(midi);
 
-    // The decay lives in the buffer now — the string dies away on its own, and the
-    // highs go before the fundamental. So this gain only sets the level and takes
-    // the note away cleanly when its time is up; an envelope shaped like the old one
-    // would decay a second time on top and choke the note.
+    const source = ctx.createBufferSource();
+    source.buffer = recorded ? recorded.buffer : modelledFor(ctx, midi);
+    // Playing a recording faster raises its pitch, the way speeding up a record does.
+    if (recorded) source.playbackRate.value = recorded.playbackRate;
+
+    // The decay lives in the buffer — a real string dies away on its own, highs
+    // first. So this gain only sets the level and takes the note away cleanly when
+    // its time is up; an envelope with a decay of its own would fight that and choke
+    // the note.
     const gain = ctx.createGain();
-    const scaledPeak = peak * TIMBRE_GAIN[timbre];
+    const scaledPeak = peak * VOICES[timbre].gain;
     const fade = Math.min(0.08, duration / 2);
     gain.gain.setValueAtTime(scaledPeak, at);
     gain.gain.setValueAtTime(scaledPeak, at + duration - fade);
     gain.gain.linearRampToValueAtTime(0.0001, at + duration);
 
-    if (timbre === 'electric') {
-      // Overdrive: the shaper squashes the string's peaks, and a lowpass shaves the
-      // fizz the shaper adds right at the top without touching what makes it bite.
+    const drive = VOICES[timbre].drive;
+    if (drive !== null) {
+      // Push it hard into the shaper first — that is what makes the note stay driven
+      // as it decays instead of only clipping on the attack. The lowpass afterwards
+      // shaves the fizz the shaper adds right at the top, leaving the bite.
+      const preGain = ctx.createGain();
+      preGain.gain.value = drive;
+
       const shaper = ctx.createWaveShaper();
       shaper.curve = DRIVE_CURVE;
       shaper.oversample = '4x';
 
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.value = 5200;
+      filter.frequency.value = 8000;
       filter.Q.value = 0.7;
 
-      source.connect(shaper).connect(filter).connect(gain).connect(master!);
+      source.connect(preGain).connect(shaper).connect(filter).connect(gain).connect(master!);
     } else {
       source.connect(gain).connect(master!);
     }
@@ -390,14 +516,14 @@ export function createAudioPlayer(): AudioPlayer {
     const peak = voicePeak(mode === 'strum' ? midiNotes.length : 2);
 
     midiNotes.forEach((midi, i) => {
-      voice(ctx, midiToFrequency(midi), start + i * step, ring, peak);
+      voice(ctx, midi, start + i * step, ring, peak);
     });
   };
 
   const playNote = (midi: number) => {
     const ctx = ensureContext();
     // On its own, and so at full strength.
-    voice(ctx, midiToFrequency(midi), ctx.currentTime + 0.02, 1, voicePeak(1));
+    voice(ctx, midi, ctx.currentTime + 0.02, 1, voicePeak(1));
   };
 
   const startProgression = (
@@ -415,7 +541,7 @@ export function createAudioPlayer(): AudioPlayer {
       pattern,
       chordBars,
       loop = false,
-      strumGap = 0.035,
+      strumGap = STRUM_SPEEDS.medium,
       onChord,
     } = options;
     const barsOf = (index: number) => Math.max(1, chordBars?.[index] ?? 1);
@@ -444,7 +570,7 @@ export function createAudioPlayer(): AudioPlayer {
       if (slot === null) return;
       const order = slot === 'up' ? [...chord].reverse() : chord;
       order.forEach((midi, i) => {
-        voice(ctx, midiToFrequency(midi), at + i * strumGap, strumRing, peak);
+        voice(ctx, midi, at + i * strumGap, strumRing, peak);
       });
     };
 
@@ -489,9 +615,10 @@ export function createAudioPlayer(): AudioPlayer {
 
   const setTimbre = (next: Timbre) => {
     timbre = next;
-    // The strings are cached per voice, so they need no invalidating — but the body
-    // is one shared set of filters and has to be pointed at the new instrument.
-    applyBody();
+    // Recordings are cached per file and fallback strings per voice, so neither needs
+    // invalidating — but the tone filters are one shared set and have to be pointed
+    // at the new voice.
+    applyTone();
   };
 
   return {

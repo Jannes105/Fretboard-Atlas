@@ -24,7 +24,13 @@ const { player, transport } = vi.hoisted(() => {
     },
   };
 });
-vi.mock('./audio', () => ({ createAudioPlayer: () => player }));
+// Only the player is swapped out. Keeping the real constants means a new one does
+// not silently break this file, and the strum speeds the UI reads stay honest.
+vi.mock('./audio', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./audio')>()),
+  createAudioPlayer: () => player,
+  prefetchSamples: vi.fn(() => Promise.resolve(new Map<string, ArrayBuffer>())),
+}));
 
 import App from './App';
 

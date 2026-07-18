@@ -23,3 +23,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Rohe Sample-Bibliothek (352 MB, CC0) - nur zum Erzeugen von public/samples
+.samples-src/

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { StrumSpeed } from '../audio';
 import { PATTERN_PRESETS, serializePattern } from '../theory';
 import { RhythmEditor } from './RhythmEditor';
 import './RhythmControls.css';
@@ -6,9 +7,18 @@ import './RhythmControls.css';
 interface RhythmControlsProps {
   beatsPerBar: number;
   rhythm: string;
+  strum: StrumSpeed;
   onBeatsPerBarChange: (beatsPerBar: number) => void;
   onRhythmChange: (rhythm: string) => void;
+  onStrumChange: (strum: StrumSpeed) => void;
 }
+
+/** How fast the hand crosses the strings, named for what it feels like. */
+const STRUMS: readonly { value: StrumSpeed; label: string }[] = [
+  { value: 'fast', label: 'schnell' },
+  { value: 'medium', label: 'mittel' },
+  { value: 'plucked', label: 'gezupft' },
+];
 
 const METERS: readonly { value: number; label: string }[] = [
   { value: 4, label: '4/4' },
@@ -33,8 +43,10 @@ function patternName(rhythm: string, beatsPerBar: number): string {
 export function RhythmControls({
   beatsPerBar,
   rhythm,
+  strum,
   onBeatsPerBarChange,
   onRhythmChange,
+  onStrumChange,
 }: RhythmControlsProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -85,6 +97,21 @@ export function RhythmControls({
               onChange={(event) => onBeatsPerBarChange(Number(event.target.value))}
             >
               {METERS.map((entry) => (
+                <option key={entry.value} value={entry.value}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field field--inline">
+            <span>Anschlag</span>
+            <select
+              aria-label="Anschlaggeschwindigkeit"
+              value={strum}
+              onChange={(event) => onStrumChange(event.target.value as StrumSpeed)}
+            >
+              {STRUMS.map((entry) => (
                 <option key={entry.value} value={entry.value}>
                   {entry.label}
                 </option>

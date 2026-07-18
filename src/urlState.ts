@@ -1,4 +1,4 @@
-import type { Timbre } from './audio';
+import { STRUM_SPEEDS, type StrumSpeed, type Timbre } from './audio';
 import type { LabelMode } from './components/FretboardView';
 import {
   ROOT_CHOICES,
@@ -38,6 +38,8 @@ export interface AppState {
   beatsPerBar: number;
   /** Strum pattern for one bar as a d/u/- string; length follows beatsPerBar. */
   rhythm: string;
+  /** How fast the hand crosses the strings. */
+  strum: StrumSpeed;
 }
 
 export const DEFAULT_STATE: AppState = {
@@ -55,10 +57,12 @@ export const DEFAULT_STATE: AppState = {
   sound: 'soft',
   beatsPerBar: 4,
   rhythm: serializePattern(defaultPattern(4)),
+  strum: 'medium',
 };
 
 const FRET_COUNTS = [12, 15, 24];
 const SOUNDS: readonly Timbre[] = ['soft', 'clean', 'electric'];
+const STRUMS = Object.keys(STRUM_SPEEDS) as readonly StrumSpeed[];
 const BEATS_PER_BAR = [2, 3, 4, 6];
 const MAX_CAPO = 7;
 export const MIN_BPM = 40;
@@ -181,6 +185,7 @@ export function readState(search: string): AppState {
     bpm: pickInt(params.get('bpm'), (v) => v >= MIN_BPM && v <= MAX_BPM, DEFAULT_STATE.bpm),
     loop: params.get('loop') === null ? DEFAULT_STATE.loop : params.get('loop') !== '0',
     sound: pickFrom(params.get('sound'), SOUNDS, DEFAULT_STATE.sound),
+    strum: pickFrom(params.get('strum'), STRUMS, DEFAULT_STATE.strum),
     beatsPerBar,
     rhythm,
   };
@@ -206,6 +211,7 @@ export function writeState(state: AppState): string {
   add('bpm', state.bpm, DEFAULT_STATE.bpm);
   if (state.loop !== DEFAULT_STATE.loop) params.set('loop', state.loop ? '1' : '0');
   add('sound', state.sound, DEFAULT_STATE.sound);
+  add('strum', state.strum, DEFAULT_STATE.strum);
   add('sig', state.beatsPerBar, DEFAULT_STATE.beatsPerBar);
   // Only a real, meter-matching pattern is worth a link; a wrong-length leftover
   // would be reset on read anyway.

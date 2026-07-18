@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type AudioPlayer, createAudioPlayer } from './audio';
+import { type AudioPlayer, createAudioPlayer, prefetchSamples, STRUM_SPEEDS } from './audio';
 import { FretboardView, type LabelMode } from './components/FretboardView';
 import { KeyFinder } from './components/KeyFinder';
 import { ProgressionPanel } from './components/ProgressionPanel';
@@ -64,6 +64,7 @@ export default function App() {
     sound,
     beatsPerBar,
     rhythm,
+    strum,
   } = state;
 
   const scale = useMemo(() => {
@@ -219,6 +220,13 @@ export default function App() {
     player().setTimbre(sound);
   }, [sound]);
 
+  // Start pulling the guitar recordings down as soon as the app is on screen. A
+  // fetch needs neither a gesture nor an AudioContext, so by the first click the
+  // ~380 KB is usually already there and only needs decoding.
+  useEffect(() => {
+    void prefetchSamples();
+  }, []);
+
   /**
    * Anchored to the register the scale actually occupies on screen, so a capo or
    * a box up the neck is heard rather than flattened to a fixed octave.
@@ -247,6 +255,7 @@ export default function App() {
       player().play(positionsToMidi(visiblePositions, chord.pitchClasses), {
         mode: 'strum',
         stack: true,
+        gap: STRUM_SPEEDS[strum],
       });
     }
   };
@@ -258,13 +267,14 @@ export default function App() {
       player().play(positionsToMidi(visiblePositions, [note.pitchClass]), {
         mode: 'strum',
         stack: true,
+        gap: STRUM_SPEEDS[strum],
       });
     }
   };
 
   /** Sound a grip exactly as drawn — the real strings under the fingers. */
   const hearVoicing = (voicing: Voicing) =>
-    player().play(voicingMidi(voicing, chordTuning), { mode: 'strum', stack: true });
+    player().play(voicingMidi(voicing, chordTuning), { mode: 'strum', stack: true, gap: STRUM_SPEEDS[strum] });
 
   // ---- Progression transport ----
 
@@ -281,6 +291,7 @@ export default function App() {
     bpm,
     beatsPerBar,
     rhythm,
+    strumGap: STRUM_SPEEDS[strum],
     loop,
     player,
     material: [steps, chordTuning, chosenVoicings],
@@ -549,6 +560,7 @@ export default function App() {
             onLoopChange={(next) => update('loop', next)}
             beatsPerBar={beatsPerBar}
             rhythm={rhythm}
+            strum={strum}
             onBeatsPerBarChange={(nextBeats) =>
               // The pattern length follows the meter, so a new meter resets it.
               patch((previous) => ({
@@ -558,6 +570,7 @@ export default function App() {
               }))
             }
             onRhythmChange={(next) => update('rhythm', next)}
+            onStrumChange={(next) => update('strum', next)}
           />
         </>
       ) : (
