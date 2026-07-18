@@ -167,11 +167,10 @@ export function SetupPanel({
           </label>
 
           <label className="field">
-            <span>Raum</span>
+            <span>Hall</span>
             <select value={reverb} onChange={(e) => onReverbChange(e.target.value as RoomId)}>
-              <option value="off">trocken</option>
-              <option value="room">Zimmer</option>
-              <option value="hall">Halle</option>
+              <option value="on">an</option>
+              <option value="off">aus</option>
             </select>
           </label>
         </div>

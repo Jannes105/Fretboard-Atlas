@@ -83,10 +83,12 @@ describe('impulseResponse', () => {
     }
   });
 
-  it('offers rooms that get bigger, with "off" genuinely silent', () => {
+  it('is either genuinely off or audibly on', () => {
+    // Nichts dazwischen: die drei Stufen waren mit eingeschalteter
+    // Convolver-Normalisierung alle gleich unhoerbar.
     expect(ROOMS.off.wet).toBe(0);
-    expect(ROOMS.hall.seconds).toBeGreaterThan(ROOMS.room.seconds);
-    expect(ROOMS.hall.wet).toBeGreaterThan(ROOMS.room.wet);
+    expect(ROOMS.on.wet).toBeGreaterThan(0.2);
+    expect(ROOMS.on.seconds).toBeGreaterThan(1);
   });
 
   it('survives nonsense rather than throwing', () => {

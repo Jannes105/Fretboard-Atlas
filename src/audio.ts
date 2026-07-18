@@ -2,6 +2,8 @@ import { pluck, type PluckOptions } from './synth/pluck';
 import { impulseResponse, ROOMS, type RoomId } from './synth/reverb';
 import { sampleFor, type SampleSet } from './synth/sampleSet';
 import {
+  arpeggioStringCount,
+  dropHighest,
   midiToFrequency,
   STANDARD_STRUM_GAP,
   type StrumSlot,
@@ -29,13 +31,22 @@ import {
 export type PlayMode = 'sequence' | 'strum';
 
 /**
- * The instrument's voice: a recorded archtop guitar through its magnetic pickup
- * (`clean`), and that same pickup driven into an overdrive (`electric`).
+ * The instrument's voice. Both are recordings, and of different guitars:
  *
- * There was a third, `soft`, fed by the microphone take of the same guitar. It
+ * - `clean` — Karoryfer Shinyguitar, an archtop through its magnetic pickup.
+ * - `electric` — FreePats EGuitarFSBS, a Fender recorded *through a real amplifier
+ *   and effects rack*, so the overdrive is played rather than computed.
+ *
+ * The overdrive used to be a WaveShaper on the clean recording, and three rounds of
+ * tuning it never sounded like an amplifier. Two reasons, both structural: a shaper
+ * per note distorts each string separately where an amplifier distorts the sum of
+ * all six, and there was no speaker cabinet to tame the fizz above 5 kHz. Both come
+ * free with a recording.
+ *
+ * A third voice, `soft`, was the microphone take of the same archtop as `clean`. It
  * measured 6.7 dB away across third-octave bands and still did not sound like a
- * second instrument — because it was not one. Two voices that differ beat three that
- * blur. `soft` now falls back to `clean` so old links keep working.
+ * second instrument — because it was not one. It now falls back to `clean`, so old
+ * links keep working.
  */
 export type Timbre = 'clean' | 'electric';
 
@@ -49,30 +60,15 @@ interface Resonance {
 /**
  * How each voice is put together.
  *
- * The tone shaping is deliberately light. A recorded guitar arrives with its own
- * body and its own pickup, so there is nothing here to reconstruct — only the
- * overdrive needs its fizz taken off up top, and the pickup take can use a touch of
- * presence. The heavy resonances this once carried existed to give a bare string
- * model the body it did not have.
+ * The tone shaping is deliberately light, and for the overdrive there is none at
+ * all: a recording arrives with its own guitar, its own pickup and — for the
+ * overdrive — its own amplifier and speaker. There is nothing here left to build.
  */
 const VOICES: Record<
   Timbre,
   {
     /** Which recorded set feeds it, keyed as in public/samples/manifest.json. */
-    readonly recording: 'electric';
-    /**
-     * How hard the note is pushed into the overdrive, or null for none.
-     *
-     * Kept modest on purpose. An earlier version drove this at 10× because that
-     * maximised how far the overdrive measured from clean — but "different" is not
-     * "better", and maximum distortion is maximally different. What it actually did
-     * was flatten the note's decay into a wall: 84 % of its opening level still there
-     * after 1.5 s, where a plucked note is down to about 20 %. A note that does not
-     * decay is exactly what a synthesiser sounds like.
-     *
-     * So the number that matters here is the envelope, not the distance from clean.
-     */
-    readonly drive: number | null;
+    readonly recording: 'electric' | 'dist';
     readonly tone: readonly Resonance[];
     /** Loudness trim, measured — not set by ear. */
     readonly gain: number;
@@ -80,15 +76,15 @@ const VOICES: Record<
 > = {
   clean: {
     recording: 'electric',
-    drive: null,
     tone: [{ frequency: 2600, q: 0.8, gain: 2 }],
     gain: 1,
   },
   electric: {
-    recording: 'electric',
-    drive: 2.5,
-    tone: [{ frequency: 6000, q: 0.7, gain: -3 }],
-    gain: 0.28,
+    recording: 'dist',
+    tone: [],
+    // A distorted recording is heavily compressed, so it carries far more energy at
+    // the same peak level. Measured at 2.97x the clean set's RMS.
+    gain: 0.34,
   },
 };
 
@@ -126,12 +122,6 @@ function shaperCurve(shape: (x: number) => number): Float32Array<ArrayBuffer> {
   for (let i = 0; i < samples; i++) curve[i] = shape((i / (samples - 1)) * 2 - 1);
   return curve;
 }
-
-/**
- * The overdrive: tanh rounds the peaks off rather than chopping them square, which
- * is the difference between warm and harsh.
- */
-const DRIVE_CURVE = shaperCurve((x) => Math.tanh(3.2 * x));
 
 /** Below this the safety net is a straight wire; above it, it bends. */
 const CEILING_KNEE = 0.7;
@@ -329,7 +319,7 @@ export function createAudioPlayer(): AudioPlayer {
   let wetGain: GainNode | null = null;
   /** The current voice — changed by setTimbre, read when each note is built. */
   let timbre: Timbre = 'clean';
-  let room: RoomId = 'room';
+  let room: RoomId = 'on';
 
   /** Decoded audio, once an AudioContext has existed long enough to decode it. */
   const recordings = new Map<string, AudioBuffer>();
@@ -413,6 +403,10 @@ export function createAudioPlayer(): AudioPlayer {
       // whether or not there is any reverb — "off" is genuinely off, not a mix at
       // zero that still colours things.
       convolver = context.createConvolver();
+      // Left on — the default — this scales the impulse response to unit gain, and
+      // for a long noisy tail that is a division by well over a hundred. Measured, it
+      // brought the reverb back at 4 % of the dry signal: audibly nothing.
+      convolver.normalize = false;
       wetGain = context.createGain();
       wetGain.gain.value = 0;
       shaped.connect(convolver).connect(wetGain).connect(ceiling);
@@ -509,27 +503,9 @@ export function createAudioPlayer(): AudioPlayer {
     gain.gain.setValueAtTime(scaledPeak, at + duration - fade);
     gain.gain.linearRampToValueAtTime(0.0001, at + duration);
 
-    const drive = VOICES[timbre].drive;
-    if (drive !== null) {
-      // Push it hard into the shaper first — that is what makes the note stay driven
-      // as it decays instead of only clipping on the attack. The lowpass afterwards
-      // shaves the fizz the shaper adds right at the top, leaving the bite.
-      const preGain = ctx.createGain();
-      preGain.gain.value = drive;
-
-      const shaper = ctx.createWaveShaper();
-      shaper.curve = DRIVE_CURVE;
-      shaper.oversample = '4x';
-
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 8000;
-      filter.Q.value = 0.7;
-
-      source.connect(preGain).connect(shaper).connect(filter).connect(gain).connect(master!);
-    } else {
-      source.connect(gain).connect(master!);
-    }
+    // Straight through. The overdrive used to be a WaveShaper here and is now part of
+    // the recording, which is the whole reason it stopped sounding computed.
+    source.connect(gain).connect(master!);
 
     source.start(at);
     source.stop(at + duration + 0.02);
@@ -610,10 +586,16 @@ export function createAudioPlayer(): AudioPlayer {
       );
     };
 
+    // Every chord of an arpeggio plays the same number of strings, so that dividing
+    // the bar among them gives the same pulse throughout. Decided across the whole
+    // progression, which is why it lives here rather than inside one strum.
+    const arpeggioStrings = style === 'arpeggio' ? arpeggioStringCount(voiced) : 0;
+
     // One strum: the strings brushed low-to-high (down) or high-to-low (up).
     const strum = (chord: readonly number[], at: number, slot: StrumSlot, peak: number) => {
       if (slot === null) return;
-      const order = slot === 'up' ? [...chord].reverse() : chord;
+      const played = style === 'arpeggio' ? dropHighest(chord, arpeggioStrings) : chord;
+      const order = slot === 'up' ? [...played].reverse() : played;
       const offsets = strumOffsets(order.length, style, secondsPerBar);
       order.forEach((midi, i) => {
         voice(ctx, midi, at + offsets[i], ring, peak);

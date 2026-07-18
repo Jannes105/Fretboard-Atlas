@@ -168,14 +168,15 @@ describe('Spielweise in der URL', () => {
   });
 });
 
-describe('Raum in der URL', () => {
-  it('liest und schreibt den Nachklang, lässt den Default aber weg', () => {
-    expect(readState('?reverb=hall').reverb).toBe('hall');
+describe('Hall in der URL', () => {
+  it('liest und schreibt den Hall, lässt den Default aber weg', () => {
     expect(readState('?reverb=off').reverb).toBe('off');
-    expect(readState('').reverb).toBe('room');
-    expect(readState('?reverb=kathedrale').reverb).toBe('room');
-    expect(writeState({ ...DEFAULT_STATE, reverb: 'room' })).toBe('');
-    expect(writeState({ ...DEFAULT_STATE, reverb: 'hall' })).toBe('?reverb=hall');
+    expect(readState('').reverb).toBe('on');
+    // Unbekannter Wert fällt zurück - auch die abgeschafften Stufen aus alten Links.
+    expect(readState('?reverb=hall').reverb).toBe('on');
+    expect(readState('?reverb=kathedrale').reverb).toBe('on');
+    expect(writeState({ ...DEFAULT_STATE, reverb: 'on' })).toBe('');
+    expect(writeState({ ...DEFAULT_STATE, reverb: 'off' })).toBe('?reverb=off');
   });
 });
 

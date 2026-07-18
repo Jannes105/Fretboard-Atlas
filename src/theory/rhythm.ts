@@ -83,6 +83,32 @@ export function strumOffsets(
 }
 
 /**
+ * How many strings an arpeggio plays: as many as the smallest chord can supply.
+ *
+ * Every chord of the progression uses this same count, and that is the whole point.
+ * The notes are spread by dividing the bar among them, so a six-string chord
+ * followed by a five-string one used to pulse at 444 ms and then 533 ms — the beat
+ * changed with the chord, which is audible and wrong. Holding the count still holds
+ * the pulse still.
+ */
+export function arpeggioStringCount(chords: readonly (readonly unknown[])[]): number {
+  const counts = chords.map((chord) => chord.length).filter((count) => count > 0);
+  return counts.length === 0 ? 0 : Math.min(...counts);
+}
+
+/**
+ * The lowest `count` notes of a chord.
+ *
+ * An arpeggio gives up the top strings first, which is how it is actually played —
+ * the picking hand runs out up there, and the bass is what carries the chord. Chords
+ * are held lowest string first throughout this code, so this is a slice from the
+ * front; the name is here to say why.
+ */
+export function dropHighest<T>(notes: readonly T[], count: number): T[] {
+  return notes.slice(0, Math.max(0, count));
+}
+
+/**
  * How long each note should ring. An arpeggio has to hold its notes at least until
  * the bar is out, or the chord is never heard as a chord — only as a queue of notes.
  */

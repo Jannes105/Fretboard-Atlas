@@ -53,15 +53,22 @@ export function impulseResponse(
 
 /** The rooms on offer, and how much of each is mixed in. */
 export interface Room extends RoomOptions {
-  /** Share of the signal that goes through the room, 0…1. */
+  /**
+   * Share of the signal that goes through the room, 0…1.
+   *
+   * Only meaningful with `ConvolverNode.normalize` turned off. Left on — which is
+   * the default — the node scales the impulse response to unit gain, and for a long
+   * noisy tail like this that is a division by well over a hundred: measured, the
+   * reverb came back at 4 % of the dry signal and was simply inaudible.
+   */
   wet: number;
 }
 
 export const ROOMS = {
   off: { seconds: 0.1, decay: 8, wet: 0 },
-  // Enough to sit the guitar on a surface without smearing a strum.
-  room: { seconds: 1.1, decay: 3.2, wet: 0.22 },
-  hall: { seconds: 2.8, decay: 2.2, wet: 0.38 },
+  // One room rather than a choice of three. Two of them were a distinction nobody
+  // could hear, and the reason was the normalisation above, not the settings.
+  on: { seconds: 1.8, decay: 2.6, wet: 0.28 },
 } as const satisfies Record<string, Room>;
 
 export type RoomId = keyof typeof ROOMS;

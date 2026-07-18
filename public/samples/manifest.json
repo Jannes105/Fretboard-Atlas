@@ -48,5 +48,59 @@
       "midi": 84,
       "file": "electric-84.mp3"
     }
+  ],
+  "dist": [
+    {
+      "midi": 40,
+      "file": "dist-40.mp3"
+    },
+    {
+      "midi": 45,
+      "file": "dist-45.mp3"
+    },
+    {
+      "midi": 48,
+      "file": "dist-48.mp3"
+    },
+    {
+      "midi": 50,
+      "file": "dist-50.mp3"
+    },
+    {
+      "midi": 52,
+      "file": "dist-52.mp3"
+    },
+    {
+      "midi": 55,
+      "file": "dist-55.mp3"
+    },
+    {
+      "midi": 59,
+      "file": "dist-59.mp3"
+    },
+    {
+      "midi": 61,
+      "file": "dist-61.mp3"
+    },
+    {
+      "midi": 64,
+      "file": "dist-64.mp3"
+    },
+    {
+      "midi": 71,
+      "file": "dist-71.mp3"
+    },
+    {
+      "midi": 77,
+      "file": "dist-77.mp3"
+    },
+    {
+      "midi": 82,
+      "file": "dist-82.mp3"
+    },
+    {
+      "midi": 85,
+      "file": "dist-85.mp3"
+    }
   ]
 }

@@ -1,13 +1,12 @@
 /**
- * Turns the Karroryfer Shinyguitar library (CC0-1.0) into the handful of small MP3s
- * the app ships.
+ * Turns two CC0 sample libraries into the handful of small MP3s the app ships.
  *
- * Run once, by hand, after unpacking the library into .samples-src/. Nothing here
+ * Run once, by hand, after fetching the libraries into .samples-src/. Nothing here
  * runs in the browser or during the build — the output is committed.
  *
  *   node scripts/build-samples.mjs
  *
- * The note each sample belongs to is read out of the library's own .sfz programs
+ * The note each sample belongs to is read out of each library's own .sfz programs
  * rather than guessed from filenames, so the mapping comes from the source.
  */
 import { execFileSync } from 'node:child_process';
@@ -17,20 +16,41 @@ import lame from '@breezystack/lamejs';
 
 const ZIP = '.samples-src/shinyguitar.zip';
 const WORK = '.samples-src/Shinyguitar';
+const FREEPATS = '.samples-src/dist2/EGuitarFSBS-bridge-dist2-SFZ-20220911';
 const OUT = 'public/samples';
 
 /**
- * The magnetic pickup take, and only that.
+ * The two voices, each from its own recording.
  *
- * The library also holds a microphone take of the same guitar, and it shipped for a
- * while as a separate "acoustic" voice. It measured 6.7 dB away across third-octave
- * bands, but it never sounded like a second instrument — because it is not one. It
- * is the same archtop, the same performance, one microphone further away.
+ * `electric` is Karoryfer's Shinyguitar (CC0-1.0), an archtop through its magnetic
+ * pickup. `dist` is FreePats' EGuitarFSBS bridge dist2 (CC0-1.0), a Fender recorded
+ * *through a real amplifier and effects rack*.
+ *
+ * That second one exists because simulating the overdrive kept failing. A WaveShaper
+ * distorts each note on its own, where an amplifier distorts the sum of all six
+ * strings — and there was no speaker cabinet, which is what tames the fizz above
+ * 5 kHz. Both are baked into a recording and neither is worth rebuilding.
  */
-const VOICES = [{ id: 'electric', program: 'electric_one.sfz', folder: 'electric' }];
+const VOICES = [
+  {
+    id: 'electric',
+    program: join(WORK, 'Programs', 'electric_one.sfz'),
+    /** Velocity layer 3 of 4 — a firm pick, the way you strum a chord. */
+    velocity: (lo) => lo === 65,
+    /** Its wavs live in the zip and are pulled out on demand. */
+    fromZip: true,
+    root: join(WORK, 'Samples'),
+  },
+  {
+    id: 'dist',
+    program: join(FREEPATS, 'EGuitarFSBS-bridge-dist2-20220911.sfz'),
+    // The hard layer where the library splits, and the single layer where it does not.
+    velocity: (lo, hi) => lo >= 93 || (lo === 1 && hi === 127),
+    fromZip: false,
+    root: FREEPATS,
+  },
+];
 
-/** Velocity layer 3 of 4 — a firm pick, the way you strum a chord. */
-const VELOCITY = { lo: 65, hi: 96 };
 /** The app needs low E (40) up to the top of a 24-fret high E (88). */
 const RANGE = { lo: 40, hi: 88 };
 /**
@@ -51,7 +71,7 @@ const SECONDS = 2;
 const BITRATE = 64;
 
 /** Reads pitch_keycenter -> sample for one velocity layer of an .sfz program. */
-function parseProgram(path) {
+function parseProgram(path, wantsVelocity) {
   const text = readFileSync(path, 'utf8');
   const byKey = new Map();
 
@@ -64,7 +84,7 @@ function parseProgram(path) {
 
     const lovel = read('lovel') ?? 1;
     const hivel = read('hivel') ?? 127;
-    if (lovel !== VELOCITY.lo || hivel !== VELOCITY.hi) continue;
+    if (!wantsVelocity(lovel, hivel)) continue;
 
     const key = read('pitch_keycenter');
     if (!key || key < RANGE.lo - 6 || key > RANGE.hi) continue;
@@ -167,9 +187,12 @@ function encodeMp3(samples, sampleRate) {
 
 // ---------------------------------------------------------------------------
 
-if (!existsSync(ZIP)) {
-  console.error(`${ZIP} fehlt. Bibliothek zuerst herunterladen.`);
-  process.exit(1);
+for (const voice of VOICES) {
+  const missing = voice.fromZip ? ZIP : voice.program;
+  if (!existsSync(missing)) {
+    console.error(`${missing} fehlt. Bibliothek zuerst herunterladen und entpacken.`);
+    process.exit(1);
+  }
 }
 
 rmSync(OUT, { recursive: true, force: true });
@@ -182,25 +205,34 @@ for (const voice of VOICES) {
   // Entry names are relative to the archive root; -d says where to put them.
   const extract = (...entries) => execFileSync('unzip', ['-o', '-q', ZIP, ...entries, '-d', '.samples-src']);
 
-  const program = join(WORK, 'Programs', voice.program);
-  if (!existsSync(program)) extract(`Shinyguitar/Programs/${voice.program}`);
+  if (voice.fromZip && !existsSync(voice.program)) {
+    extract(voice.program.split(/[/\\]/).slice(1).join('/'));
+  }
 
-  const byKey = parseProgram(program);
+  const byKey = parseProgram(voice.program, voice.velocity);
   const all = [...byKey.keys()].sort((a, b) => a - b);
 
+  const inRange = all.filter((key) => key >= RANGE.lo); // below the guitar's low E
+  const highest = inRange[inRange.length - 1];
+
   let sparse = 0;
-  const keys = all.filter((key) => {
-    if (key < RANGE.lo) return false; // below the guitar's low E
+  const keys = inRange.filter((key, i) => {
+    // The top of the library always stays. Dropping it would leave the highest frets
+    // stretching six semitones off the nearest recording, which is a different
+    // instrument rather than the same one played higher.
+    if (key === highest) return true;
+    // A neighbour a semitone away is covered by the one before it at no real cost.
+    if (i > 0 && key - inRange[i - 1] <= 1) return false;
     if (key <= DENSE_BELOW) return true;
     return sparse++ % 2 === 0;
   });
 
   // Pull only the wavs actually needed out of the 352 MB archive.
-  extract(...keys.map((key) => `Shinyguitar/Samples/${byKey.get(key)}`));
+  if (voice.fromZip) extract(...keys.map((key) => `Shinyguitar/Samples/${byKey.get(key)}`));
 
   const notes = [];
   for (const key of keys) {
-    const source = join('.samples-src/Shinyguitar/Samples', byKey.get(key));
+    const source = join(voice.root, byKey.get(key));
     const { samples, sampleRate } = decodeWav(readFileSync(source));
     const mp3 = encodeMp3(shape(samples, sampleRate), sampleRate);
 

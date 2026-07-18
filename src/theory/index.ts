@@ -52,6 +52,8 @@ export {
   type PatternPreset,
   type StrumStyle,
   STANDARD_STRUM_GAP,
+  arpeggioStringCount,
+  dropHighest,
   strumOffsets,
   strumRing,
 } from './rhythm';

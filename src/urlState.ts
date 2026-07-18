@@ -63,7 +63,7 @@ export const DEFAULT_STATE: AppState = {
   beatsPerBar: 4,
   rhythm: serializePattern(defaultPattern(4)),
   strum: 'standard',
-  reverb: 'room',
+  reverb: 'on',
 };
 
 const FRET_COUNTS = [12, 15, 24];

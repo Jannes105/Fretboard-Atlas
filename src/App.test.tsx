@@ -326,16 +326,16 @@ describe('App — Klang', () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    expect(player.setRoom).toHaveBeenCalledWith('room');
+    expect(player.setRoom).toHaveBeenCalledWith('on');
 
     await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
     const roomSelect = [...container.querySelectorAll<HTMLSelectElement>('.setup-panel select')].find(
-      (select) => [...select.options].some((option) => option.value === 'hall'),
+      (select) => [...select.options].some((option) => option.value === 'off'),
     )!;
-    await user.selectOptions(roomSelect, 'hall');
+    await user.selectOptions(roomSelect, 'off');
 
-    expect(player.setRoom).toHaveBeenCalledWith('hall');
-    expect(window.location.search).toContain('reverb=hall');
+    expect(player.setRoom).toHaveBeenCalledWith('off');
+    expect(window.location.search).toContain('reverb=off');
   });
 });
 

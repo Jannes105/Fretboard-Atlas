@@ -4,6 +4,8 @@ import {
   isDefaultPattern,
   parsePattern,
   PATTERN_PRESETS,
+  arpeggioStringCount,
+  dropHighest,
   strumOffsets,
   strumRing,
   serializePattern,
@@ -95,5 +97,51 @@ describe('strumRing', () => {
 
   it('lässt den normalen Anschlag unangetastet', () => {
     expect(strumRing('standard', 2.67, 0.9)).toBe(0.9);
+  });
+});
+
+describe('Arpeggio über eine ganze Folge', () => {
+  it('nimmt die Saitenzahl des kleinsten Akkords', () => {
+    // Sonst pulsiert es je Akkord anders: Takt geteilt durch 6 gegen geteilt durch 5.
+    expect(arpeggioStringCount([[1, 2, 3, 4, 5, 6], [1, 2, 3, 4, 5], [1, 2, 3, 4, 5, 6]])).toBe(5);
+    expect(arpeggioStringCount([[1, 2, 3, 4]])).toBe(4);
+    expect(arpeggioStringCount([])).toBe(0);
+  });
+
+  it('lässt oben weg, nicht unten — der Bass trägt den Akkord', () => {
+    expect(dropHighest([40, 47, 52, 56, 59, 64], 4)).toEqual([40, 47, 52, 56]);
+    // Kürzer als verlangt bleibt unverändert, statt zu erfinden.
+    expect(dropHighest([40, 47, 52], 5)).toEqual([40, 47, 52]);
+    expect(dropHighest([40, 47, 52], 0)).toEqual([]);
+  });
+
+  it('gibt allen Akkorden derselben Folge dieselben Einsatzzeiten', () => {
+    const chords = [
+      [40, 47, 52, 56, 59, 64],
+      [45, 52, 57, 61, 64],
+      [43, 50, 55, 59, 62, 67],
+    ];
+    const count = arpeggioStringCount(chords);
+    const secondsPerBar = 2.67;
+
+    const times = chords.map((chord) =>
+      strumOffsets(dropHighest(chord, count).length, 'arpeggio', secondsPerBar),
+    );
+
+    expect(times[0]).toHaveLength(5);
+    expect(times[1]).toEqual(times[0]);
+    expect(times[2]).toEqual(times[0]);
+  });
+
+  it('behält bei jedem Akkord den Bass', () => {
+    const chords = [
+      [40, 47, 52, 56, 59, 64],
+      [45, 52, 57, 61, 64],
+    ];
+    const count = arpeggioStringCount(chords);
+
+    for (const chord of chords) {
+      expect(dropHighest(chord, count)[0]).toBe(chord[0]);
+    }
   });
 });
