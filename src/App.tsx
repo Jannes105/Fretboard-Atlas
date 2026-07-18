@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type AudioPlayer, createAudioPlayer, type ProgressionHandle, type Timbre } from './audio';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { type AudioPlayer, createAudioPlayer } from './audio';
 import { FretboardView, type LabelMode } from './components/FretboardView';
 import { KeyFinder } from './components/KeyFinder';
-import { ProgressionBuilder } from './components/ProgressionBuilder';
-import { ProgressionChord } from './components/ProgressionChord';
-import { RhythmControls } from './components/RhythmControls';
+import { ProgressionPanel } from './components/ProgressionPanel';
+import { SetupPanel } from './components/SetupPanel';
+import { useAppState } from './hooks/useAppState';
+import { useTransport } from './hooks/useTransport';
 import {
   buildProgression,
   Chord,
@@ -17,8 +18,6 @@ import {
   Fretboard,
   serializePattern,
   Note,
-  parsePattern,
-  pitchClassName,
   positionsToMidi,
   progressionsFor,
   ROOT_CHOICES,
@@ -32,15 +31,9 @@ import {
   voicingsFor,
 } from './theory';
 import {
-  type AppState,
   customProgId,
   customProgSteps,
-  customTuningId,
   customTuningNotes,
-  MAX_BPM,
-  MIN_BPM,
-  readState,
-  writeState,
 } from './urlState';
 import './App.css';
 
@@ -54,18 +47,8 @@ type Highlight =
   | { kind: 'degree'; index: number }
   | null;
 
-/** The twelve notes offered per string in the custom-tuning editor. */
-const NOTE_OPTIONS: string[] = Array.from({ length: 12 }, (_, pitchClass) =>
-  pitchClassName(pitchClass),
-);
-
 export default function App() {
-  // One object rather than a dozen useStates: it is exactly what goes in the URL,
-  // so persisting it is a single effect instead of a dozen.
-  const [state, setState] = useState<AppState>(() => readState(window.location.search));
-
-  const update = <K extends keyof AppState>(key: K, value: AppState[K]) =>
-    setState((previous) => ({ ...previous, [key]: value }));
+  const { state, update, patch } = useAppState();
 
   const {
     root,
@@ -82,12 +65,6 @@ export default function App() {
     beatsPerBar,
     rhythm,
   } = state;
-
-  // Replace rather than push, so the back button does not walk through every
-  // twiddle of a dropdown.
-  useEffect(() => {
-    window.history.replaceState(null, '', `${window.location.pathname}${writeState(state)}`);
-  }, [state]);
 
   const scale = useMemo(() => {
     const type = SCALE_TYPES.find((t) => t.id === scaleTypeId) ?? SCALE_TYPES[0];
@@ -231,45 +208,6 @@ export default function App() {
   // At most one voicing picker is open.
   const [openPicker, setOpenPicker] = useState<number | null>(null);
 
-  /**
-   * Tuning, capo and fret count are set once and then left alone, so they live
-   * behind a trigger that spells out the current setup rather than eight
-   * dropdowns competing with the key. Deliberately not URL state: sharing a link
-   * with a panel hanging open makes no sense.
-   */
-  const [setupOpen, setSetupOpen] = useState(false);
-  const setupRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!setupOpen) return;
-
-    const onDown = (event: MouseEvent) => {
-      if (!setupRef.current?.contains(event.target as Node)) setSetupOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSetupOpen(false);
-    };
-
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [setupOpen]);
-
-  // The trigger's label: the setup is readable without opening anything. A capo
-  // only earns a mention when there is one — the normal case is no capo, and
-  // saying so every time is noise on a phone-width line.
-  const setupSummary = [
-    // A custom tuning shows its notes; a preset just its name.
-    isCustomTuning ? tuning.description : tuning.name,
-    capo > 0 ? `Kapo ${capo}. Bund` : null,
-    `${fretCount} Bünde`,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-
   // One player for the whole session, built lazily so no AudioContext exists
   // until the first play — browsers require a user gesture to start audio.
   const playerRef = useRef<AudioPlayer | null>(null);
@@ -330,58 +268,25 @@ export default function App() {
 
   // ---- Progression transport ----
 
-  const [playingStep, setPlayingStep] = useState<number | null>(null);
-  const transportRef = useRef<ProgressionHandle | null>(null);
+  // Play the grips actually on screen; only fall back to an abstract voicing where
+  // no shape exists for this tuning.
+  const chordNotes = steps.map((step, i) => {
+    const voicing = stepVoicings[i]?.[voicingIndex(i)];
+    return voicing ? voicingMidi(voicing, chordTuning) : chordMidiTones(step.chord);
+  });
 
-  const stopProgression = useCallback(() => {
-    transportRef.current?.stop();
-    transportRef.current = null;
-    setPlayingStep(null);
-  }, []);
+  const transport = useTransport({
+    chordNotes,
+    chordBars,
+    bpm,
+    beatsPerBar,
+    rhythm,
+    loop,
+    player,
+    material: [steps, chordTuning, chosenVoicings],
+  });
 
-  const startProgression = () => {
-    // Play the grips actually on screen; only fall back to an abstract voicing
-    // where no shape exists for this tuning.
-    const chordNotes = steps.map((step, i) => {
-      const voicing = stepVoicings[i]?.[voicingIndex(i)];
-      return voicing ? voicingMidi(voicing, chordTuning) : chordMidiTones(step.chord);
-    });
-
-    transportRef.current = player().startProgression(chordNotes, {
-      // A bar is beatsPerBar beats at the current tempo; each chord holds its bars.
-      secondsPerBar: (beatsPerBar * 60) / bpm,
-      beatsPerBar,
-      pattern: parsePattern(rhythm, beatsPerBar),
-      chordBars,
-      loop,
-      onChord: (index) => {
-        setPlayingStep(index);
-        // A run that ends on its own must clear the handle too, or the tempo
-        // knob below would "restart" a take that already finished.
-        if (index === null) transportRef.current = null;
-      },
-    });
-  };
-
-  const isPlaying = playingStep !== null;
-  const toggleProgression = () => (isPlaying ? stopProgression() : startProgression());
-
-  // Leaving the page with a loop still armed would keep scheduling forever.
-  useEffect(() => stopProgression, [stopProgression]);
-
-  // Different material (key, grips, tuning) — the loop would otherwise carry on
-  // with chords that are no longer on screen.
-  useEffect(() => {
-    stopProgression();
-  }, [steps, chordTuning, chosenVoicings, stopProgression]);
-
-  // Tempo and loop are the knobs you reach for WHILE practising, so those pick up
-  // straight away instead of stopping the take.
-  const restartRef = useRef(startProgression);
-  restartRef.current = startProgression;
-  useEffect(() => {
-    if (transportRef.current) restartRef.current();
-  }, [bpm, loop, beatsPerBar, rhythm]);
+  const { playingStep, isPlaying } = transport;
 
   return (
     <main className="app">
@@ -391,106 +296,18 @@ export default function App() {
           <p className="subtitle">Tonarten und Skalen auf dem Hals sichtbar machen.</p>
         </div>
 
-        {/* The instrument itself: set once, so it states its value and keeps the
-            controls one click away rather than competing with the key. */}
-        <div className="setup" ref={setupRef}>
-          <button
-            type="button"
-            className={setupOpen ? 'setup-trigger is-open' : 'setup-trigger'}
-            aria-expanded={setupOpen}
-            onClick={() => setSetupOpen((open) => !open)}
-          >
-            <span>{setupSummary}</span>
-            <span className="setup-caret" aria-hidden="true">
-              ▾
-            </span>
-          </button>
-
-          {setupOpen ? (
-            <div className="setup-panel">
-              <label className="field">
-                <span>Stimmung</span>
-                <select
-                  value={isCustomTuning ? 'custom' : tuningId}
-                  onChange={(e) =>
-                    update(
-                      'tuningId',
-                      // Switching to custom seeds the editor from the current tuning.
-                      e.target.value === 'custom'
-                        ? customTuningId(tuning.stringLabels)
-                        : e.target.value,
-                    )
-                  }
-                >
-                  {Tuning.ALL.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.description}
-                    </option>
-                  ))}
-                  <option value="custom">Eigene Stimmung</option>
-                </select>
-              </label>
-
-              {isCustomTuning ? (
-                <div className="tuning-strings" role="group" aria-label="Saiten stimmen">
-                  {tuning.stringLabels.map((label, i) => (
-                    <select
-                      // Strings never reorder, so the index is a stable key.
-                      // eslint-disable-next-line react/no-array-index-key
-                      key={i}
-                      aria-label={`Saite ${tuning.stringLabels.length - i}`}
-                      value={label}
-                      onChange={(e) => {
-                        const notes = [...tuning.stringLabels];
-                        notes[i] = e.target.value;
-                        update('tuningId', customTuningId(notes));
-                      }}
-                    >
-                      {NOTE_OPTIONS.map((note) => (
-                        <option key={note} value={note}>
-                          {note}
-                        </option>
-                      ))}
-                    </select>
-                  ))}
-                </div>
-              ) : null}
-
-              <label className="field">
-                <span>Kapo</span>
-                <select value={capo} onChange={(e) => update('capo', Number(e.target.value))}>
-                  <option value={0}>ohne</option>
-                  {[1, 2, 3, 4, 5, 6, 7].map((fret) => (
-                    <option key={fret} value={fret}>
-                      {fret}. Bund
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="field">
-                <span>Bünde</span>
-                <select
-                  value={fretCount}
-                  onChange={(e) => update('fretCount', Number(e.target.value))}
-                >
-                  <option value={12}>12</option>
-                  <option value={15}>15</option>
-                  <option value={24}>24</option>
-                </select>
-              </label>
-
-              <label className="field">
-                <span>Klang</span>
-                <select value={sound} onChange={(e) => update('sound', e.target.value as Timbre)}>
-                  <option value="soft">Weich</option>
-                  <option value="clean">Clean</option>
-                  <option value="electric">Overdrive</option>
-                </select>
-              </label>
-            </div>
-          ) : null}
-        </div>
+        <SetupPanel
+          tuning={tuning}
+          tuningId={tuningId}
+          isCustomTuning={isCustomTuning}
+          capo={capo}
+          fretCount={fretCount}
+          sound={sound}
+          onTuningIdChange={(next) => update('tuningId', next)}
+          onCapoChange={(next) => update('capo', next)}
+          onFretCountChange={(next) => update('fretCount', next)}
+          onSoundChange={(next) => update('sound', next)}
+        />
       </header>
 
       <section className="scale-strip">
@@ -554,14 +371,14 @@ export default function App() {
 
           <KeyFinder
             onPick={(pickedRoot, pickedScaleTypeId) =>
-              setState((previous) => ({
+              patch((previous) => ({
                 ...previous,
                 root: pickedRoot,
                 scaleTypeId: pickedScaleTypeId,
               }))
             }
             onAdopt={(symbols, pickedRoot, pickedScaleTypeId) =>
-              setState((previous) => ({
+              patch((previous) => ({
                 ...previous,
                 root: pickedRoot,
                 scaleTypeId: pickedScaleTypeId,
@@ -704,115 +521,44 @@ export default function App() {
             </ol>
           </section>
 
-          <section className="panel">
-            <div className="panel-head">
-              <h2>Akkordfolge</h2>
-              <select
-                className="select"
-                value={isCustom ? 'custom' : (preset?.id ?? '')}
-                onChange={(e) => {
-                  if (e.target.value === 'custom') {
-                    // Seed the builder with what is on screen (one bar each), so it
-                    // is never blank.
-                    update(
-                      'progressionId',
-                      customProgId(steps.map((s) => ({ symbol: s.chord.name(), bars: 1 }))),
-                    );
-                  } else {
-                    update('progressionId', e.target.value);
-                  }
-                }}
-              >
-                {progressions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-                <option value="custom">Eigene Folge</option>
-              </select>
-            </div>
-
-            {isCustom ? (
-              <ProgressionBuilder
-                steps={customChordSteps ?? []}
-                onChange={(next) => update('progressionId', customProgId(next))}
-              />
-            ) : preset?.hint ? (
-              <p className="hint">{preset.hint}</p>
-            ) : null}
-
-            <div className="transport">
-              <button
-                type="button"
-                className={isPlaying ? 'play-button is-playing' : 'play-button'}
-                onClick={toggleProgression}
-                aria-label={isPlaying ? 'Akkordfolge stoppen' : 'Akkordfolge abspielen'}
-              >
-                {isPlaying ? '■' : '▶'}
-              </button>
-
-              <label className="tempo">
-                <span>
-                  Tempo <output>{bpm}</output> BPM
-                </span>
-                {/* Single BPM steps: pushing a passage up by two is how tempo
-                    practice actually works. Arrow keys nudge exactly one. */}
-                <input
-                  type="range"
-                  min={MIN_BPM}
-                  max={MAX_BPM}
-                  step={1}
-                  value={bpm}
-                  onChange={(e) => update('bpm', Number(e.target.value))}
-                />
-              </label>
-
-              <label className="toggle">
-                <input
-                  type="checkbox"
-                  checked={loop}
-                  onChange={(e) => update('loop', e.target.checked)}
-                />
-                <span>Wiederholen</span>
-              </label>
-
-              <RhythmControls
-                beatsPerBar={beatsPerBar}
-                rhythm={rhythm}
-                onBeatsPerBarChange={(nextBeats) =>
-                  // The pattern length follows the meter, so a new meter resets it.
-                  setState((previous) => ({
-                    ...previous,
-                    beatsPerBar: nextBeats,
-                    rhythm: serializePattern(defaultPattern(nextBeats)),
-                  }))
-                }
-                onRhythmChange={(next) => update('rhythm', next)}
-              />
-            </div>
-
-            <ol className="progression">
-              {steps.map((step, i) => (
-                <ProgressionChord
-                  key={`${step.chord.name()}#${i}`}
-                  step={step}
-                  voicings={stepVoicings[i] ?? []}
-                  selected={voicingIndex(i)}
-                  onSelect={(index) =>
-                    setChosenVoicings((current) => {
-                      const next = [...current];
-                      next[i] = index;
-                      return next;
-                    })
-                  }
-                  isOpen={openPicker === i}
-                  onToggle={() => setOpenPicker((open) => (open === i ? null : i))}
-                  onHear={hearVoicing}
-                  isPlaying={playingStep === i}
-                />
-              ))}
-            </ol>
-          </section>
+          <ProgressionPanel
+            progressions={progressions}
+            preset={preset}
+            isCustom={isCustom}
+            customChordSteps={customChordSteps}
+            onProgressionIdChange={(next) => update('progressionId', next)}
+            steps={steps}
+            stepVoicings={stepVoicings}
+            voicingIndex={voicingIndex}
+            onSelectVoicing={(step, voicing) =>
+              setChosenVoicings((current) => {
+                const next = [...current];
+                next[step] = voicing;
+                return next;
+              })
+            }
+            openPicker={openPicker}
+            onTogglePicker={(step) => setOpenPicker((open) => (open === step ? null : step))}
+            onHearVoicing={hearVoicing}
+            isPlaying={isPlaying}
+            playingStep={playingStep}
+            onToggleTransport={transport.toggle}
+            bpm={bpm}
+            onBpmChange={(next) => update('bpm', next)}
+            loop={loop}
+            onLoopChange={(next) => update('loop', next)}
+            beatsPerBar={beatsPerBar}
+            rhythm={rhythm}
+            onBeatsPerBarChange={(nextBeats) =>
+              // The pattern length follows the meter, so a new meter resets it.
+              patch((previous) => ({
+                ...previous,
+                beatsPerBar: nextBeats,
+                rhythm: serializePattern(defaultPattern(nextBeats)),
+              }))
+            }
+            onRhythmChange={(next) => update('rhythm', next)}
+          />
         </>
       ) : (
         <p className="empty">
