@@ -30,16 +30,49 @@ export type Timbre = 'soft' | 'clean' | 'electric';
  * plectrum.
  */
 const STRINGS: Record<Timbre, Omit<PluckOptions, 'random'>> = {
-  soft: { damping: 0.55, pick: 0.62, sustainSeconds: 4 },
-  clean: { damping: 0.22, pick: 0.22, sustainSeconds: 6 },
-  electric: { damping: 0.14, pick: 0.14, sustainSeconds: 8 },
+  // Picked away from the bridge and damped the most: round and woody.
+  soft: { damping: 0.08, pickPosition: 0.26, pickNoise: 0.05, sustainSeconds: 4.5 },
+  clean: { damping: 0.06, pickPosition: 0.19, pickNoise: 0.07, sustainSeconds: 6 },
+  // Close to the bridge, which thins the low partials — that is the twang.
+  electric: { damping: 0.03, pickPosition: 0.13, pickNoise: 0.06, sustainSeconds: 8 },
+};
+
+/** One resonance of the instrument's body: where, how narrow, how much. */
+interface Resonance {
+  frequency: number;
+  q: number;
+  gain: number;
+}
+
+/**
+ * The box the string is bolted to. An acoustic gets the air resonance of the sound
+ * hole and the ring of the top plate, plus a dip where a bare model sounds glassy;
+ * the electric gets the resonant peak of a pickup instead, which is what gives it
+ * its bite.
+ */
+const BODIES: Record<Timbre, readonly [Resonance, Resonance, Resonance]> = {
+  soft: [
+    { frequency: 100, q: 1.1, gain: 4.5 }, // Helmholtz — the sound hole breathing
+    { frequency: 210, q: 1.4, gain: 3 }, // the top plate
+    { frequency: 3000, q: 0.8, gain: -3 }, // takes the glassiness off
+  ],
+  clean: [
+    { frequency: 110, q: 1.1, gain: 4 },
+    { frequency: 230, q: 1.4, gain: 3 },
+    { frequency: 3200, q: 0.8, gain: -2 },
+  ],
+  electric: [
+    { frequency: 120, q: 1, gain: 2 },
+    { frequency: 2500, q: 1.2, gain: 5 }, // the pickup's own resonance
+    { frequency: 6500, q: 0.7, gain: -5 },
+  ],
 };
 
 /**
  * Per-timbre loudness trim, so switching voice does not jump in volume. Set from
  * the measured RMS of the rendered strings, not by ear.
  */
-const TIMBRE_GAIN: Record<Timbre, number> = { soft: 1, clean: 0.85, electric: 0.3 };
+const TIMBRE_GAIN: Record<Timbre, number> = { soft: 1, clean: 0.92, electric: 0.6 };
 
 /** How much of a note is rendered; longer than anything the app actually holds. */
 const RENDER_SECONDS = 2.4;
@@ -180,6 +213,8 @@ export function createAudioPlayer(): AudioPlayer {
   let context: AudioContext | null = null;
   /** Everything goes through here, so nothing can hit the output raw. */
   let master: GainNode | null = null;
+  /** The instrument's body, in the sum — see BODIES. */
+  let body: BiquadFilterNode[] | null = null;
   let live: AudioScheduledSourceNode[] = [];
   /** The current voice — changed by setTimbre, read when each note is built. */
   let timbre: Timbre = 'soft';
@@ -192,6 +227,16 @@ export function createAudioPlayer(): AudioPlayer {
   let progressionTimers: number[] = [];
   let progressionCancelled = true;
   let progressionOnChord: ProgressionOptions['onChord'] = undefined;
+
+  /** Points the body filters at the current voice. Cheap — three parameter sets. */
+  const applyBody = () => {
+    if (!body) return;
+    BODIES[timbre].forEach((resonance, i) => {
+      body![i].frequency.value = resonance.frequency;
+      body![i].Q.value = resonance.q;
+      body![i].gain.value = resonance.gain;
+    });
+  };
 
   const ensureContext = (): AudioContext => {
     if (!context) {
@@ -207,9 +252,19 @@ export function createAudioPlayer(): AudioPlayer {
       limiter.attack.value = 0.003;
       limiter.release.value = 0.15;
 
+      // The body. A bare string model sounds like wire, because that is all it is —
+      // an instrument is a string plus the box it is bolted to. These three filters
+      // are that box, and they belong to the instrument rather than to any one note,
+      // so they sit in the sum: three filters in total instead of three per pluck.
+      body = [context.createBiquadFilter(), context.createBiquadFilter(), context.createBiquadFilter()];
+      for (const filter of body) filter.type = 'peaking';
+
       master = context.createGain();
       master.gain.value = 0.9;
-      master.connect(limiter).connect(context.destination);
+      master.connect(body[0]).connect(body[1]).connect(body[2]).connect(limiter);
+      limiter.connect(context.destination);
+
+      applyBody();
     }
 
     if (context.state === 'suspended') void context.resume();
@@ -434,6 +489,9 @@ export function createAudioPlayer(): AudioPlayer {
 
   const setTimbre = (next: Timbre) => {
     timbre = next;
+    // The strings are cached per voice, so they need no invalidating — but the body
+    // is one shared set of filters and has to be pointed at the new instrument.
+    applyBody();
   };
 
   return {

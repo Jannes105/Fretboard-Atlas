@@ -1,17 +1,25 @@
 /**
  * A plucked string, synthesised — Karplus-Strong.
  *
- * The idea in one sentence: a burst of noise (the pick) runs around a delay loop
- * whose length sets the pitch, and every lap it is nudged through a gentle lowpass.
+ * Two parts, and both matter.
  *
- * That lowpass is the whole point. The signal passes it hundreds of times per
- * second, so its damping compounds: high harmonics are gone in a fraction of a
- * second while the fundamental rings on. A real string behaves exactly this way,
- * and it is what an oscillator with a volume envelope can never do — that only
- * gets quieter, never darker.
+ * **The loop** sets how the note evolves: the string's displacement runs around a
+ * delay line whose length fixes the pitch, and every lap it passes a gentle lowpass.
+ * That filter compounds over hundreds of laps a second, so the high harmonics are
+ * gone in a fraction of a second while the fundamental rings on. A real string
+ * behaves exactly this way, and it is what an oscillator with a volume envelope can
+ * never do — that only gets quieter, never darker.
+ *
+ * **The excitation** sets what the note is made of, and it is easy to get wrong.
+ * Filling the loop with noise excites every harmonic equally, which measures as no
+ * rolloff at all and sounds buzzy and koto-like — the fundamental ends up the
+ * quietest part of its own note. So the loop starts from the shape a real string
+ * actually has when plucked: pulled aside into a **triangle** and let go. Those
+ * partials fall away as 1/n² on their own.
  *
  * Nothing here touches Web Audio. Numbers in, samples out, so it can be measured
- * in a plain test.
+ * in a plain test — including the harmonic rolloff, which is the property that
+ * decides whether this sounds like a string at all.
  */
 
 export interface PluckOptions {
@@ -22,10 +30,16 @@ export interface PluckOptions {
    */
   damping: number;
   /**
-   * 0…1 — softness of the pick. 0 is white noise, a hard plectrum with all the
-   * harmonics excited at once; 1 is smoothed, closer to a thumb.
+   * 0.05…0.5 — where along the string it is plucked, as a fraction of its length.
+   *
+   * This is also the pick-position filter, for free: a triangle peaking at `p` puts
+   * a null on every harmonic that has a node there. Near the bridge (small values)
+   * that thins the low partials and sounds nasal and twangy; toward the middle it is
+   * round and mellow, like picking over the sound hole.
    */
-  pick: number;
+  pickPosition: number;
+  /** 0…1 — a trace of plectrum scrape over the pluck. A little goes a long way. */
+  pickNoise: number;
   /** Seconds for the string to fall by 60 dB from the loop's losses alone. */
   sustainSeconds: number;
   /** Injectable randomness, so a test can render the same string twice. */
@@ -63,16 +77,19 @@ export function pluck(frequency: number, sampleRate: number, seconds: number, op
   const size = Math.floor(delay) + 2;
   const line = new Float32Array(size);
 
-  // The pick: noise, optionally smoothed. A one-pole lowpass rolls the top off, and
-  // the coefficient is what turns a plectrum into a thumb.
-  const smoothing = clamp01(options.pick) * 0.9;
-  let previous = 0;
+  // The pluck itself: the string pulled aside into a triangle peaking where it is
+  // picked. This shape is the whole reason the note has a sane spectrum — its
+  // partials fall off as 1/n², where noise would leave every harmonic screaming at
+  // full strength and bury the fundamental in its own note.
+  const pickPosition = Math.min(0.5, Math.max(0.02, options.pickPosition));
+  const scrape = clamp01(options.pickNoise);
   let sum = 0;
   for (let i = 0; i < size; i++) {
-    const white = random() * 2 - 1;
-    previous = white * (1 - smoothing) + previous * smoothing;
-    line[i] = previous;
-    sum += previous;
+    const along = i / size;
+    const triangle =
+      along < pickPosition ? along / pickPosition : (1 - along) / (1 - pickPosition);
+    line[i] = triangle * (1 - scrape) + (random() * 2 - 1) * scrape;
+    sum += line[i];
   }
 
   // Any DC left in the loop never decays — it just circles forever as a thump under
