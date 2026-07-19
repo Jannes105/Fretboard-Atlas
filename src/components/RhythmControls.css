@@ -1,4 +1,18 @@
+/*
+ * The panel is anchored to the transport row, not to the trigger, at every width.
+ *
+ * Anchored to the trigger it had to open leftward, because the trigger sits at the
+ * right of the row — and then its width pushed it off the screen instead. That is
+ * not a width problem and max-width cannot fix it: in 6/8 the pattern grid is twelve
+ * slots, the panel came out 672 px wide, and right-anchored at x=550 it started at
+ * -122. The transport row starts at the page margin, so opening rightward from there
+ * cannot run off either edge.
+ */
 .rhythm-controls {
+  position: static;
+}
+
+.transport {
   position: relative;
 }
 
@@ -40,14 +54,12 @@
 .rhythm-panel {
   position: absolute;
   top: calc(100% + 0.4rem);
-  /* The trigger sits at the right of the transport row, so the panel opens
-     leftward — anchored left it ran off the screen edge. */
-  right: 0;
+  left: 0;
   z-index: 20;
   display: grid;
   gap: 0.8rem;
   width: max-content;
-  max-width: calc(100vw - 2rem);
+  max-width: min(calc(100vw - 2rem), 100%);
   padding: 0.9rem;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -55,28 +67,29 @@
   box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
 }
 
-/* Inside the panel the editor is the content, not a floating row. */
+/*
+ * Inside the panel the editor is the content, not a floating row.
+ *
+ * `min-width: 0` is the load-bearing part. Grid and flex children default to
+ * `min-width: auto`, which means they refuse to shrink below their content — so in
+ * 6/8 the twelve-slot grid stayed 428 px wide inside a 339 px panel and simply hung
+ * out of it, cut off at the screen edge. Allowing them to shrink is what lets the
+ * overflow rule below actually do something.
+ */
 .rhythm-panel .rhythm {
+  min-width: 0;
   margin-bottom: 0;
 }
 
 /*
- * On a phone the trigger sits mid-row, so a panel anchored to it hangs off the
- * left edge — clipped, not scrollable, simply unreachable. Anchor it to the
- * transport row instead, which starts at the page margin.
+ * A bar is one line, so the grid never wraps — twelve slots of 6/8 would otherwise
+ * fold into something that no longer reads as a bar. When the panel runs out of room
+ * the grid scrolls instead, which keeps both the metaphor and every slot reachable.
  */
-@media (max-width: 700px) {
-  .rhythm-controls {
-    position: static;
-  }
-
-  .transport {
-    position: relative;
-  }
-
-  .rhythm-panel {
-    left: 0;
-    right: auto;
-    max-width: calc(100vw - 2rem);
-  }
+.rhythm-panel .rhythm-grid {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  /* Room for the scrollbar, so it never sits on top of the bottom row of slots. */
+  padding-bottom: 0.15rem;
 }
