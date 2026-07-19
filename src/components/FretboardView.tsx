@@ -10,6 +10,7 @@ import {
   NUT_X,
   numberX,
   ROOT_RADIUS,
+  STRING_GAP,
   stringY,
 } from './neckGeometry';
 import './FretboardView.css';
@@ -282,6 +283,26 @@ export function FretboardView({
               >
                 {/* A title makes the pitch discoverable on hover and to a screen reader. */}
                 {onPlayNote ? <title>{`${note.note.name()} — anhören`}</title> : null}
+                {/*
+                 * The tap target. A dot of r=13 renders around 19 CSS px on a
+                 * phone, well under a fingertip. A RECTANGLE rather than a bigger
+                 * circle: circles wide enough to help would overlap on adjacent
+                 * strings, and the note drawn last would steal its neighbour's
+                 * tap — a wrong-note bug that is miserable to track down. One
+                 * fret by one string spacing tiles the neck exactly.
+                 *
+                 * `fill` must be transparent, not none: an unpainted shape takes
+                 * no pointer events at all.
+                 */}
+                {onPlayNote ? (
+                  <rect
+                    className="note-hit"
+                    x={cx - FRET_WIDTH / 2}
+                    y={cy - STRING_GAP / 2}
+                    width={FRET_WIDTH}
+                    height={STRING_GAP}
+                  />
+                ) : null}
                 <circle
                   className={classes}
                   cx={cx}

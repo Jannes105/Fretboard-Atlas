@@ -41,6 +41,19 @@
   width: 100%;
   height: auto;
   display: block;
+
+  /* Kills the browser's 300 ms wait for a possible double-tap zoom, which on a
+     phone made every note feel like it answered late. */
+  touch-action: manipulation;
+}
+
+/*
+ * Enlarges the tap target without enlarging the dot. Must be `transparent` and
+ * not `none`: an unpainted shape receives no pointer events, which would make
+ * this silently do nothing.
+ */
+.note-hit {
+  fill: transparent;
 }
 
 /* ---------- The instrument ---------- */

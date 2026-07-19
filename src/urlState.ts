@@ -250,3 +250,32 @@ export function writeState(state: AppState): string {
   const query = params.toString();
   return query === '' ? '' : `?${query}`;
 }
+
+/** Below this width the CSS switches to its phone layout (see App.css). */
+export const NARROW_VIEWPORT = 700;
+/** A 24-fret neck cannot be read on a phone; twelve frets can. */
+export const NARROW_FRET_COUNT = 12;
+
+/**
+ * What a device should start from: the URL, plus a device-appropriate value for
+ * anything the URL did not spell out. Only the fret count qualifies today.
+ *
+ * Kept apart from readState so that stays a pure function of its string — a
+ * property urlState.test.ts pins down in its very first assertion, and the reason
+ * DEFAULT_STATE.fretCount stays at 24 no matter what device is asking.
+ *
+ * The seed does not create a hidden mode: writeState omits only DEFAULTS, so the
+ * moment it applies, `frets=12` lands in the URL. A phone user's link is therefore
+ * explicit and opens as twelve frets anywhere. A desktop link at 24 (unwritten)
+ * opening on a phone as 12 is the correct reading of "the sender did not say".
+ */
+export function initialState(search: string, viewportWidth: number): AppState {
+  const state = readState(search);
+
+  const urlIsSilentAboutFrets = new URLSearchParams(search).get('frets') === null;
+  if (urlIsSilentAboutFrets && viewportWidth > 0 && viewportWidth < NARROW_VIEWPORT) {
+    return { ...state, fretCount: NARROW_FRET_COUNT };
+  }
+
+  return state;
+}

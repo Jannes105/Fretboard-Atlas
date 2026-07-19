@@ -178,3 +178,41 @@ describe('FretboardView — Scrollen zur Lage', () => {
     ).not.toThrow();
   });
 });
+
+describe('FretboardView — Trefferflaeche fuer den Finger', () => {
+  it('legt unter jede spielbare Note eine unsichtbare Flaeche', () => {
+    const { container } = render(
+      <FretboardView
+        scale={aMajor}
+        fretboard={board}
+        labelMode="note"
+        onPlayNote={() => {}}
+      />,
+    );
+    expect(container.querySelectorAll('.note-hit')).toHaveLength(
+      container.querySelectorAll('.note').length,
+    );
+  });
+
+  it('laesst sie weg, wo nichts zu spielen ist', () => {
+    const { container } = render(
+      <FretboardView scale={aMajor} fretboard={board} labelMode="note" />,
+    );
+    expect(container.querySelectorAll('.note-hit')).toHaveLength(0);
+  });
+
+  it('spielt beim Treffer der Flaeche denselben Ton wie beim Treffer des Punktes', () => {
+    const onPlayNote = vi.fn();
+    const { container } = render(
+      <FretboardView
+        scale={aMajor}
+        fretboard={board}
+        labelMode="note"
+        onPlayNote={onPlayNote}
+      />,
+    );
+
+    fireEvent.click(container.querySelector('.note-hit')!);
+    expect(onPlayNote).toHaveBeenCalledExactlyOnceWith(board.mapScale(aMajor)[0].midi);
+  });
+});
