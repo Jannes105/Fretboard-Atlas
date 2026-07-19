@@ -98,6 +98,42 @@ function svg({ rounded, scale }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">${background}${inner}</svg>`;
 }
 
+/**
+ * The favicon is a different drawing, not the same one shrunk.
+ *
+ * A browser tab renders this at 16–32 px. The app icon has twelve dots, six strings
+ * and four frets; at 16 px that is roughly two pixels per string and it collapses
+ * into a grey smear with a hint of orange. Detail that cannot survive the size is
+ * not detail, it is noise.
+ *
+ * So this keeps only what identifies the app: a piece of fretboard, and the amber
+ * root note you are always looking for. Three strings and two frets, all of them
+ * thick enough to still be a line at 16 px — under about 32 units on this 512 canvas
+ * a stroke is thinner than one device pixel and turns to grey mush.
+ */
+function faviconSvg() {
+  const strings = [168, 256, 344];
+  const frets = [188, 356];
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="${BOARD}"/>
+  ${frets
+    .map(
+      (x) =>
+        `<line x1="${x}" y1="96" x2="${x}" y2="416" stroke="${FRET}" stroke-width="26" stroke-linecap="round"/>`,
+    )
+    .join('')}
+  ${strings
+    .map(
+      (y, i) =>
+        `<line x1="64" y1="${y}" x2="448" y2="${y}" stroke="${STRING}" stroke-width="${24 + i * 8}" stroke-linecap="round"/>`,
+    )
+    .join('')}
+  <circle cx="272" cy="256" r="104" fill="${ROOT}" stroke="${ROOT_STROKE}" stroke-width="14"/>
+</svg>
+`;
+}
+
 const targets = [
   { file: 'icon-192.png', size: 192, svg: svg({ rounded: true, scale: 1 }) },
   { file: 'icon-512.png', size: 512, svg: svg({ rounded: true, scale: 1 }) },
@@ -112,3 +148,9 @@ for (const target of targets) {
   await writeFile(join(OUT, target.file), png);
   console.log(`${target.file}  ${target.size}x${target.size}  ${png.length} B`);
 }
+
+// Shipped as SVG: a tab may ask for 16, 32 or 48 px depending on the platform and
+// the display, and one vector answers all of them.
+const favicon = faviconSvg();
+await writeFile(join(OUT, 'favicon.svg'), favicon);
+console.log(`favicon.svg  vector  ${Buffer.byteLength(favicon)} B`);
