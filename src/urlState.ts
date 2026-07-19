@@ -32,6 +32,11 @@ export interface AppState {
   progressionId: string;
   /** 0 = whole neck. */
   boxNumber: number;
+  /**
+   * Crop the neck to the selected position. Unlike the theme, this describes the
+   * picture rather than the viewer, so it belongs in a shareable link.
+   */
+  boxZoom: boolean;
   /** Tempo of the progression, in beats per minute. */
   bpm: number;
   loop: boolean;
@@ -59,6 +64,7 @@ export const DEFAULT_STATE: AppState = {
   chordSize: 3,
   progressionId: 'I-V-vi-IV',
   boxNumber: 0,
+  boxZoom: true,
   bpm: 90,
   loop: true,
   sound: 'clean',
@@ -194,6 +200,7 @@ export function readState(search: string): AppState {
     progressionId: params.get('prog') ?? DEFAULT_STATE.progressionId,
     // The scale decides how many boxes exist, so only the lower bound is checked here.
     boxNumber: pickInt(params.get('box'), (v) => v >= 0, DEFAULT_STATE.boxNumber),
+    boxZoom: params.get('zoom') === null ? DEFAULT_STATE.boxZoom : params.get('zoom') !== '0',
     bpm: pickInt(params.get('bpm'), (v) => v >= MIN_BPM && v <= MAX_BPM, DEFAULT_STATE.bpm),
     loop: params.get('loop') === null ? DEFAULT_STATE.loop : params.get('loop') !== '0',
     sound: pickFrom(params.get('sound'), SOUNDS, DEFAULT_STATE.sound),
@@ -222,6 +229,8 @@ export function writeState(state: AppState): string {
   add('chords', state.chordSize, DEFAULT_STATE.chordSize);
   add('prog', state.progressionId, DEFAULT_STATE.progressionId);
   add('box', state.boxNumber, DEFAULT_STATE.boxNumber);
+  // A boolean needs its own branch: add() only takes strings and numbers.
+  if (state.boxZoom !== DEFAULT_STATE.boxZoom) params.set('zoom', state.boxZoom ? '1' : '0');
   add('bpm', state.bpm, DEFAULT_STATE.bpm);
   if (state.loop !== DEFAULT_STATE.loop) params.set('loop', state.loop ? '1' : '0');
   add('sound', state.sound, DEFAULT_STATE.sound);

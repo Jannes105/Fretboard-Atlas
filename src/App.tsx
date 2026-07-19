@@ -500,6 +500,19 @@ export default function App() {
           </select>
         </label>
 
+        {/* Only meaningful with a position selected — there is nothing else to
+            crop to, and offering it on the whole neck would be a dead control. */}
+        {box ? (
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={!state.boxZoom}
+              onChange={(e) => update('boxZoom', !e.target.checked)}
+            />
+            <span>Ganzen Hals zeigen</span>
+          </label>
+        ) : null}
+
         <label className="field field--inline">
           <span>Beschriftung</span>
           <select
@@ -518,6 +531,7 @@ export default function App() {
         fretboard={fretboard}
         labelMode={labelMode}
         position={box}
+        zoom={state.boxZoom}
         highlight={picked?.pitchClasses ?? null}
         highlightLabel={picked?.label ?? null}
         onPlayNote={(midi) => player().playNote(midi)}

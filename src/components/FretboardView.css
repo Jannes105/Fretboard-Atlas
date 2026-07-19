@@ -11,6 +11,12 @@
   mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
 }
 
+/* A cropped box does not continue off-screen, so a fade there would just dim its
+   last fret for no reason. */
+.fretboard-scroll--zoomed {
+  mask-image: none;
+}
+
 /* The browser's default scrollbar is a slab; this one belongs to the design. */
 .fretboard-scroll {
   scrollbar-width: thin;

@@ -6,6 +6,7 @@ import { FretboardView } from './FretboardView';
 
 const board = new Fretboard(undefined, 15);
 const aMajor = new Scale(Note.parse('A'), MAJOR);
+const aMinorPentatonic = new Scale(Note.parse('A'), MINOR_PENTATONIC);
 
 function dots(container: HTMLElement) {
   return [...container.querySelectorAll('.note-dot')];
@@ -91,5 +92,70 @@ describe('FretboardView', () => {
     const undimmed = dots(container).filter((d) => !d.classList.contains('is-dimmed')).length;
 
     expect(undimmed).toBe(inBox);
+  });
+});
+
+describe('FretboardView — Lage im Ausschnitt', () => {
+  const viewWidth = (container: HTMLElement) =>
+    Number(container.querySelector('svg.fretboard')!.getAttribute('viewBox')!.split(' ')[2]);
+
+  const position = { number: 1, anchorFret: 5, startFret: 4, endFret: 8 };
+
+  it('beschneidet die Zeichnung auf die Lage, statt den ganzen Hals zu zeigen', () => {
+    const { container: full } = render(
+      <FretboardView scale={aMinorPentatonic} fretboard={board} labelMode="note" />,
+    );
+    const wide = viewWidth(full);
+    document.body.innerHTML = '';
+
+    const { container: zoomed } = render(
+      <FretboardView
+        scale={aMinorPentatonic}
+        fretboard={board}
+        labelMode="note"
+        position={position}
+        zoom
+      />,
+    );
+
+    expect(viewWidth(zoomed)).toBeLessThan(wide);
+    // Die Toene bleiben im DOM und werden nur vom Ausschnitt abgeschnitten — die
+    // gedimmten Nachbarn sind weiterhin Teil des Bildes.
+    expect(zoomed.querySelectorAll('.note-dot')).toHaveLength(
+      board.mapScale(aMinorPentatonic).length,
+    );
+  });
+
+  it('zeigt ohne zoom den ganzen Hals, die Lage aber weiterhin umrandet', () => {
+    const { container } = render(
+      <FretboardView
+        scale={aMinorPentatonic}
+        fretboard={board}
+        labelMode="note"
+        position={position}
+        zoom={false}
+      />,
+    );
+
+    const { container: plain } = render(
+      <FretboardView scale={aMinorPentatonic} fretboard={board} labelMode="note" />,
+    );
+
+    expect(viewWidth(container)).toBe(viewWidth(plain));
+    expect(container.querySelector('.box-outline')).not.toBeNull();
+  });
+
+  it('behaelt im Ausschnitt die Saitennamen', () => {
+    const { container } = render(
+      <FretboardView
+        scale={aMinorPentatonic}
+        fretboard={board}
+        labelMode="note"
+        position={{ number: 4, anchorFret: 12, startFret: 11, endFret: 15 }}
+        zoom
+      />,
+    );
+
+    expect(container.querySelectorAll('.string-label')).toHaveLength(6);
   });
 });
