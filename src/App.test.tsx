@@ -660,3 +660,58 @@ describe('App — Transport der Akkordfolge', () => {
     expect(container.querySelectorAll('.progression-chord.is-playing')).toHaveLength(0);
   });
 });
+
+describe('App — Pentatonik borgt sich die Harmonie', () => {
+  const chordSymbols = (container: HTMLElement) =>
+    [...container.querySelectorAll('.chord-card .chord-symbol')].map((el) => el.textContent);
+
+  it('zeigt der Moll-Pentatonik die Akkorde ihrer Molltonart statt gar keiner', () => {
+    window.history.replaceState(null, '', '/?root=A&scale=minor-pentatonic');
+    const { container } = render(<App />);
+
+    // Frueher stand hier die Absage „braucht sieben Stufen" und sonst nichts.
+    expect(container.querySelector('.empty')).toBeNull();
+    expect(chordSymbols(container)).toEqual(['Am', 'Bdim', 'C', 'Dm', 'Em', 'F', 'G']);
+    expect(container.querySelector('.panel-source')?.textContent).toBe('aus A-Moll (Äolisch)');
+
+    // Und damit gibt es auch wieder etwas abzuspielen.
+    expect(container.querySelector('.transport .play-button')).not.toBeNull();
+  });
+
+  it('laesst eine siebenstufige Skala unberuehrt — kein Hinweis, wo nichts geborgt ist', () => {
+    const { container } = render(<App />);
+    expect(container.querySelector('.panel-source')).toBeNull();
+  });
+
+  it('klingt ein geborgter Akkord vollstaendig, auch wenn seine Toene nicht in der Skala liegen', () => {
+    // Die Falle: die VI-Stufe von A-Moll ist F-A-C, und ein F liegt nirgends auf
+    // einem Pentatonik-Hals. Wuerde der Akkord aus den sichtbaren Skalentoenen
+    // gespielt, kaeme eine nackte A/C-Doppel heraus statt eines Akkords.
+    window.history.replaceState(null, '', '/?root=A&scale=minor-pentatonic');
+    const { container } = render(<App />);
+
+    const sixth = [...container.querySelectorAll<HTMLButtonElement>('.chord-card')].find(
+      (card) => card.querySelector('.chord-symbol')?.textContent === 'F',
+    )!;
+    fireEvent.click(sixth);
+
+    const midi = player.play.mock.calls.at(-1)![0] as number[];
+    const pitchClasses = new Set(midi.map((m) => m % 12));
+    // F = 5, A = 9, C = 0 — alle drei, nicht nur die beiden aus der Pentatonik.
+    expect([...pitchClasses].sort((a, b) => a - b)).toEqual([0, 5, 9]);
+  });
+
+  it('haelt die Bluesskala in Moll und liefert den 12-Bar-Blues als Septakkorde', () => {
+    window.history.replaceState(null, '', '/?root=A&scale=blues&prog=12-bar-blues');
+    const { container } = render(<App />);
+
+    expect(container.querySelector('.panel-source')?.textContent).toBe('aus A-Moll (Äolisch)');
+    // Die Progression erzwingt die Dominantseptime selbst, unabhaengig davon, dass
+    // die Elterntonart Moll ist: I, IV und V haben in A-Dur und A-Moll dieselben
+    // Grundtoene.
+    const steps = [...container.querySelectorAll('.progression .chord-symbol')].map(
+      (el) => el.textContent,
+    );
+    expect(new Set(steps)).toEqual(new Set(['A7', 'D7', 'E7']));
+  });
+});

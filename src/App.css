@@ -562,6 +562,15 @@ button:focus-visible {
   font-weight: 650;
 }
 
+/* Names the key a pentatonic borrowed its chords from, without competing with
+   the heading it qualifies. */
+.panel-source {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
 /* A select sitting next to a heading should be only as wide as its content,
    unlike the ones stacked under a label in the setup panel. */
 .panel-head .select {

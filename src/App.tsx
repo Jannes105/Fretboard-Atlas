@@ -104,10 +104,21 @@ export default function App() {
    */
   const chordTuning = useMemo(() => tuning.withCapo(capo), [tuning, capo]);
 
+  /**
+   * The key the harmony comes from. For a seven-note scale that is the scale
+   * itself; a pentatonic or the blues scale borrows from the key behind it, on the
+   * same root. Everything chord-shaped hangs off this rather than off `scale`,
+   * which is why a pentatonic now has chords, a progression and a transport at all.
+   */
+  const chordScale = useMemo(() => scale.chordSource(), [scale]);
+
   const chords = useMemo(
-    () => (scale.type.isHeptatonic ? diatonicChords(scale, chordSize) : []),
-    [scale, chordSize],
+    () => (chordScale ? diatonicChords(chordScale, chordSize) : []),
+    [chordScale, chordSize],
   );
+
+  /** True when the chords on screen are not the scale's own. */
+  const isBorrowedHarmony = chordScale !== null && chordScale !== scale;
 
   const boxes = useMemo(() => fretboard.scalePositions(scale), [fretboard, scale]);
 
@@ -122,6 +133,22 @@ export default function App() {
     return box ? all.filter((p) => p.fret >= box.startFret && p.fret <= box.endFret) : all;
   }, [fretboard, scale, box]);
 
+  /**
+   * Positions to sound a CHORD from. Not the same set as `visiblePositions`: that
+   * one holds scale notes only, and a borrowed chord reaches outside the scale —
+   * the VI of A minor pentatonic is F–A–C, and there is no F on a pentatonic neck.
+   * Sounding it from the scale map would give a bare A/C dyad and quietly break the
+   * app's one rule, that clicking a thing lets you hear it.
+   *
+   * Still filtered by the box, so a chord keeps the register of the position you
+   * are looking at.
+   */
+  const chordPositions = useMemo(() => {
+    if (chordScale === null || chordScale === scale) return visiblePositions;
+    const all = fretboard.mapScale(chordScale);
+    return box ? all.filter((p) => p.fret >= box.startFret && p.fret <= box.endFret) : all;
+  }, [fretboard, chordScale, scale, box, visiblePositions]);
+
   const lowestMidi = useMemo(
     () => visiblePositions.reduce((min, p) => Math.min(min, p.midi), Number.POSITIVE_INFINITY),
     [visiblePositions],
@@ -129,20 +156,17 @@ export default function App() {
 
   const [highlight, setHighlight] = useState<Highlight>(null);
 
-  // Resolve the highlight into what the fretboard picks out AND what to play. The
-  // pitch classes drive the visual highlight; the MIDI notes are the real fretted
-  // pitches of every shown position — for a chord, all of its tones on screen.
+  // Resolve the highlight into what the fretboard picks out: the pitch classes to
+  // pick out, and a name for them. What to PLAY is worked out where the click
+  // happens (pickChord, pickDegree) — a chord and a scale tone draw from different
+  // position sets, and carrying an unread `midi` here once hid that difference.
   const picked = useMemo(() => {
     if (highlight === null) return null;
 
     if (highlight.kind === 'chord') {
       const chord = chords[highlight.index];
       if (!chord) return null;
-      return {
-        pitchClasses: chord.pitchClasses,
-        label: chord.name(),
-        midi: positionsToMidi(visiblePositions, chord.pitchClasses),
-      };
+      return { pitchClasses: chord.pitchClasses, label: chord.name() };
     }
 
     const note = scale.notes[highlight.index];
@@ -150,16 +174,18 @@ export default function App() {
     return {
       pitchClasses: [note.pitchClass],
       label: `Stufe ${scale.degreeLabelOf(note.pitchClass)}`,
-      midi: positionsToMidi(visiblePositions, [note.pitchClass]),
     };
-  }, [highlight, chords, scale, visiblePositions]);
+  }, [highlight, chords, scale]);
 
   const isChordActive = (index: number) =>
     highlight?.kind === 'chord' && highlight.index === index;
   const isDegreeActive = (index: number) =>
     highlight?.kind === 'degree' && highlight.index === index;
 
-  const progressions = useMemo(() => progressionsFor(scale), [scale]);
+  const progressions = useMemo(
+    () => (chordScale ? progressionsFor(chordScale) : []),
+    [chordScale],
+  );
 
   // A self-built progression rides in the same slot, marked by a "custom:" prefix.
   const customChordSteps = customProgSteps(progressionId);
@@ -185,12 +211,14 @@ export default function App() {
           // skip
         }
       }
-      return { steps: customSteps(scale, chords), chordBars: bars };
+      // Roman numerals are measured against the key the harmony lives in, so a
+      // self-built sequence over a pentatonic is numbered from its parent key.
+      return { steps: customSteps(chordScale ?? scale, chords), chordBars: bars };
     }
     const chosen = progressions.find((p) => p.id === progressionId) ?? progressions[0] ?? null;
-    const built = chosen ? buildProgression(scale, chosen, chordSize) : [];
+    const built = chosen && chordScale ? buildProgression(chordScale, chosen, chordSize) : [];
     return { steps: built, chordBars: built.map(() => 1) };
-  }, [progressionId, progressions, scale, chordSize]);
+  }, [progressionId, progressions, scale, chordScale, chordSize]);
 
   /**
    * The grips available per step, and which one is chosen. This lives here rather
@@ -261,12 +289,17 @@ export default function App() {
    * at the pitches it has on screen AND shows it on the neck — no separate button,
    * and no toggling off, because you want to click the same chord twice to hear it
    * twice. The "aufheben" link is what clears.
+   *
+   * Sounded from chordPositions, not from the scale map: a borrowed chord has tones
+   * the scale does not, and playing only the ones that happen to be in the
+   * pentatonic would make the VI a two-note fragment. The neck still highlights
+   * only scale tones — that gap is the lesson, not a bug.
    */
   const pickChord = (index: number) => {
     setHighlight({ kind: 'chord', index });
     const chord = chords[index];
     if (chord) {
-      player().play(positionsToMidi(visiblePositions, chord.pitchClasses), {
+      player().play(positionsToMidi(chordPositions, chord.pitchClasses), {
         mode: 'strum',
         stack: true,
         gap: strumGapNow, duration: chordSeconds,
@@ -494,7 +527,12 @@ export default function App() {
         <>
           <section className="panel">
             <div className="panel-head">
-              <h2>Leitereigene Akkorde</h2>
+              <h2>
+                Leitereigene Akkorde
+                {isBorrowedHarmony ? (
+                  <span className="panel-source">aus {chordScale.name()}</span>
+                ) : null}
+              </h2>
               <select
                 className="select"
                 aria-label="Akkordgröße"
@@ -506,7 +544,11 @@ export default function App() {
               </select>
             </div>
 
-            <p className="hint">Anklicken: du hörst den Akkord und siehst seine Töne im Hals.</p>
+            <p className="hint">
+              {isBorrowedHarmony
+                ? `${scale.type.name} hat keine eigenen Stufenakkorde — diese kommen aus ${chordScale.name()}, der Tonart dahinter. Anklicken: du hörst den Akkord und siehst, welche seiner Töne im Hals liegen.`
+                : 'Anklicken: du hörst den Akkord und siehst seine Töne im Hals.'}
+            </p>
 
             <ol className="chord-row">
               {chords.map((chord, i) => (
@@ -596,9 +638,14 @@ export default function App() {
           />
         </>
       ) : (
+        /*
+         * Unreachable today: every scale on offer either has seven degrees of its
+         * own or names the key it borrows from. It stays as the honest answer for
+         * a future scale that has neither — a whole-tone scale, say.
+         */
         <p className="empty">
-          {scale.type.name} hat {scale.notes.length} Stufen — leitereigene Akkorde brauchen sieben.
-          Wähl eine Dur-, Moll- oder Kirchentonart.
+          {scale.type.name} hat {scale.notes.length} Stufen und keine Tonart, aus der sich
+          Stufenakkorde borgen ließen. Wähl eine Dur-, Moll- oder Kirchentonart.
         </p>
       )}
     </main>

@@ -1,5 +1,12 @@
 import { Note } from './Note';
-import { degreeLabel, MAJOR, NATURAL_MINOR, scaleTypeById, type ScaleType } from './ScaleType';
+import {
+  chordParentOf,
+  degreeLabel,
+  MAJOR,
+  NATURAL_MINOR,
+  scaleTypeById,
+  type ScaleType,
+} from './ScaleType';
 
 /** A key: a root note plus a scale type. */
 export class Scale {
@@ -37,6 +44,21 @@ export class Scale {
       throw new Error(`Unbekannte Tonart/Skala: "${match[2].trim()}"`);
     }
     return new Scale(root, type);
+  }
+
+  /**
+   * The key whose diatonic harmony backs this one: itself when it has seven
+   * degrees, its parent on the SAME root when it has fewer, null when it has no
+   * parent either.
+   *
+   * A-Moll-Pentatonik → A-Moll, A-Blues → A-Moll, C-Dur-Pentatonik → C-Dur. The
+   * root never moves: a pentatonic is played over the key it is named for, not
+   * over its relative major.
+   */
+  chordSource(): Scale | null {
+    const parent = chordParentOf(this.type);
+    if (parent === null) return null;
+    return parent === this.type ? this : new Scale(this.root, parent);
   }
 
   /** Pitch classes of the scale notes, in scale order. */

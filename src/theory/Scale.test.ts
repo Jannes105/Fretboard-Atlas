@@ -13,6 +13,7 @@ import {
   NATURAL_MINOR,
   SCALE_TYPES,
   scaleTypesInGroup,
+  chordParentOf,
 } from './ScaleType';
 
 /** Scale notes as names — spelling matters, so we compare strings. */
@@ -334,5 +335,51 @@ describe('Invarianten über alle Skalentypen', () => {
       expect(scale.notes.length, type.id).toBe(type.semitones.length);
       expect(new Set(scale.pitchClasses).size, type.id).toBe(type.semitones.length);
     }
+  });
+});
+
+describe('Woher eine Skala ihre Akkorde borgt', () => {
+  it('verweist jede Elternskala auf einen echten, siebenstufigen Typ', () => {
+    // Fängt einen Tippfehler in chordParentId ab, bevor er als Absturz auffällt.
+    for (const type of SCALE_TYPES) {
+      if (!type.chordParentId) continue;
+      const parent = chordParentOf(type);
+      expect(parent, type.id).not.toBeNull();
+      expect(parent!.isHeptatonic, `${type.id} -> ${parent!.id}`).toBe(true);
+    }
+  });
+
+  it('gibt einer siebenstufigen Skala sich selbst zurück', () => {
+    const aMajor = new Scale(Note.parse('A'), MAJOR);
+    expect(aMajor.chordSource()).toBe(aMajor);
+  });
+
+  it('behält den Grundton — eine Pentatonik borgt bei ihrer eigenen Tonart', () => {
+    // Nicht bei der Paralleltonart: A-Moll-Pentatonik wird über A-Moll gespielt,
+    // nicht über C-Dur, auch wenn beide dieselben Töne hätten.
+    for (const root of ROOT_CHOICES) {
+      const source = new Scale(Note.parse(root), MINOR_PENTATONIC).chordSource()!;
+      expect(source.root.name(), root).toBe(root);
+      expect(source.type).toBe(NATURAL_MINOR);
+    }
+
+    expect(new Scale(Note.parse('C'), MAJOR_PENTATONIC).chordSource()!.type).toBe(MAJOR);
+    expect(new Scale(Note.parse('A'), BLUES).chordSource()!.type).toBe(NATURAL_MINOR);
+  });
+
+  it('liegt mit den Pentatoniken in ihrer Elterntonart — die Bluesskala bewusst nicht', () => {
+    for (const type of [MINOR_PENTATONIC, MAJOR_PENTATONIC]) {
+      const scale = new Scale(Note.parse('A'), type);
+      const source = scale.chordSource()!;
+      for (const pitchClass of scale.pitchClasses) {
+        expect(source.contains(pitchClass), `${type.id}: ${pitchClass}`).toBe(true);
+      }
+    }
+
+    // Die Bluesskala fällt hier absichtlich heraus: die b5 ist der blue note und
+    // liegt außerhalb der Tonart. Das ist kein Fehler, der zu "reparieren" wäre.
+    const aBlues = new Scale(Note.parse('A'), BLUES);
+    const outside = aBlues.pitchClasses.filter((pc) => !aBlues.chordSource()!.contains(pc));
+    expect(outside).toEqual([Note.parse('Eb').pitchClass]);
   });
 });

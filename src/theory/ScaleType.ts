@@ -27,6 +27,15 @@ export interface ScaleType {
   /** True for seven-note scales that support diatonic chord building. */
   readonly isHeptatonic: boolean;
   readonly group: ScaleGroup;
+  /**
+   * Where this scale borrows its harmony, when it has none of its own.
+   *
+   * Only seven degrees can be stacked into diatonic chords, so a pentatonic has
+   * no chords to call its own — but it is played *over* a key, and that key is
+   * what this names. Held as an id rather than as a reference so the table stays
+   * declarative and independent of declaration order.
+   */
+  readonly chordParentId?: string;
 }
 
 function scaleType(
@@ -35,6 +44,7 @@ function scaleType(
   semitones: readonly number[],
   diatonicSteps: readonly number[],
   group: ScaleGroup = 'more',
+  chordParentId?: string,
 ): ScaleType {
   if (semitones.length !== diatonicSteps.length) {
     throw new Error(`ScaleType "${id}": semitones und diatonicSteps müssen gleich lang sein.`);
@@ -46,6 +56,7 @@ function scaleType(
     diatonicSteps,
     isHeptatonic: semitones.length === 7,
     group,
+    chordParentId,
   };
 }
 
@@ -90,6 +101,8 @@ export const MAJOR_PENTATONIC = scaleType(
   'Dur-Pentatonik',
   [0, 2, 4, 7, 9],
   [0, 1, 2, 4, 5],
+  'more',
+  'major',
 );
 
 export const MINOR_PENTATONIC = scaleType(
@@ -98,15 +111,25 @@ export const MINOR_PENTATONIC = scaleType(
   [0, 3, 5, 7, 10],
   [0, 2, 3, 4, 6],
   'basics',
+  'natural-minor',
 );
 
-/** Minor pentatonic plus the b5 "blue note"; the b5 and 5 share a letter by design. */
+/**
+ * Minor pentatonic plus the b5 "blue note"; the b5 and 5 share a letter by design.
+ *
+ * Its harmony comes from natural minor, matching the b3 and b7 of its own tones.
+ * That the blues is actually played over dominant sevenths is not lost: the
+ * 12-bar preset forces that quality itself, and degrees I, IV and V have the same
+ * roots in the major and minor of a key — so the twelve bars come out as A7, D7,
+ * E7 either way.
+ */
 export const BLUES = scaleType(
   'blues',
   'Bluesskala',
   [0, 3, 5, 6, 7, 10],
   [0, 2, 3, 4, 4, 6],
   'basics',
+  'natural-minor',
 );
 
 /** Basics first — that is also the order the UI lists them in. */
@@ -134,6 +157,15 @@ export function scaleTypeById(id: string): ScaleType {
 
 export function scaleTypesInGroup(group: ScaleGroup): ScaleType[] {
   return SCALE_TYPES.filter((type) => type.group === group);
+}
+
+/**
+ * The heptatonic scale this one borrows its chords from — itself when it already
+ * has seven degrees, null when it has neither.
+ */
+export function chordParentOf(type: ScaleType): ScaleType | null {
+  if (type.isHeptatonic) return type;
+  return type.chordParentId ? scaleTypeById(type.chordParentId) : null;
 }
 
 /**

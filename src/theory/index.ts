@@ -3,6 +3,7 @@ export {
   SCALE_TYPES,
   scaleTypeById,
   scaleTypesInGroup,
+  chordParentOf,
   degreeLabel,
   MAJOR,
   NATURAL_MINOR,
