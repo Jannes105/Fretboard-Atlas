@@ -5,6 +5,16 @@ describe('Tuning — Beschreibung', () => {
   it('leitet die Saitennamen aus den Tonhöhen ab, statt sie im Namen zu wiederholen', () => {
     expect(Tuning.STANDARD.description).toBe('Standard (E-A-D-G-B-E)');
     expect(Tuning.DROP_D.description).toBe('Drop D (D-A-D-G-B-E)');
+    expect(Tuning.EB.description).toBe('Eb Standard (Eb-Ab-Db-Gb-Bb-Eb)');
+  });
+
+  it('gibt Eb dieselben Saitenabstände wie Standard — daher dieselben Griffe', () => {
+    // Nicht die Tonhöhen entscheiden über die Akkordformen, sondern die Abstände
+    // zwischen den Saiten. Eb verschiebt alle sechs gleich, wie ein Kapo nach unten.
+    expect(Tuning.EB.intervals).toEqual(Tuning.STANDARD.intervals);
+    expect(Tuning.EB.openStrings.map((midi) => midi + 1)).toEqual([
+      ...Tuning.STANDARD.openStrings,
+    ]);
   });
 
   it('beschreibt auch eine gekapodete Stimmung mit den Tönen, die dann wirklich klingen', () => {

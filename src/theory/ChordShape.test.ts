@@ -255,6 +255,21 @@ describe('Formen-Sets werden über die Saiten-Intervalle zugeordnet', () => {
     }
   });
 
+  it('greift dieselben Formen in Eb einen Bund höher', () => {
+    // Eb verschiebt alle sechs Saiten gleich weit, lässt die Intervalle also in
+    // Ruhe und erbt dadurch das Standard-Set. Derselbe klingende Akkord will dann
+    // aber einen Bund weiter oben gegriffen werden — die Form wandert, sie ändert
+    // sich nicht. Gedämpfte Saiten bleiben gedämpft.
+    const aMajor = Chord.fromQuality(Note.parse('A'), 'major');
+    const standard = voicingsFor(aMajor);
+    const eb = voicingsFor(aMajor, { tuning: Tuning.EB });
+
+    expect(eb.map((v) => v.shapeName)).toEqual(standard.map((v) => v.shapeName));
+    expect(eb.map((v) => v.frets)).toEqual(
+      standard.map((v) => v.frets.map((fret) => (fret < 0 ? fret : fret + 1))),
+    );
+  });
+
   it('rechnet mit Kapo die Bünde ab dem Kapo', () => {
     // Mit Kapo 2 liegt D zwei Bünde über dem Kapo auf der A-Saite.
     const dMajor = Chord.fromQuality(Note.parse('D'), 'major');

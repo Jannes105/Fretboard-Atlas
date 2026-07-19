@@ -87,7 +87,13 @@ export class Tuning {
    */
   static readonly DROP_D = new Tuning('drop-d', 'Drop D', [38, 45, 50, 55, 59, 64]);
 
-  static readonly ALL: readonly Tuning[] = [Tuning.STANDARD, Tuning.DROP_D];
+  /**
+   * Every string down a semitone. The gaps between them are untouched, so this
+   * shares the standard shape set — the same reason a capo does (see `intervals`).
+   */
+  static readonly EB = new Tuning('eb', 'Eb Standard', [39, 44, 49, 54, 58, 63]);
+
+  static readonly ALL: readonly Tuning[] = [Tuning.STANDARD, Tuning.EB, Tuning.DROP_D];
 
   static byId(id: string): Tuning {
     return Tuning.ALL.find((tuning) => tuning.id === id) ?? Tuning.STANDARD;
