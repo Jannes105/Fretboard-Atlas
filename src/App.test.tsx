@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Type-only: erased at runtime, so it does not defeat the vi.mock below.
 import type { ProgressionOptions } from './audio';
+import { Fretboard, MAJOR, Note, positionsAtPitch, Scale } from './theory';
 
 // The audio engine is replaced by a spy: the tests check that the UI asks for the
 // right notes, without a real AudioContext (which jsdom has not got anyway).
@@ -713,5 +714,64 @@ describe('App — Pentatonik borgt sich die Harmonie', () => {
       (el) => el.textContent,
     );
     expect(new Set(steps)).toEqual(new Set(['A7', 'D7', 'E7']));
+  });
+});
+
+describe('App — Marker beim Abspielen der Skala', () => {
+  const scalePlayButton = (container: HTMLElement) =>
+    container.querySelector<HTMLButtonElement>('.scale-title .play-button')!;
+
+  /** Der onNote-Callback, den App dem Player beim Abspielen mitgibt. */
+  const onNoteOf = (call: number) => player.play.mock.calls[call][1].onNote as (
+    index: number | null,
+  ) => void;
+
+  it('laesst waehrend des Laufs genau die klingenden Stellen leuchten', () => {
+    const { container } = render(<App />);
+    fireEvent.click(scalePlayButton(container));
+
+    const sequence = player.play.mock.calls[0][0] as number[];
+    const onNote = onNoteOf(0);
+
+    act(() => onNote(3));
+    const halos = container.querySelectorAll('.note-halo');
+    // Dieselbe Tonhoehe liegt mehrfach auf dem Hals — alle Stellen leuchten.
+    expect(halos.length).toBeGreaterThan(0);
+
+    // Und zwar genau die Stellen dieser Tonhoehe.
+    const board = new Fretboard(undefined, 24);
+    const expected = positionsAtPitch(board.mapScale(new Scale(Note.parse('A'), MAJOR)), sequence[3]);
+    expect(halos).toHaveLength(expected.length);
+  });
+
+  it('raeumt den Marker weg, wenn der Lauf endet', () => {
+    const { container } = render(<App />);
+    fireEvent.click(scalePlayButton(container));
+
+    const onNote = onNoteOf(0);
+    act(() => onNote(2));
+    expect(container.querySelectorAll('.note-halo').length).toBeGreaterThan(0);
+
+    act(() => onNote(null));
+    expect(container.querySelectorAll('.note-halo')).toHaveLength(0);
+  });
+
+  it('startet bei erneutem Druck einen neuen Lauf', () => {
+    // Das Unterbrechen ist Sache des Players (play() ruft stop()), hier zaehlt
+    // nur, dass die App wirklich neu anfragt statt den alten Lauf weiterlaufen
+    // zu lassen.
+    const { container } = render(<App />);
+    fireEvent.click(scalePlayButton(container));
+    fireEvent.click(scalePlayButton(container));
+
+    expect(player.play).toHaveBeenCalledTimes(2);
+  });
+
+  it('stoppt den Player, wenn die App verschwindet', () => {
+    const view = render(<App />);
+    fireEvent.click(scalePlayButton(view.container));
+
+    view.unmount();
+    expect(player.stop).toHaveBeenCalled();
   });
 });

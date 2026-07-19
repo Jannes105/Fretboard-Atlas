@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type AudioPlayer, createAudioPlayer, LOOSE_ARPEGGIO_GAP, prefetchSamples } from './audio';
 import { FretboardView, type LabelMode } from './components/FretboardView';
+import { positionKey } from './components/neckGeometry';
 import { KeyFinder } from './components/KeyFinder';
 import { ProgressionPanel } from './components/ProgressionPanel';
 import { SetupPanel } from './components/SetupPanel';
@@ -20,6 +21,7 @@ import {
   serializePattern,
   STANDARD_STRUM_GAP,
   Note,
+  positionsAtPitch,
   positionsToMidi,
   progressionsFor,
   ROOT_CHOICES,
@@ -269,6 +271,35 @@ export default function App() {
     void prefetchSamples();
   }, []);
 
+  // Silence the player when the app goes away. useTransport only ever stopped the
+  // progression, so a scale run's timers used to outlive the component.
+  useEffect(() => () => playerRef.current?.stop(), []);
+
+  /**
+   * Which note of the scale run is sounding, as an index into the sequence below.
+   * Only the index is kept: turning it into positions needs the sequence, which is
+   * derived, so storing the positions too would be a second copy that can go stale.
+   */
+  const [soundingIndex, setSoundingIndex] = useState<number | null>(null);
+
+  const scaleSequence = useMemo(
+    () => scaleMidiSequence(scale, { baseMidi: lowestMidi, descend: true }),
+    [scale, lowestMidi],
+  );
+
+  // A pitch usually sits on several positions at once, and all of them light up —
+  // it is the same note, playable in more than one place.
+  const soundingKeys = useMemo(() => {
+    if (soundingIndex === null) return null;
+    const midi = scaleSequence[soundingIndex];
+    if (midi === undefined) return null;
+    return new Set(positionsAtPitch(visiblePositions, midi).map(positionKey));
+  }, [soundingIndex, scaleSequence, visiblePositions]);
+
+  // A run that is no longer playable — the key changed mid-run — must not leave
+  // its marker behind.
+  useEffect(() => setSoundingIndex(null), [scaleSequence]);
+
   /**
    * Anchored to the register the scale actually occupies on screen, so a capo or
    * a box up the neck is heard rather than flattened to a fixed octave.
@@ -280,8 +311,10 @@ export default function App() {
    * ("lässt eine hohe Lage höher klingen als eine tiefe").
    */
   const playScale = () =>
-    player().play(scaleMidiSequence(scale, { baseMidi: lowestMidi, descend: true }), {
+    player().play(scaleSequence, {
       mode: 'sequence',
+      // Lights each note on the neck as it sounds; null when the run is over.
+      onNote: setSoundingIndex,
     });
 
   /**
@@ -532,6 +565,7 @@ export default function App() {
         labelMode={labelMode}
         position={box}
         zoom={state.boxZoom}
+        sounding={soundingKeys}
         highlight={picked?.pitchClasses ?? null}
         highlightLabel={picked?.label ?? null}
         onPlayNote={(midi) => player().playNote(midi)}

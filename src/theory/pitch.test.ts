@@ -6,10 +6,12 @@ import {
   chordMidiTones,
   midiForPitchClass,
   midiToFrequency,
+  positionsAtPitch,
   positionsToMidi,
   scaleMidiSequence,
   voicingMidi,
 } from './pitch';
+import { Fretboard } from './Fretboard';
 import { Scale } from './Scale';
 import { MAJOR, MINOR_PENTATONIC, NATURAL_MINOR } from './ScaleType';
 import { Tuning } from './Tuning';
@@ -198,5 +200,40 @@ describe('voicingMidi', () => {
       expect(midi.length, chord.name()).toBeGreaterThan(0);
       expect(new Set(midi.map((m) => m % 12)), chord.name()).toEqual(new Set(chord.pitchClasses));
     }
+  });
+});
+
+describe('positionsAtPitch', () => {
+  const board = new Fretboard(undefined, 15);
+  const aMinorPentatonic = new Scale(Note.parse('A'), MINOR_PENTATONIC);
+  const positions = board.mapScale(aMinorPentatonic);
+
+  it('findet alle Stellen, an denen dieselbe Tonhoehe liegt', () => {
+    // A3 (MIDI 57) liegt in Standardstimmung mehrfach: 5. Bund E-Saite,
+    // leere A-Saite.
+    const found = positionsAtPitch(positions, 57);
+    expect(found.length).toBeGreaterThan(1);
+    expect(found.every((p) => p.midi === 57)).toBe(true);
+  });
+
+  it('bevorzugt die exakte Oktave vor der blossen Tonklasse', () => {
+    const found = positionsAtPitch(positions, 57);
+    // Es gibt A auch in anderen Oktaven; die duerfen hier nicht mitkommen.
+    expect(found.some((p) => p.midi !== 57)).toBe(false);
+  });
+
+  it('weicht auf die Tonklasse aus, wo die Tonhoehe gar nicht auf dem Hals liegt', () => {
+    // Der Schlusston eines Laufs kann ueber dem letzten Bund liegen. Ohne diesen
+    // Ausweg fiele der Marker dort einfach aus.
+    const tooHigh = Math.max(...positions.map((p) => p.midi)) + 12;
+    const found = positionsAtPitch(positions, tooHigh);
+
+    expect(found.length).toBeGreaterThan(0);
+    expect(found.every((p) => p.pitchClass === ((tooHigh % 12) + 12) % 12)).toBe(true);
+  });
+
+  it('liefert nichts, wenn die Tonklasse gar nicht vorkommt', () => {
+    // Bb liegt nicht in A-Moll-Pentatonik.
+    expect(positionsAtPitch(positions, Note.parse('Bb').pitchClass + 60)).toEqual([]);
   });
 });

@@ -164,6 +164,14 @@ export interface PlayOptions {
    * of those over each other is just mush.
    */
   stack?: boolean;
+  /**
+   * Fires as each note sounds, by index, and with null once the run is over —
+   * this is what drives a marker along the neck.
+   *
+   * Only meaningful for a run that replaces (so: not stacking), because the marker
+   * belongs to one run at a time.
+   */
+  onNote?: (index: number | null) => void;
 }
 
 const DEFAULTS: Record<PlayMode, { gap: number; duration: number }> = {
@@ -343,10 +351,15 @@ export function createAudioPlayer(): AudioPlayer {
    *  oldest entry is simply the first key when the cache has to make room. */
   const strings = new Map<string, AudioBuffer>();
 
-  /** Timers of the running progression — its loop keeps arming new ones. */
-  let progressionTimers: number[] = [];
-  let progressionCancelled = true;
-  let progressionOnChord: ProgressionOptions['onChord'] = undefined;
+  /**
+   * The one timed run in flight — a progression, or a scale played note by note.
+   * Both schedule their audio on the AudioContext clock and let a timer nudge the
+   * marker along behind it, and both are torn down the same way, so they share
+   * these rather than each keeping their own.
+   */
+  let runTimers: number[] = [];
+  let runCancelled = true;
+  let runOnStep: ((index: number | null) => void) | undefined = undefined;
 
   /** Points the tone filters at the current voice. */
   const applyTone = () => {
@@ -422,16 +435,31 @@ export function createAudioPlayer(): AudioPlayer {
   };
 
   /**
-   * Tears down a running progression. Kept separate from stop() so that stop()
-   * can call it without recursing back through the handle.
+   * Tears down the timed run. Kept separate from stop() so that stop() can call it
+   * without recursing back through the handle. Reporting the end (null) is part of
+   * it, so whoever is drawing a marker always hears that it is over.
    */
-  const cancelProgression = () => {
-    progressionCancelled = true;
-    for (const timer of progressionTimers) clearTimeout(timer);
-    progressionTimers = [];
+  const cancelRun = () => {
+    runCancelled = true;
+    for (const timer of runTimers) clearTimeout(timer);
+    runTimers = [];
 
-    progressionOnChord?.(null);
-    progressionOnChord = undefined;
+    runOnStep?.(null);
+    runOnStep = undefined;
+  };
+
+  /**
+   * Fires `run` at an AudioContext time. The audio itself is scheduled
+   * sample-accurately; this only has to move a marker, so a timer derived from the
+   * same clock is close enough.
+   */
+  const after = (ctx: AudioContext, seconds: number, run: () => void) => {
+    const delayMs = Math.max(0, (seconds - ctx.currentTime) * 1000);
+    runTimers.push(
+      window.setTimeout(() => {
+        if (!runCancelled) run();
+      }, delayMs),
+    );
   };
 
   /**
@@ -439,7 +467,7 @@ export function createAudioPlayer(): AudioPlayer {
    * timers would otherwise keep scheduling new chords after the sound stopped.
    */
   const stop = () => {
-    cancelProgression();
+    cancelRun();
     stopVoices();
   };
 
@@ -568,6 +596,24 @@ export function createAudioPlayer(): AudioPlayer {
     midiNotes.forEach((midi, i) => {
       voice(ctx, midi, start + i * step, ring, peak);
     });
+
+    /*
+     * Follow the run with a marker. This sits AFTER the stop() above on purpose:
+     * that call ends the previous run and reports its null, so pressing play twice
+     * hands the marker cleanly from one run to the next instead of leaving the
+     * first one lit.
+     */
+    if (options.onNote) {
+      const onNote = options.onNote;
+      runCancelled = false;
+      runOnStep = onNote;
+
+      midiNotes.forEach((_, i) => after(ctx, start + i * step, () => onNote(i)));
+      after(ctx, start + (midiNotes.length - 1) * step + ring, () => {
+        onNote(null);
+        runCancelled = true;
+      });
+    }
   };
 
   const playNote = (midi: number) => {
@@ -602,17 +648,11 @@ export function createAudioPlayer(): AudioPlayer {
     const slotSeconds = secondsPerBeat / 2; // eighth-note grid: two slots per beat
 
     const ctx = ensureContext();
-    progressionCancelled = false;
-    progressionOnChord = onChord;
+    runCancelled = false;
+    runOnStep = onChord;
 
-    const after = (seconds: number, run: () => void) => {
-      const delayMs = Math.max(0, (seconds - ctx.currentTime) * 1000);
-      progressionTimers.push(
-        window.setTimeout(() => {
-          if (!progressionCancelled) run();
-        }, delayMs),
-      );
-    };
+    /** This progression's binding of the shared timer helper. */
+    const schedule = (seconds: number, run: () => void) => after(ctx, seconds, run);
 
     // Every chord of an arpeggio plays the same number of strings, so that dividing
     // the bar among them gives the same pulse throughout. Decided across the whole
@@ -653,7 +693,7 @@ export function createAudioPlayer(): AudioPlayer {
     const totalSeconds = voiced.reduce((sum, _, index) => sum + barsOf(index) * secondsPerBar, 0);
 
     const schedulePass = (startAt: number) => {
-      if (progressionCancelled) return;
+      if (runCancelled) return;
 
       let offset = 0;
       voiced.forEach((chord, index) => {
@@ -670,7 +710,7 @@ export function createAudioPlayer(): AudioPlayer {
           }
         }
         // The audio is scheduled sample-accurately; the marker just follows along.
-        if (onChord) after(at, () => onChord(index));
+        if (onChord) schedule(at, () => onChord(index));
         offset += bars * secondsPerBar;
       });
 
@@ -678,11 +718,11 @@ export function createAudioPlayer(): AudioPlayer {
 
       if (loop) {
         // Arm the next pass slightly early so the loop joins without a gap.
-        after(endAt - 0.3, () => schedulePass(endAt));
+        schedule(endAt - 0.3, () => schedulePass(endAt));
       } else {
-        after(endAt, () => {
+        schedule(endAt, () => {
           onChord?.(null);
-          progressionCancelled = true;
+          runCancelled = true;
         });
       }
     };

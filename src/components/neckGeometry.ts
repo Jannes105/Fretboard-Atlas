@@ -33,6 +33,17 @@ export const DOUBLE_INLAY_OFFSET = STRING_GAP * 0.85;
  */
 export const LABEL_GUTTER = 46;
 
+/**
+ * Identifies one position on the neck.
+ *
+ * A string key rather than the position object, because App and FretboardView each
+ * call mapScale() separately and so hold different objects for the same fret —
+ * comparing by identity would silently never match.
+ */
+export function positionKey(position: { stringIndex: number; fret: number }): string {
+  return `${position.stringIndex}-${position.fret}`;
+}
+
 /** Y of a string. String 0 is the low E and sits at the bottom, as on a chart. */
 export function stringY(stringIndex: number, stringCount: number): number {
   return TOP_Y + (stringCount - 1 - stringIndex) * STRING_GAP;

@@ -183,9 +183,38 @@
   fill: var(--chord-text);
 }
 
+/*
+ * The note sounding right now. A ring around the dot rather than a recolouring of
+ * it — the dot's own colour already says root/picked/dimmed, and the marker has to
+ * be readable on top of any of those.
+ */
+.note-halo {
+  fill: none;
+  stroke: var(--root-stroke);
+  stroke-width: 3;
+  opacity: 0.9;
+  animation: note-pulse 0.45s ease-out;
+}
+
+@keyframes note-pulse {
+  from {
+    opacity: 0.25;
+    stroke-width: 8;
+  }
+  to {
+    opacity: 0.9;
+    stroke-width: 3;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .note-dot,
   .note-label {
     transition: none;
+  }
+
+  /* The ring still marks the note; it just stops swelling into place. */
+  .note-halo {
+    animation: none;
   }
 }

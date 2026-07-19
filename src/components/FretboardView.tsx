@@ -9,6 +9,7 @@ import {
   noteX as noteXAt,
   NUT_X,
   numberX,
+  positionKey,
   ROOT_RADIUS,
   STRING_GAP,
   stringY,
@@ -38,6 +39,11 @@ interface FretboardViewProps {
    * dimmed around it. Without a position there is nothing to crop to.
    */
   zoom?: boolean;
+  /**
+   * Positions sounding right now, as keys from positionKey — the marker that walks
+   * the neck while a scale plays.
+   */
+  sounding?: ReadonlySet<string> | null;
 }
 
 export function FretboardView({
@@ -49,6 +55,7 @@ export function FretboardView({
   highlightLabel = null,
   onPlayNote,
   zoom = false,
+  sounding = null,
 }: FretboardViewProps) {
   const { fretCount, stringCount, capo, tuning } = fretboard;
 
@@ -275,14 +282,30 @@ export function FretboardView({
               .filter(Boolean)
               .join(' ');
 
+            const isSounding = sounding?.has(positionKey(note)) ?? false;
+
             return (
               <g
-                key={`${note.stringIndex}-${note.fret}`}
+                key={positionKey(note)}
                 className="note"
                 onClick={onPlayNote ? () => onPlayNote(note.midi) : undefined}
               >
                 {/* A title makes the pitch discoverable on hover and to a screen reader. */}
                 {onPlayNote ? <title>{`${note.note.name()} — anhören`}</title> : null}
+                {/*
+                 * The marker, as its own ring UNDER the dot rather than a class on
+                 * it: the dot already carries a root/picked/dimmed cascade, and a
+                 * fourth state fighting that would be a colour puzzle. Drawn first,
+                 * so the dot stays legible on top of it.
+                 */}
+                {isSounding ? (
+                  <circle
+                    className="note-halo"
+                    cx={cx}
+                    cy={cy}
+                    r={(note.isRoot ? ROOT_RADIUS : DOT_RADIUS) + 7}
+                  />
+                ) : null}
                 {/*
                  * The tap target. A dot of r=13 renders around 19 CSS px on a
                  * phone, well under a fingertip. A RECTANGLE rather than a bigger

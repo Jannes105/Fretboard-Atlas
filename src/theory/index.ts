@@ -78,6 +78,7 @@ export {
   scaleMidiSequence,
   chordMidiTones,
   positionsToMidi,
+  positionsAtPitch,
   voicingMidi,
   type ScaleSequenceOptions,
   type PlayablePosition,

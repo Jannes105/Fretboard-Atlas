@@ -85,6 +85,26 @@ export function positionsToMidi(
 }
 
 /**
+ * The positions that sound a given pitch.
+ *
+ * Two things make this more than a filter. One pitch usually sits on several
+ * positions at once, and lighting all of them is right — they are the same note,
+ * playable in more than one place. And a scale run's closing octave can land above
+ * the last drawn fret, where an exact match would find nothing and a marker would
+ * simply blink out; there, every position of the same pitch class stands in for it.
+ */
+export function positionsAtPitch<T extends PlayablePosition>(
+  positions: readonly T[],
+  midi: number,
+): T[] {
+  const exact = positions.filter((p) => p.midi === midi);
+  if (exact.length > 0) return exact;
+
+  const pitchClass = ((midi % 12) + 12) % 12;
+  return positions.filter((p) => p.pitchClass === pitchClass);
+}
+
+/**
  * What a grip actually sounds, low string first — muted strings dropped.
  *
  * This is the honest voicing: the pitches under the fingers in the shape being
