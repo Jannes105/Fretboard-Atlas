@@ -237,9 +237,6 @@ export function FretboardView({
                 rx={6}
               />
               <line className="capo" x1={capoX} y1={boardTop - 3} x2={capoX} y2={boardFoot + 3} />
-              <text className="capo-label" x={capoX} y={boardTop - 10} textAnchor="middle">
-                Kapo {capo}
-              </text>
             </>
           ) : null}
 
@@ -387,6 +384,23 @@ export function FretboardView({
             );
           })}
         </g>
+
+        {/*
+         * Outside the clip, like the string names: it is an annotation above the
+         * board, not part of it. A crop that starts at or past the capo would
+         * otherwise slice the word in half, since it is centred on the bar. Nudged
+         * right where it would run off the left edge, so it stays readable.
+         */}
+        {capo > 0 ? (
+          <text
+            className="capo-label"
+            x={Math.max(capoX, layout.labelX + 26)}
+            y={boardTop - 10}
+            textAnchor="middle"
+          >
+            Kapo {capo}
+          </text>
+        ) : null}
 
         {/* Outside the clip: the names live in the left margin, not on the wood. */}
         {Array.from({ length: stringCount }, (_, stringIndex) => (
