@@ -270,6 +270,17 @@ describe('App — Einstellungen', () => {
     await user.keyboard('{Escape}');
     expect(container.querySelectorAll('.setup-panel')).toHaveLength(0);
   });
+
+  it('bietet den Kapo bis zum 12. Bund an', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
+    // Kapo ist das zweite Feld: „ohne" plus zwölf Bünde.
+    const capoSelect = container.querySelectorAll('.setup-panel select')[1];
+    expect(capoSelect.querySelectorAll('option')).toHaveLength(13);
+    expect(capoSelect.querySelectorAll('option')[12].textContent).toBe('12. Bund');
+  });
 });
 
 describe('App — Eigene Stimmung', () => {

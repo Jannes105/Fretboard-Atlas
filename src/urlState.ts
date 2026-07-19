@@ -75,7 +75,8 @@ const STRUMS: readonly StrumStyle[] = ['standard', 'arpeggio'];
 const SUSTAINS: readonly NoteLength[] = ['ring', 'stopped'];
 const CLICKS: readonly ClickMode[] = ['off', 'countIn', 'metronome'];
 const BEATS_PER_BAR = [2, 3, 4, 6];
-const MAX_CAPO = 7;
+/** Exported because SetupPanel builds its dropdown from it — one limit, not two. */
+export const MAX_CAPO = 12;
 export const MIN_BPM = 40;
 export const MAX_BPM = 200;
 

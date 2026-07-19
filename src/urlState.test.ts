@@ -47,9 +47,9 @@ describe('readState', () => {
   });
 
   it('lehnt einen Kapo jenseits des Reglers ab', () => {
-    expect(readState('?capo=8').capo).toBe(DEFAULT_STATE.capo);
+    expect(readState('?capo=13').capo).toBe(DEFAULT_STATE.capo);
     expect(readState('?capo=-1').capo).toBe(DEFAULT_STATE.capo);
-    expect(readState('?capo=7').capo).toBe(7);
+    expect(readState('?capo=12').capo).toBe(12);
   });
 
   it('nimmt nur Bundzahlen, die es im Regler gibt', () => {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Timbre } from '../audio';
 import { pitchClassName, Tuning } from '../theory';
-import { customTuningId } from '../urlState';
+import { customTuningId, MAX_CAPO } from '../urlState';
 
 /** The twelve notes offered per string in the custom-tuning editor. */
 const NOTE_OPTIONS: string[] = Array.from({ length: 12 }, (_, pitchClass) =>
@@ -136,7 +136,11 @@ export function SetupPanel({
             <span>Kapo</span>
             <select value={capo} onChange={(e) => onCapoChange(Number(e.target.value))}>
               <option value={0}>ohne</option>
-              {[1, 2, 3, 4, 5, 6, 7].map((fret) => (
+              {/* Also capped by the neck, which today never bites — the shortest
+                  neck on offer has as many frets as MAX_CAPO. It is here so that
+                  shortening either limit cannot start promising a capo that
+                  App then quietly clamps away. */}
+              {Array.from({ length: Math.min(MAX_CAPO, fretCount) }, (_, i) => i + 1).map((fret) => (
                 <option key={fret} value={fret}>
                   {fret}. Bund
                 </option>
