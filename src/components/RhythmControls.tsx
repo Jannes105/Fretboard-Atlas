@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { type NoteLength, PATTERN_PRESETS, serializePattern, type StrumStyle } from '../theory';
+import {
+  type ClickMode,
+  type NoteLength,
+  PATTERN_PRESETS,
+  serializePattern,
+  type StrumStyle,
+} from '../theory';
 import { RhythmEditor } from './RhythmEditor';
 import './RhythmControls.css';
 
@@ -8,10 +14,12 @@ interface RhythmControlsProps {
   rhythm: string;
   strum: StrumStyle;
   sustain: NoteLength;
+  click: ClickMode;
   onBeatsPerBarChange: (beatsPerBar: number) => void;
   onRhythmChange: (rhythm: string) => void;
   onStrumChange: (strum: StrumStyle) => void;
   onSustainChange: (sustain: NoteLength) => void;
+  onClickChange: (click: ClickMode) => void;
 }
 
 /**
@@ -30,6 +38,17 @@ const STRUMS: readonly { value: StrumStyle; label: string }[] = [
  * How long a note lasts. Sits directly under the playing style because the two are
  * one decision about the strumming hand: what it does, and whether it lets go.
  */
+/**
+ * The click track. 'Einzaehler' counts you in and then leaves you to the guitar;
+ * 'Metronom' keeps going. Both count in, because a click that starts on the same
+ * beat as the music gives you nothing to come in on.
+ */
+const CLICKS: readonly { value: ClickMode; label: string }[] = [
+  { value: 'off', label: 'aus' },
+  { value: 'countIn', label: 'Einzähler' },
+  { value: 'metronome', label: 'Metronom' },
+];
+
 const LENGTHS: readonly { value: NoteLength; label: string }[] = [
   { value: 'ring', label: 'ausklingen' },
   { value: 'stopped', label: 'abgestoppt' },
@@ -60,10 +79,12 @@ export function RhythmControls({
   rhythm,
   strum,
   sustain,
+  click,
   onBeatsPerBarChange,
   onRhythmChange,
   onStrumChange,
   onSustainChange,
+  onClickChange,
 }: RhythmControlsProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -145,6 +166,21 @@ export function RhythmControls({
               onChange={(event) => onSustainChange(event.target.value as NoteLength)}
             >
               {LENGTHS.map((entry) => (
+                <option key={entry.value} value={entry.value}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field field--inline">
+            <span>Klick</span>
+            <select
+              aria-label="Klick"
+              value={click}
+              onChange={(event) => onClickChange(event.target.value as ClickMode)}
+            >
+              {CLICKS.map((entry) => (
                 <option key={entry.value} value={entry.value}>
                   {entry.label}
                 </option>

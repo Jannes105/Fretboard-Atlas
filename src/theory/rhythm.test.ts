@@ -5,6 +5,8 @@ import {
   parsePattern,
   PATTERN_PRESETS,
   arpeggioStringCount,
+  clickTimes,
+  countInBars,
   dropHighest,
   strumOffsets,
   noteSeconds,
@@ -168,5 +170,50 @@ describe('Arpeggio über eine ganze Folge', () => {
     for (const chord of chords) {
       expect(dropHighest(chord, count)[0]).toBe(chord[0]);
     }
+  });
+});
+
+describe('clickTimes', () => {
+  const BAR = 2.67; // ein 4/4-Takt bei 90 BPM
+
+  it('legt einen Klick auf jeden Schlag', () => {
+    const clicks = clickTimes(4, BAR, 1);
+
+    expect(clicks).toHaveLength(4);
+    expect(clicks.map((c) => +c.at.toFixed(4))).toEqual([0, 0.6675, 1.335, 2.0025]);
+  });
+
+  it('betont die Eins, sonst wäre 3/4 nicht von 4/4 zu unterscheiden', () => {
+    expect(clickTimes(3, BAR, 2).map((c) => c.accent)).toEqual([
+      true, false, false,
+      true, false, false,
+    ]);
+  });
+
+  it('setzt bei einem Versatz an, damit der Einzähler vorne liegt', () => {
+    const [first] = clickTimes(4, BAR, 1, 10);
+    expect(first.at).toBe(10);
+  });
+
+  it('folgt Tempo und Taktart', () => {
+    // Halbe Taktlänge, halbe Abstände.
+    expect(clickTimes(4, BAR / 2, 1)[1].at).toBeCloseTo(BAR / 8, 6);
+    // Mehr Schläge, engere Abstände im selben Takt.
+    expect(clickTimes(6, BAR, 1)).toHaveLength(6);
+  });
+
+  it('gibt bei Unsinn nichts zurück, statt zu werfen', () => {
+    expect(clickTimes(0, BAR, 1)).toEqual([]);
+    expect(clickTimes(4, BAR, 0)).toEqual([]);
+  });
+});
+
+describe('countInBars', () => {
+  it('zählt ein, sobald überhaupt geklickt wird', () => {
+    // Ein Metronom, das auf derselben Eins startet wie die Musik, gibt einem nichts,
+    // worauf man einsetzen kann.
+    expect(countInBars('metronome')).toBe(1);
+    expect(countInBars('countIn')).toBe(1);
+    expect(countInBars('off')).toBe(0);
   });
 });

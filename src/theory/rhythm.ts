@@ -154,6 +154,56 @@ export function noteSeconds(
   };
 }
 
+/**
+ * The click track.
+ *
+ * `countIn` is one bar of clicks and then silence — you are counted in and then
+ * play along to the guitar alone. `metronome` keeps clicking throughout, and counts
+ * in as well, because a metronome that starts on the same beat as the music gives
+ * you nothing to come in on.
+ */
+export type ClickMode = 'off' | 'countIn' | 'metronome';
+
+/** One click: when, and whether it is the downbeat. */
+export interface Click {
+  readonly at: number;
+  readonly accent: boolean;
+}
+
+/**
+ * The beats of `bars` bars, starting at `from` seconds.
+ *
+ * The first beat of each bar is accented — without it a click track in 3/4 is
+ * indistinguishable from one in 4/4, which defeats the point of counting.
+ */
+export function clickTimes(
+  beatsPerBar: number,
+  secondsPerBar: number,
+  bars: number,
+  from = 0,
+): Click[] {
+  if (beatsPerBar <= 0 || bars <= 0) return [];
+
+  const secondsPerBeat = secondsPerBar / beatsPerBar;
+  const clicks: Click[] = [];
+
+  for (let bar = 0; bar < bars; bar++) {
+    for (let beat = 0; beat < beatsPerBar; beat++) {
+      clicks.push({
+        at: from + bar * secondsPerBar + beat * secondsPerBeat,
+        accent: beat === 0,
+      });
+    }
+  }
+
+  return clicks;
+}
+
+/** How much silence to put before the music: one bar, or none. */
+export function countInBars(mode: ClickMode): number {
+  return mode === 'off' ? 0 : 1;
+}
+
 export interface PatternPreset {
   readonly id: string;
   readonly name: string;

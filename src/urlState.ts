@@ -7,6 +7,7 @@ import {
   isDefaultPattern,
   serializePattern,
   defaultPattern,
+  type ClickMode,
   type NoteLength,
   type StrumStyle,
   Tuning,
@@ -44,6 +45,8 @@ export interface AppState {
   strum: StrumStyle;
   /** Whether notes ring on or are cut off after each strum. */
   sustain: NoteLength;
+  /** Count-in only, a click throughout, or neither. */
+  click: ClickMode;
 }
 
 export const DEFAULT_STATE: AppState = {
@@ -63,12 +66,14 @@ export const DEFAULT_STATE: AppState = {
   rhythm: serializePattern(defaultPattern(4)),
   strum: 'standard',
   sustain: 'ring',
+  click: 'off',
 };
 
 const FRET_COUNTS = [12, 15, 24];
 const SOUNDS: readonly Timbre[] = ['clean', 'electric'];
 const STRUMS: readonly StrumStyle[] = ['standard', 'arpeggio'];
 const SUSTAINS: readonly NoteLength[] = ['ring', 'stopped'];
+const CLICKS: readonly ClickMode[] = ['off', 'countIn', 'metronome'];
 const BEATS_PER_BAR = [2, 3, 4, 6];
 const MAX_CAPO = 7;
 export const MIN_BPM = 40;
@@ -193,6 +198,7 @@ export function readState(search: string): AppState {
     sound: pickFrom(params.get('sound'), SOUNDS, DEFAULT_STATE.sound),
     strum: pickFrom(params.get('strum'), STRUMS, DEFAULT_STATE.strum),
     sustain: pickFrom(params.get('sustain'), SUSTAINS, DEFAULT_STATE.sustain),
+    click: pickFrom(params.get('click'), CLICKS, DEFAULT_STATE.click),
     beatsPerBar,
     rhythm,
   };
@@ -220,6 +226,7 @@ export function writeState(state: AppState): string {
   add('sound', state.sound, DEFAULT_STATE.sound);
   add('strum', state.strum, DEFAULT_STATE.strum);
   add('sustain', state.sustain, DEFAULT_STATE.sustain);
+  add('click', state.click, DEFAULT_STATE.click);
   add('sig', state.beatsPerBar, DEFAULT_STATE.beatsPerBar);
   // Only a real, meter-matching pattern is worth a link; a wrong-length leftover
   // would be reset on read anyway.

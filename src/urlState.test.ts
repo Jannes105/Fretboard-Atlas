@@ -179,6 +179,17 @@ describe('Tonlaenge in der URL', () => {
   });
 });
 
+describe('Klick in der URL', () => {
+  it('liest und schreibt den Klick, laesst den Default aber weg', () => {
+    expect(readState('?click=metronome').click).toBe('metronome');
+    expect(readState('?click=countIn').click).toBe('countIn');
+    expect(readState('').click).toBe('off');
+    expect(readState('?click=laut').click).toBe('off');
+    expect(writeState({ ...DEFAULT_STATE, click: 'off' })).toBe('');
+    expect(writeState({ ...DEFAULT_STATE, click: 'metronome' })).toBe('?click=metronome');
+  });
+});
+
 describe('writeState', () => {
   it('schreibt gar nichts, solange alles auf Default steht', () => {
     expect(writeState(DEFAULT_STATE)).toBe('');

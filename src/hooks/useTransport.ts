@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AudioPlayer, ProgressionHandle } from '../audio';
-import { type NoteLength, parsePattern, type StrumStyle } from '../theory';
+import { type ClickMode, type NoteLength, parsePattern, type StrumStyle } from '../theory';
 
 export interface TransportOptions {
   /** The notes of each chord, ready to play — already the grips shown on screen. */
@@ -15,6 +15,8 @@ export interface TransportOptions {
   style: StrumStyle;
   /** Left to ring on, or cut off after each strum. */
   length: NoteLength;
+  /** Count-in only, a click throughout, or neither. */
+  click: ClickMode;
   loop: boolean;
   /** Lazily built, so no AudioContext exists before the first gesture. */
   player: () => AudioPlayer;
@@ -47,6 +49,7 @@ export function useTransport({
   rhythm,
   style,
   length,
+  click,
   loop,
   player,
   material,
@@ -69,6 +72,7 @@ export function useTransport({
       chordBars,
       style,
       length,
+      click,
       loop,
       onChord: (index) => {
         setPlayingStep(index);
@@ -95,7 +99,7 @@ export function useTransport({
   restartRef.current = start;
   useEffect(() => {
     if (handleRef.current) restartRef.current();
-  }, [bpm, loop, beatsPerBar, rhythm, style, length]);
+  }, [bpm, loop, beatsPerBar, rhythm, style, length, click]);
 
   const isPlaying = playingStep !== null;
 

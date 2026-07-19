@@ -2,6 +2,9 @@ import { pluck, type PluckOptions } from './synth/pluck';
 import { sampleFor, type SampleSet } from './synth/sampleSet';
 import {
   arpeggioStringCount,
+  type ClickMode,
+  clickTimes,
+  countInBars,
   dropHighest,
   midiToFrequency,
   STANDARD_STRUM_GAP,
@@ -174,6 +177,12 @@ const DEFAULTS: Record<PlayMode, { gap: number; duration: number }> = {
  */
 export const LOOSE_ARPEGGIO_GAP = 0.14;
 
+/** The click track: a fifth apart so the downbeat is tellable, and very short. */
+const CLICK_HZ = 1000;
+const CLICK_ACCENT_HZ = 1500;
+const CLICK_SECONDS = 0.045;
+const CLICK_PEAK = 0.3;
+
 /** Amplitude of a note sounding on its own. */
 const PEAK = 0.55;
 
@@ -208,6 +217,8 @@ export interface ProgressionOptions {
   style?: StrumStyle;
   /** Left to ring on, or cut off after each strum. */
   length?: NoteLength;
+  /** Count-in only, a click throughout, or neither. */
+  click?: ClickMode;
   /** Fires as each chord starts, and with null when playback ends — drives the marker. */
   onChord?: (index: number | null) => void;
 }
@@ -313,6 +324,14 @@ export function createAudioPlayer(): AudioPlayer {
   let master: GainNode | null = null;
   /** Tone shaping, in the sum rather than per note — see VOICES. */
   let tone: BiquadFilterNode[] | null = null;
+  /**
+   * The safety net, kept to hand because the click joins the signal here.
+   *
+   * A metronome is not the instrument: it must not pick up the guitar's voicing
+   * filters or its loudness trim, or changing to the overdrive would move the click
+   * too. It does still pass the ceiling, because nothing reaches the output raw.
+   */
+  let ceiling: WaveShaperNode | null = null;
   let live: AudioScheduledSourceNode[] = [];
   /** The current voice — changed by setTimbre, read when each note is built. */
   let timbre: Timbre = 'clean';
@@ -371,7 +390,7 @@ export function createAudioPlayer(): AudioPlayer {
       });
 
       // The safety net, and the last thing anything passes through.
-      const ceiling = context.createWaveShaper();
+      ceiling = context.createWaveShaper();
       ceiling.curve = CEILING_CURVE;
       ceiling.oversample = '4x';
       ceiling.connect(context.destination);
@@ -494,6 +513,39 @@ export function createAudioPlayer(): AudioPlayer {
     live.push(source);
   };
 
+  /**
+   * One tick of the click track.
+   *
+   * A short, hard ping rather than a sampled woodblock: it has to cut through a
+   * ringing chord, and anything with a tail of its own would blur against the beat
+   * it is marking. The downbeat sits a fifth higher so a bar is countable.
+   */
+  const tick = (ctx: AudioContext, at: number, accent: boolean) => {
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = accent ? CLICK_ACCENT_HZ : CLICK_HZ;
+
+    // Square waves are harsh on their own; this takes the edge off without
+    // softening the transient, which is the part that marks the beat.
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 3200;
+
+    const gain = ctx.createGain();
+    const peak = CLICK_PEAK * (accent ? 1 : 0.72);
+    gain.gain.setValueAtTime(peak, at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + CLICK_SECONDS);
+
+    osc.connect(filter).connect(gain).connect(ceiling!);
+    osc.start(at);
+    osc.stop(at + CLICK_SECONDS + 0.01);
+
+    osc.addEventListener('ended', () => {
+      live = live.filter((other) => other !== osc);
+    });
+    live.push(osc);
+  };
+
   const play = (midiNotes: readonly number[], options: PlayOptions = {}) => {
     if (midiNotes.length === 0) return;
 
@@ -541,6 +593,7 @@ export function createAudioPlayer(): AudioPlayer {
       loop = false,
       style = 'standard',
       length = 'ring',
+      click = 'off',
       onChord,
     } = options;
     const barsOf = (index: number) => Math.max(1, chordBars?.[index] ?? 1);
@@ -610,6 +663,11 @@ export function createAudioPlayer(): AudioPlayer {
         // Lay one bar's worth across each bar the chord is held.
         for (let bar = 0; bar < bars; bar++) {
           scheduleBar(chord, at + bar * secondsPerBar, peak);
+          if (click === 'metronome') {
+            for (const beat of clickTimes(beatsPerBar, secondsPerBar, 1, at + bar * secondsPerBar)) {
+              tick(ctx, beat.at, beat.accent);
+            }
+          }
         }
         // The audio is scheduled sample-accurately; the marker just follows along.
         if (onChord) after(at, () => onChord(index));
@@ -629,7 +687,15 @@ export function createAudioPlayer(): AudioPlayer {
       }
     };
 
-    schedulePass(ctx.currentTime + 0.06);
+    // The count-in sits before the music, once — a loop counts you in at the start,
+    // not on every repeat.
+    const begin = ctx.currentTime + 0.06;
+    const countIn = countInBars(click) * secondsPerBar;
+    for (const beat of clickTimes(beatsPerBar, secondsPerBar, countInBars(click), begin)) {
+      tick(ctx, beat.at, beat.accent);
+    }
+
+    schedulePass(begin + countIn);
 
     return { stop };
   };

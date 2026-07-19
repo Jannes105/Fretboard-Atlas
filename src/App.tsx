@@ -67,6 +67,7 @@ export default function App() {
     rhythm,
     strum,
     sustain,
+    click,
   } = state;
 
   const scale = useMemo(() => {
@@ -302,6 +303,7 @@ export default function App() {
     rhythm,
     style: strum,
     length: sustain,
+    click,
     loop,
     player,
     material: [steps, chordTuning, chosenVoicings],
@@ -572,6 +574,7 @@ export default function App() {
             rhythm={rhythm}
             strum={strum}
             sustain={sustain}
+            click={click}
             onBeatsPerBarChange={(nextBeats) =>
               // The pattern length follows the meter, so a new meter resets it.
               patch((previous) => ({
@@ -583,6 +586,7 @@ export default function App() {
             onRhythmChange={(next) => update('rhythm', next)}
             onStrumChange={(next) => update('strum', next)}
             onSustainChange={(next) => update('sustain', next)}
+            onClickChange={(next) => update('click', next)}
           />
         </>
       ) : (

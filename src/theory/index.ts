@@ -57,6 +57,9 @@ export {
   strumOffsets,
   noteSeconds,
   type NoteLength,
+  type ClickMode,
+  clickTimes,
+  countInBars,
   SOFT_RELEASE,
 } from './rhythm';
 export {
