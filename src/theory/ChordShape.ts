@@ -166,8 +166,13 @@ export interface VoicingOptions {
   readonly maxFret?: number;
 }
 
-/** Lowest fret at which `string` sounds the given pitch class. */
-function firstFretFor(tuning: Tuning, stringIndex: number, pitchClass: number): number {
+/**
+ * Lowest fret at which `string` sounds the given pitch class.
+ *
+ * Exported for caged.ts, which places its forms by exactly the same rule — better
+ * shared than copied.
+ */
+export function firstFretFor(tuning: Tuning, stringIndex: number, pitchClass: number): number {
   const open = tuning.pitchClassAt(stringIndex, 0);
   return mod(pitchClass - open, 12);
 }

@@ -43,6 +43,15 @@ export {
 } from './ChordShape';
 export { generateVoicings } from './voicingSearch';
 export {
+  CAGED_ORDER,
+  CAGED_SHAPES,
+  cagedPlacement,
+  cagedPlacements,
+  type CagedForm,
+  type CagedPlacement,
+  type CagedShape,
+} from './caged';
+export {
   type StrumSlot,
   SLOTS_PER_BEAT,
   serializePattern,

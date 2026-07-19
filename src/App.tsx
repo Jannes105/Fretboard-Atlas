@@ -10,6 +10,8 @@ import { useTheme } from './hooks/useTheme';
 import { useTransport } from './hooks/useTransport';
 import {
   buildProgression,
+  cagedPlacements,
+  type CagedForm,
   Chord,
   type ChordSize,
   chordMidiTones,
@@ -121,6 +123,22 @@ export default function App() {
 
   /** True when the chords on screen are not the scale's own. */
   const isBorrowedHarmony = chordScale !== null && chordScale !== scale;
+
+  /**
+   * The CAGED form laid over the neck, placed on the key's tonic chord.
+   *
+   * The tonic is what makes the lesson land — "the box you are in is the E-shape
+   * of A". Empty outside standard-interval tunings, where the forms would be
+   * wrong; the picker hides itself then rather than offering a dead control.
+   */
+  const tonicChord = useMemo(() => chords[0] ?? null, [chords]);
+
+  const cagedForms = useMemo(
+    () => (tonicChord ? cagedPlacements(tonicChord, { tuning: chordTuning, maxFret: fretCount }) : []),
+    [tonicChord, chordTuning, fretCount],
+  );
+
+  const caged = cagedForms.find((placement) => placement.form === state.cagedForm) ?? null;
 
   const boxes = useMemo(() => fretboard.scalePositions(scale), [fretboard, scale]);
 
@@ -546,6 +564,28 @@ export default function App() {
           </label>
         ) : null}
 
+        {/* Hidden where the forms would not hold — a wrong grip beats no grip
+            nowhere, and that rule applies to a teaching overlay too. */}
+        {cagedForms.length > 0 ? (
+          <label className="field field--inline">
+            <span>CAGED</span>
+            <select
+              aria-label="CAGED-Form"
+              value={state.cagedForm ?? ''}
+              onChange={(e) =>
+                update('cagedForm', e.target.value === '' ? null : (e.target.value as CagedForm))
+              }
+            >
+              <option value="">aus</option>
+              {cagedForms.map((placement) => (
+                <option key={placement.form} value={placement.form}>
+                  {placement.form}-Form ({placement.startFret}. Bund)
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
         <label className="field field--inline">
           <span>Beschriftung</span>
           <select
@@ -566,6 +606,7 @@ export default function App() {
         position={box}
         zoom={state.boxZoom}
         sounding={soundingKeys}
+        caged={caged}
         highlight={picked?.pitchClasses ?? null}
         highlightLabel={picked?.label ?? null}
         onPlayNote={(midi) => player().playNote(midi)}

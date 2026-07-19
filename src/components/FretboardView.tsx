@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { Fretboard, Scale, ScalePosition } from '../theory';
+import type { CagedPlacement, Fretboard, Scale, ScalePosition } from '../theory';
 import {
   DOT_RADIUS,
   DOUBLE_INLAY_OFFSET,
@@ -44,6 +44,11 @@ interface FretboardViewProps {
    * the neck while a scale plays.
    */
   sounding?: ReadonlySet<string> | null;
+  /**
+   * One CAGED form laid over the scale: its fret window outlined, and a ring on
+   * every scale dot the grip actually stops.
+   */
+  caged?: CagedPlacement | null;
 }
 
 export function FretboardView({
@@ -56,6 +61,7 @@ export function FretboardView({
   onPlayNote,
   zoom = false,
   sounding = null,
+  caged = null,
 }: FretboardViewProps) {
   const { fretCount, stringCount, capo, tuning } = fretboard;
 
@@ -249,6 +255,22 @@ export function FretboardView({
             />
           ) : null}
 
+          {/*
+           * The CAGED form's window. Same maths as the box outline — both are "a
+           * window on the neck" — but drawn in the chord accent, because a form is
+           * about harmony while a box is about the hand.
+           */}
+          {caged ? (
+            <rect
+              className="caged-outline"
+              x={NUT_X + (caged.startFret - 1) * FRET_WIDTH}
+              y={boardTop + 7}
+              width={(caged.endFret - caged.startFret + 1) * FRET_WIDTH}
+              height={boardFoot - boardTop - 14}
+              rx={7}
+            />
+          ) : null}
+
           {/* Fret numbers, below the board. */}
           {Array.from({ length: fretCount + 1 }, (_, fret) => fret).map((fret) => (
             <text
@@ -283,6 +305,9 @@ export function FretboardView({
               .join(' ');
 
             const isSounding = sounding?.has(positionKey(note)) ?? false;
+            // A scale dot the grip actually stops — where the shape and the scale
+            // are the same note under the same finger.
+            const isCagedTone = caged?.frets[note.stringIndex] === note.fret;
 
             return (
               <g
@@ -304,6 +329,16 @@ export function FretboardView({
                     cx={cx}
                     cy={cy}
                     r={(note.isRoot ? ROOT_RADIUS : DOT_RADIUS) + 7}
+                  />
+                ) : null}
+                {/* Also a ring, and also under the dot — same reasoning as the
+                    marker, and the two can legitimately coincide. */}
+                {isCagedTone ? (
+                  <circle
+                    className="note-caged"
+                    cx={cx}
+                    cy={cy}
+                    r={(note.isRoot ? ROOT_RADIUS : DOT_RADIUS) + 4}
                   />
                 ) : null}
                 {/*

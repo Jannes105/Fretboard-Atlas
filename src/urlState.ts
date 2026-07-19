@@ -11,6 +11,8 @@ import {
   type NoteLength,
   type StrumStyle,
   Tuning,
+  CAGED_ORDER,
+  type CagedForm,
 } from './theory';
 
 /**
@@ -37,6 +39,8 @@ export interface AppState {
    * picture rather than the viewer, so it belongs in a shareable link.
    */
   boxZoom: boolean;
+  /** Which CAGED form to lay over the scale, or null for none. */
+  cagedForm: CagedForm | null;
   /** Tempo of the progression, in beats per minute. */
   bpm: number;
   loop: boolean;
@@ -65,6 +69,7 @@ export const DEFAULT_STATE: AppState = {
   progressionId: 'I-V-vi-IV',
   boxNumber: 0,
   boxZoom: true,
+  cagedForm: null,
   bpm: 90,
   loop: true,
   sound: 'clean',
@@ -157,6 +162,13 @@ function pickFrom<T extends string>(raw: string | null, allowed: readonly T[], f
   return raw !== null && (allowed as readonly string[]).includes(raw) ? (raw as T) : fallback;
 }
 
+/** A CAGED form letter, or null — an unknown letter simply means no overlay. */
+function readCagedForm(raw: string | null): CagedForm | null {
+  return raw !== null && (CAGED_ORDER as readonly string[]).includes(raw)
+    ? (raw as CagedForm)
+    : null;
+}
+
 /** A preset id, or a well-formed custom tuning; anything else falls back to standard. */
 function readTuning(raw: string | null): string {
   if (raw !== null && customTuningNotes(raw) !== null) return raw;
@@ -201,6 +213,7 @@ export function readState(search: string): AppState {
     // The scale decides how many boxes exist, so only the lower bound is checked here.
     boxNumber: pickInt(params.get('box'), (v) => v >= 0, DEFAULT_STATE.boxNumber),
     boxZoom: params.get('zoom') === null ? DEFAULT_STATE.boxZoom : params.get('zoom') !== '0',
+    cagedForm: readCagedForm(params.get('caged')),
     bpm: pickInt(params.get('bpm'), (v) => v >= MIN_BPM && v <= MAX_BPM, DEFAULT_STATE.bpm),
     loop: params.get('loop') === null ? DEFAULT_STATE.loop : params.get('loop') !== '0',
     sound: pickFrom(params.get('sound'), SOUNDS, DEFAULT_STATE.sound),
@@ -231,6 +244,7 @@ export function writeState(state: AppState): string {
   add('box', state.boxNumber, DEFAULT_STATE.boxNumber);
   // A boolean needs its own branch: add() only takes strings and numbers.
   if (state.boxZoom !== DEFAULT_STATE.boxZoom) params.set('zoom', state.boxZoom ? '1' : '0');
+  if (state.cagedForm !== null) params.set('caged', state.cagedForm);
   add('bpm', state.bpm, DEFAULT_STATE.bpm);
   if (state.loop !== DEFAULT_STATE.loop) params.set('loop', state.loop ? '1' : '0');
   add('sound', state.sound, DEFAULT_STATE.sound);

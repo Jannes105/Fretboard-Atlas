@@ -775,3 +775,49 @@ describe('App — Marker beim Abspielen der Skala', () => {
     expect(player.stop).toHaveBeenCalled();
   });
 });
+
+describe('App — CAGED-Overlay', () => {
+  const picker = (container: HTMLElement) =>
+    container.querySelector<HTMLSelectElement>('[aria-label="CAGED-Form"]');
+
+  it('legt die gewaehlte Form ueber den Hals', () => {
+    window.history.replaceState(null, '', '/?root=A&scale=major&caged=E');
+    const { container } = render(<App />);
+
+    expect(container.querySelector('.caged-outline')).not.toBeNull();
+    // Die E-Form von A ist der Barre-Griff im 5. Bund: sechs gegriffene Saiten,
+    // von denen jede auf einem Skalenton liegt.
+    expect(container.querySelectorAll('.note-caged').length).toBeGreaterThan(0);
+  });
+
+  it('zeigt ohne Auswahl kein Overlay, aber den Picker', () => {
+    const { container } = render(<App />);
+    expect(container.querySelector('.caged-outline')).toBeNull();
+    expect(picker(container)).not.toBeNull();
+  });
+
+  it('verschweigt den Picker in einer Stimmung, in der die Formen nicht gelten', () => {
+    // Lieber kein Angebot als ein falsches — dieselbe Regel wie bei den Griffen.
+    window.history.replaceState(null, '', '/?tuning=drop-d');
+    const { container } = render(<App />);
+
+    expect(picker(container)).toBeNull();
+    expect(container.querySelector('.caged-outline')).toBeNull();
+  });
+
+  it('ignoriert eine unbekannte Form aus der URL, statt zu stolpern', () => {
+    window.history.replaceState(null, '', '/?caged=Z');
+    const { container } = render(<App />);
+    expect(container.querySelector('.caged-outline')).toBeNull();
+  });
+
+  it('bietet in einer Molltonart nur die drei greifbaren Formen an', () => {
+    window.history.replaceState(null, '', '/?root=A&scale=natural-minor');
+    const { container } = render(<App />);
+
+    const forms = [...picker(container)!.querySelectorAll('option')]
+      .map((option) => option.value)
+      .filter(Boolean);
+    expect(new Set(forms)).toEqual(new Set(['A', 'E', 'D']));
+  });
+});

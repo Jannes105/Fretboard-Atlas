@@ -183,6 +183,22 @@
   fill: var(--chord-text);
 }
 
+/* The CAGED form's window: the chord accent, next to the box outline's neutral. */
+.caged-outline {
+  fill: none;
+  stroke: var(--chord);
+  stroke-width: 2;
+  opacity: 0.85;
+}
+
+/* A scale tone this grip stops. */
+.note-caged {
+  fill: none;
+  stroke: var(--chord-stroke);
+  stroke-width: 2.5;
+  opacity: 0.95;
+}
+
 /*
  * The note sounding right now. A ring around the dot rather than a recolouring of
  * it — the dot's own colour already says root/picked/dimmed, and the marker has to
