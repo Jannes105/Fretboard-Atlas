@@ -159,3 +159,22 @@ describe('FretboardView — Lage im Ausschnitt', () => {
     expect(container.querySelectorAll('.string-label')).toHaveLength(6);
   });
 });
+
+describe('FretboardView — Scrollen zur Lage', () => {
+  it('wirft nicht, wenn die Umgebung kein Layout hat', () => {
+    // jsdom rechnet kein Layout: scrollWidth ist 0 und scrollTo fehlt. Der Effekt
+    // muss das aushalten, statt beim Rendern zu sterben. Das echte Verhalten laesst
+    // sich hier nicht pruefen — es haengt an genau den Zahlen, die jsdom nicht hat.
+    expect(() =>
+      render(
+        <FretboardView
+          scale={aMinorPentatonic}
+          fretboard={board}
+          labelMode="note"
+          position={{ number: 4, anchorFret: 12, startFret: 11, endFret: 15 }}
+          zoom={false}
+        />,
+      ),
+    ).not.toThrow();
+  });
+});

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { Fretboard, Scale, ScalePosition } from '../theory';
 import {
   DOT_RADIUS,
@@ -79,8 +80,46 @@ export function FretboardView({
     highlightLabel,
   ].filter(Boolean);
 
+  /**
+   * Bring the selected position into view when the neck is NOT cropped — Lage 5
+   * sits around the 15th fret, and without this you would have to go looking for
+   * the box you just picked. A crop needs none of this: it already shows only the
+   * box.
+   *
+   * Lives here rather than in App because only the view knows where a fret falls
+   * in pixels, and handing that upward would leak the geometry this component
+   * just gathered up.
+   */
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const positionNumber = position?.number ?? null;
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    // jsdom has no layout: scrollWidth is 0 and scrollTo may be missing entirely.
+    if (!el || position === null || cropped || typeof el.scrollTo !== 'function') return;
+    if (el.scrollWidth === 0) return;
+
+    const pxPerUnit = el.scrollWidth / width;
+    const centre = fretCenterX((position.startFret + position.endFret) / 2) * pxPerUnit;
+
+    el.scrollTo({
+      left: Math.max(0, centre - el.clientWidth / 2),
+      // The CSS honours this twice already; a scroll is no less motion.
+      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
+    });
+    // Keyed on the position NUMBER, not the object: App rebuilds the boxes on
+    // every render, so the object identity changes even when the box does not —
+    // which would re-scroll and fight the user mid-drag.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positionNumber, cropped, width]);
+
   return (
-    <div className={cropped ? 'fretboard-scroll fretboard-scroll--zoomed' : 'fretboard-scroll'}>
+    <div
+      ref={scrollRef}
+      className={cropped ? 'fretboard-scroll fretboard-scroll--zoomed' : 'fretboard-scroll'}
+    >
       <svg
         className={onPlayNote ? 'fretboard fretboard--playable' : 'fretboard'}
         viewBox={layout.viewBox}
