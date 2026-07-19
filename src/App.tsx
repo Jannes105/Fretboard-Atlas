@@ -5,6 +5,7 @@ import { KeyFinder } from './components/KeyFinder';
 import { ProgressionPanel } from './components/ProgressionPanel';
 import { SetupPanel } from './components/SetupPanel';
 import { useAppState } from './hooks/useAppState';
+import { useTheme } from './hooks/useTheme';
 import { useTransport } from './hooks/useTransport';
 import {
   buildProgression,
@@ -50,6 +51,9 @@ type Highlight =
 
 export default function App() {
   const { state, update, patch } = useAppState();
+  // Deliberately not part of `state`: the theme belongs to the reader, not to the
+  // link. See useTheme.
+  const { theme, setTheme } = useTheme();
 
   const {
     root,
@@ -326,10 +330,12 @@ export default function App() {
           capo={capo}
           fretCount={fretCount}
           sound={sound}
+          theme={theme}
           onTuningIdChange={(next) => update('tuningId', next)}
           onCapoChange={(next) => update('capo', next)}
           onFretCountChange={(next) => update('fretCount', next)}
           onSoundChange={(next) => update('sound', next)}
+          onThemeChange={setTheme}
         />
       </header>
 

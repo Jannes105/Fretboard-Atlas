@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Timbre } from '../audio';
+import type { ThemeChoice } from '../hooks/useTheme';
 import { pitchClassName, Tuning } from '../theory';
 import { customTuningId, MAX_CAPO } from '../urlState';
 
@@ -15,16 +16,20 @@ interface SetupPanelProps {
   capo: number;
   fretCount: number;
   sound: Timbre;
+  theme: ThemeChoice;
   onTuningIdChange: (tuningId: string) => void;
   onCapoChange: (capo: number) => void;
   onFretCountChange: (fretCount: number) => void;
   onSoundChange: (sound: Timbre) => void;
+  onThemeChange: (theme: ThemeChoice) => void;
 }
 
 /**
- * The instrument itself — tuning, capo, fret count, voice. All of it is set once
- * and then left alone, so it lives behind a trigger that spells out its value
- * rather than four dropdowns competing with the key for attention.
+ * The instrument itself — tuning, capo, fret count, voice — plus how the page is
+ * lit. All of it is set once and then left alone, so it lives behind a trigger
+ * that spells out its value rather than five dropdowns competing with the key for
+ * attention. The theme is not the instrument, but it shares that "set and forget"
+ * character, and it has nowhere better to live.
  */
 export function SetupPanel({
   tuning,
@@ -33,10 +38,12 @@ export function SetupPanel({
   capo,
   fretCount,
   sound,
+  theme,
   onTuningIdChange,
   onCapoChange,
   onFretCountChange,
   onSoundChange,
+  onThemeChange,
 }: SetupPanelProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -162,6 +169,15 @@ export function SetupPanel({
             <select value={sound} onChange={(e) => onSoundChange(e.target.value as Timbre)}>
               <option value="clean">Clean</option>
               <option value="electric">Overdrive</option>
+            </select>
+          </label>
+
+          <label className="field">
+            <span>Darstellung</span>
+            <select value={theme} onChange={(e) => onThemeChange(e.target.value as ThemeChoice)}>
+              <option value="system">Automatisch</option>
+              <option value="light">Hell</option>
+              <option value="dark">Dunkel</option>
             </select>
           </label>
         </div>

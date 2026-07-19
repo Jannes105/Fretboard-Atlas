@@ -44,18 +44,43 @@
   --text: #1f1d1a;
   --text-muted: #78716a;
   --accent: #c08430;
+
+  /*
+   * The dark page palette, named once. Two rules below switch it on — the OS
+   * preference and the manual override — and neither may hold a second copy of
+   * these values, or the two drift apart.
+   */
+  --dark-bg: #171614;
+  --dark-panel: #201e1c;
+  --dark-panel-sunken: #1b1a18;
+  --dark-border: #34312d;
+  --dark-text: #ede9e3;
+  --dark-text-muted: #9a9389;
+  --dark-accent: #e0a33f;
 }
 
+/* The OS preference — unless the reader has explicitly asked for light. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #171614;
-    --panel: #201e1c;
-    --panel-sunken: #1b1a18;
-    --border: #34312d;
-    --text: #ede9e3;
-    --text-muted: #9a9389;
-    --accent: #e0a33f;
+  :root:not([data-theme='light']) {
+    --bg: var(--dark-bg);
+    --panel: var(--dark-panel);
+    --panel-sunken: var(--dark-panel-sunken);
+    --border: var(--dark-border);
+    --text: var(--dark-text);
+    --text-muted: var(--dark-text-muted);
+    --accent: var(--dark-accent);
   }
+}
+
+/* The manual override, which has to win on a light OS too. */
+:root[data-theme='dark'] {
+  --bg: var(--dark-bg);
+  --panel: var(--dark-panel);
+  --panel-sunken: var(--dark-panel-sunken);
+  --border: var(--dark-border);
+  --text: var(--dark-text);
+  --text-muted: var(--dark-text-muted);
+  --accent: var(--dark-accent);
 }
 
 * {

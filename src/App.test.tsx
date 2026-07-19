@@ -264,8 +264,8 @@ describe('App — Einstellungen', () => {
     const { container } = render(<App />);
 
     await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
-    // Stimmung, Kapo, Bünde, Klang.
-    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(4);
+    // Stimmung, Kapo, Bünde, Klang, Darstellung.
+    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(5);
 
     await user.keyboard('{Escape}');
     expect(container.querySelectorAll('.setup-panel')).toHaveLength(0);

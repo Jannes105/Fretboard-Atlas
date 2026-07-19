@@ -65,6 +65,12 @@ Damit übersteht die Ansicht einen Reload und lässt sich als Link verschicken �
 was `localStorage` nicht könnte. Geschrieben wird nur, was vom Default abweicht;
 Unsinn in der URL fällt auf die Defaults zurück, statt zu werfen.
 
+**Eine Ausnahme: die Darstellung (hell/dunkel) liegt im `localStorage`.** Genau
+das Argument für die URL spricht hier dagegen — ein Link soll die Musik
+transportieren, nicht die Augen des Absenders. `?theme=dark` würde dem Empfänger
+im Sonnenlicht eine fremde Vorliebe aufzwingen. Jedes Feld in `AppState`
+beschreibt das Instrument oder die Musik; keines den Betrachter.
+
 ## Deployment
 
 Netlify baut aus diesem Repo (siehe `netlify.toml`). Über HTTPS registriert sich

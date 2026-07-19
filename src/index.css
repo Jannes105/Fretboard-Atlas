@@ -6,6 +6,19 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/*
+ * The manual theme has to reach the native controls too. The app is largely built
+ * out of <select>s, and their chrome is drawn by the OS from color-scheme alone —
+ * without these two lines the page flips and the dropdowns stay behind.
+ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
 * {
   box-sizing: border-box;
 }
