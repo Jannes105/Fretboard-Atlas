@@ -80,18 +80,18 @@ export function SetupPanel({
     <div className="setup" ref={containerRef}>
       <button
         type="button"
-        className={open ? 'setup-trigger is-open' : 'setup-trigger'}
+        className={open ? 'trigger setup-trigger is-open' : 'trigger setup-trigger'}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
         <span>{summary}</span>
-        <span className="setup-caret" aria-hidden="true">
+        <span className="trigger-caret" aria-hidden="true">
           ▾
         </span>
       </button>
 
       {open ? (
-        <div className="setup-panel">
+        <div className="popover setup-panel">
           <label className="field">
             <span>Stimmung</span>
             <select

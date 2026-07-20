@@ -6,11 +6,11 @@
   min-width: 6.5rem;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--panel);
   transition:
-    border-color 0.1s ease,
-    background 0.1s ease;
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 /* Marks the chord sounding right now, so you can see where the loop is. */

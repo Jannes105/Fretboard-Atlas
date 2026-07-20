@@ -2,39 +2,11 @@
   position: relative;
 }
 
-/* Same quiet, bordered look as the setup trigger — one control idiom, not two. */
-.keyfinder-trigger {
-  padding: 0.3rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--panel);
-  color: var(--text-muted);
-  font: inherit;
-  font-size: var(--text-xs);
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    border-color var(--transition-fast),
-    color var(--transition-fast);
-}
 
-.keyfinder-trigger:hover,
-.keyfinder-trigger.is-open {
-  border-color: var(--text-muted);
-  color: var(--text);
-}
-
+/* The rest comes from .popover. */
 .keyfinder-panel {
-  position: absolute;
-  top: calc(100% + 0.4rem);
   left: 0;
-  z-index: var(--z-popover);
   width: min(22rem, 88vw);
-  padding: 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-  box-shadow: var(--shadow-popover);
 }
 
 .keyfinder-field {

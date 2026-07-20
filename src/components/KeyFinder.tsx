@@ -96,7 +96,7 @@ export function KeyFinder({ onPick, onAdopt }: KeyFinderProps) {
     <div className="keyfinder" ref={containerRef}>
       <button
         type="button"
-        className={open ? 'keyfinder-trigger is-open' : 'keyfinder-trigger'}
+        className={open ? 'trigger keyfinder-trigger is-open' : 'trigger keyfinder-trigger'}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
@@ -104,7 +104,7 @@ export function KeyFinder({ onPick, onAdopt }: KeyFinderProps) {
       </button>
 
       {open ? (
-        <div className="keyfinder-panel">
+        <div className="popover keyfinder-panel">
           <label className="keyfinder-field">
             <span>Akkorde aus einem Tab?</span>
             <input

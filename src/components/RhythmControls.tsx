@@ -113,7 +113,7 @@ export function RhythmControls({
     <div className="rhythm-controls" ref={containerRef}>
       <button
         type="button"
-        className={open ? 'rhythm-trigger is-open' : 'rhythm-trigger'}
+        className={open ? 'trigger rhythm-trigger is-open' : 'trigger rhythm-trigger'}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
@@ -121,13 +121,13 @@ export function RhythmControls({
         <span>
           {meter} · {strum === 'arpeggio' ? 'Arpeggio' : patternName(rhythm, beatsPerBar)}
         </span>
-        <span className="rhythm-caret" aria-hidden="true">
+        <span className="trigger-caret" aria-hidden="true">
           ▾
         </span>
       </button>
 
       {open ? (
-        <div className="rhythm-panel">
+        <div className="popover rhythm-panel">
           <label className="field field--inline">
             <span>Takt</span>
             <select

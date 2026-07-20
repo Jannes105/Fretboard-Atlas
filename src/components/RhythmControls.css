@@ -16,55 +16,14 @@
   position: relative;
 }
 
-/* States its value ("4/4 · Viertel") so the setting is readable without opening —
-   the same quiet, bordered idiom as the setup trigger in the header. */
-.rhythm-trigger {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.35rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--panel);
-  color: var(--text-muted);
-  font: inherit;
-  font-size: var(--text-sm);
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    border-color var(--transition-fast),
-    color var(--transition-fast);
-}
 
-.rhythm-trigger:hover,
-.rhythm-trigger.is-open {
-  border-color: var(--text-muted);
-  color: var(--text);
-}
-
-.rhythm-caret {
-  font-size: var(--text-2xs);
-  line-height: 1;
-}
-
-.rhythm-trigger.is-open .rhythm-caret {
-  transform: rotate(180deg);
-}
-
+/* The rest comes from .popover. */
 .rhythm-panel {
-  position: absolute;
-  top: calc(100% + 0.4rem);
   left: 0;
-  z-index: var(--z-popover);
   display: grid;
   gap: 0.8rem;
   width: max-content;
   max-width: min(calc(100vw - 2rem), 100%);
-  padding: 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-  box-shadow: var(--shadow-popover);
 }
 
 /*
