@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type AudioPlayer, createAudioPlayer, LOOSE_ARPEGGIO_GAP, prefetchSamples } from './audio';
-import { FretboardView, type LabelMode } from './components/FretboardView';
+import { FretboardView } from './components/FretboardView';
 import { positionKey } from './components/neckGeometry';
 import { KeyFinder } from './components/KeyFinder';
 import { ProgressionPanel } from './components/ProgressionPanel';
@@ -533,42 +533,56 @@ export default function App() {
         ) : null}
       </section>
 
-      {/* Both of these change only what the neck shows, so they sit on the neck. */}
+      {/*
+       * These all change only what the neck shows, so they sit on the neck.
+       *
+       * No visible labels: every value says what it is ("Ganzer Hals",
+       * "Notennamen", "CAGED aus"), and three uppercase captions weighed more than
+       * the controls they named. The aria-labels carry the names for anyone who
+       * cannot see the values — which is also how the phone layout already worked.
+       */}
       <div className="neck-bar">
-        <label className="field field--inline">
-          <span>Lage</span>
-          <select
-            aria-label="Lage"
-            value={box ? state.boxNumber : 0}
-            onChange={(e) => update('boxNumber', Number(e.target.value))}
-          >
-            <option value={0}>Ganzer Hals</option>
-            {boxes.map((option) => (
-              <option key={option.number} value={option.number}>
-                Lage {option.number} ({option.anchorFret}. Bund)
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {/* Only meaningful with a position selected — there is nothing else to
-            crop to, and offering it on the whole neck would be a dead control. */}
-        {box ? (
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={!state.boxZoom}
-              onChange={(e) => update('boxZoom', !e.target.checked)}
-            />
-            <span>Ganzen Hals zeigen</span>
+        {/* The zoom belongs TO the position, not beside it, so the two sit in one
+            group and the button is visibly the smaller of the pair. */}
+        <div className="control-pair">
+          <label className="field field--inline">
+            <select
+              aria-label="Lage"
+              value={box ? state.boxNumber : 0}
+              onChange={(e) => update('boxNumber', Number(e.target.value))}
+            >
+              <option value={0}>Ganzer Hals</option>
+              {boxes.map((option) => (
+                <option key={option.number} value={option.number}>
+                  Lage {option.number} ({option.anchorFret}. Bund)
+                </option>
+              ))}
+            </select>
           </label>
-        ) : null}
+
+          {/* Only meaningful with a position selected — there is nothing else to
+              crop to, and offering it on the whole neck would be a dead control. */}
+          {box ? (
+            <button
+              type="button"
+              className={state.boxZoom ? 'icon-toggle' : 'icon-toggle is-on'}
+              aria-pressed={!state.boxZoom}
+              aria-label="Ganzen Hals zeigen"
+              title="Ganzen Hals zeigen"
+              onClick={() => update('boxZoom', !state.boxZoom)}
+            >
+              {/* Arrows pushing outward: widen the view past the box. */}
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M6.5 3.5 3 8l3.5 4.5M9.5 3.5 13 8l-3.5 4.5" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
 
         {/* Hidden where the forms would not hold — a wrong grip beats no grip
             nowhere, and that rule applies to a teaching overlay too. */}
         {cagedForms.length > 0 ? (
           <label className="field field--inline">
-            <span>CAGED</span>
             <select
               aria-label="CAGED-Form"
               value={state.cagedForm ?? ''}
@@ -576,27 +590,40 @@ export default function App() {
                 update('cagedForm', e.target.value === '' ? null : (e.target.value as CagedForm))
               }
             >
-              <option value="">aus</option>
+              {/*
+               * The options carry the word, since no caption does any more — but
+               * only the form's letter after it. A select is as wide as its
+               * longest option, and "CAGED E-Form (5. Bund)" pushed the row onto
+               * a third line on a phone. In CAGED the letter IS the name.
+               */}
+              <option value="">CAGED aus</option>
               {cagedForms.map((placement) => (
                 <option key={placement.form} value={placement.form}>
-                  {placement.form}-Form ({placement.startFret}. Bund)
+                  CAGED {placement.form} ({placement.startFret}. Bund)
                 </option>
               ))}
             </select>
           </label>
         ) : null}
 
-        <label className="field field--inline">
-          <span>Beschriftung</span>
-          <select
-            aria-label="Beschriftung"
-            value={labelMode}
-            onChange={(e) => update('labelMode', e.target.value as LabelMode)}
+        {/* Two options are not worth a dropdown: both fit side by side, and the
+            choice is then one click rather than two. */}
+        <div className="segmented" role="group" aria-label="Beschriftung">
+          <button
+            type="button"
+            aria-pressed={labelMode === 'note'}
+            onClick={() => update('labelMode', 'note')}
           >
-            <option value="note">Notennamen</option>
-            <option value="degree">Stufen</option>
-          </select>
-        </label>
+            Notennamen
+          </button>
+          <button
+            type="button"
+            aria-pressed={labelMode === 'degree'}
+            onClick={() => update('labelMode', 'degree')}
+          >
+            Stufen
+          </button>
+        </div>
       </div>
 
       <FretboardView

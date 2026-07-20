@@ -457,6 +457,95 @@ button:focus-visible {
   margin-bottom: 0.5rem;
 }
 
+/* A control and its modifier, held close enough to read as one thing. */
+.control-pair {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/*
+ * The zoom. A small square button rather than a labelled checkbox: it modifies the
+ * position beside it instead of standing alongside it, and a checkbox among
+ * dropdowns broke the row's rhythm.
+ */
+.icon-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.icon-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-toggle:hover {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+/* Pressed means the crop is off and the whole neck is on screen. */
+.icon-toggle.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-text);
+}
+
+/*
+ * Two mutually exclusive options, both on show. A dropdown would hide one of them
+ * behind a click for no gain.
+ */
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-sunken);
+}
+
+.segmented button {
+  padding: 0.25rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.segmented button:hover {
+  color: var(--text);
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
 .picked-actions {
   display: inline-flex;
   align-items: center;
@@ -817,14 +906,7 @@ button:focus-visible {
     font-size: var(--text-xs);
   }
 
-  /*
-   * Drop the field labels: "Ganzer Hals" and "Notennamen" say what they are, and
-   * without them both fit on one line instead of stacking above the neck.
-   */
-  .neck-bar .field--inline > span {
-    display: none;
-  }
-
+  /* The labels are gone everywhere now, so only the spacing needs tightening. */
   .neck-bar {
     gap: 0.5rem;
   }
