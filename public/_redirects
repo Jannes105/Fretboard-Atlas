@@ -1,4 +1,0 @@
-# Single-page app: every path falls back to index.html, or reloading a deep link
-# 404s. Duplicates the rule in netlify.toml on purpose — that file is only read
-# when Netlify builds the site itself, and a hand-uploaded dist/ never sees it.
-/*  /index.html  200

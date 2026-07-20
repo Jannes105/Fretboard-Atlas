@@ -73,10 +73,14 @@ beschreibt das Instrument oder die Musik; keines den Betrachter.
 
 ## Deployment
 
-GitHub Actions baut die Seite bei jedem Push auf `main` und veröffentlicht sie
-auf GitHub Pages (siehe `.github/workflows/deploy.yml`). Für ein öffentliches
-Repository ist beides unbegrenzt kostenlos — das war der Grund für den Wechsel
-weg von einem Anbieter mit Build-Kontingent.
+Live unter <https://jannes105.github.io/Fretboard-Atlas/>.
+
+GitHub Actions baut die Seite bei jedem Push auf `main`, lässt die Tests laufen
+und veröffentlicht sie auf GitHub Pages (siehe `.github/workflows/deploy.yml`).
+Für ein öffentliches Repository sind die Actions-Minuten unbegrenzt und Pages
+kostenlos — die weichen Grenzen (1 GB Seite, 100 GB Traffic im Monat, 10 Builds
+pro Stunde) liegen für dieses Projekt außer Reichweite: der ganze Build wiegt
+unter 1 MB.
 
 Über HTTPS registriert sich der Service Worker, danach läuft die App **offline**
 — praktisch, wenn im Proberaum kein Netz ist.
@@ -90,9 +94,6 @@ Pages-Stand nachstellen will: `GITHUB_PAGES=true npm run build`.
 
 **GitHub Pages kennt keine Weiterleitungen und keine eigenen HTTP-Header.** Den
 SPA-Fallback erledigt eine Kopie von `index.html` als `404.html`, die der
-Workflow anlegt. Die Cache-Regeln aus `netlify.toml` entfallen ersatzlos; GitHub
-setzt eigene, kurz genug, dass ein Service-Worker-Update durchkommt.
-
-`netlify.toml` und `public/_redirects` / `public/_headers` bleiben liegen, falls
-das Projekt je wieder bei Netlify oder Cloudflare landet. Auf GitHub Pages sind
-sie wirkungslos.
+Workflow anlegt. Eigene Cache-Regeln gibt es nicht; GitHub liefert `sw.js` mit
+`max-age=600` aus, ein Update erreicht ein offenes Gerät also nach spätestens
+zehn Minuten.

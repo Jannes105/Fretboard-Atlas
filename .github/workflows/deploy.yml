@@ -46,7 +46,7 @@ jobs:
 
       # GitHub Pages kennt keine Weiterleitungsregeln: ein tiefer Pfad landet auf
       # 404.html statt auf index.html. Dieselbe Datei unter beiden Namen macht
-      # daraus den SPA-Fallback, den netlify.toml per Redirect gelöst hat.
+      # daraus den SPA-Fallback.
       - run: cp dist/index.html dist/404.html
 
       - uses: actions/configure-pages@v5
