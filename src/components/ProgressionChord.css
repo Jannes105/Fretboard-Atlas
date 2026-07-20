@@ -6,7 +6,7 @@
   min-width: 6.5rem;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--panel);
   transition:
     border-color 0.1s ease,
@@ -27,12 +27,12 @@
   margin-top: 0.3rem;
   padding: 0.3rem;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: none;
   color: inherit;
   font: inherit;
   cursor: pointer;
-  transition: border-color 0.12s ease;
+  transition: border-color var(--transition-fast);
 }
 
 .voicing-button:disabled {
@@ -50,12 +50,12 @@
   margin-top: 0.15rem;
   padding: 0.15rem 0.3rem;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: none;
-  color: var(--accent);
+  color: var(--accent-text);
   font: inherit;
-  font-size: 0.7rem;
-  font-weight: 650;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
   cursor: pointer;
 }
 
@@ -65,12 +65,12 @@
 
 .voicing-caption {
   margin-top: 0.15rem;
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
 }
 
 .no-shape {
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
   font-style: italic;
 }
@@ -94,15 +94,15 @@
 .voicing-option {
   padding: 0.35rem;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: none;
   color: inherit;
   font: inherit;
   cursor: pointer;
   white-space: nowrap;
   transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .voicing-option:hover,

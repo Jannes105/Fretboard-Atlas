@@ -29,7 +29,7 @@
 
 .fretboard-scroll::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .fretboard-scroll::-webkit-scrollbar-track {
@@ -94,7 +94,7 @@
 .capo-label {
   fill: var(--capo);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 
 /* The frets behind the capo cannot be reached. */
@@ -115,7 +115,7 @@
 .fret-number {
   fill: var(--text-muted);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
 }
 
@@ -170,7 +170,7 @@
 .note-label {
   fill: var(--note-text);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   pointer-events: none;
 }
 

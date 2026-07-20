@@ -42,8 +42,16 @@
   --panel-sunken: #f2efe9;
   --border: #e5e0d6;
   --text: #1f1d1a;
-  --text-muted: #78716a;
+  --text-muted: #6b645c;
   --accent: #c08430;
+  /*
+   * The accent as TEXT. Two tokens, because one colour cannot do both jobs on a
+   * light page: #c08430 is the right warm amber for a border or a filled button,
+   * but against the page it only reaches 3:1 — and the scale degrees (I, ii, iii)
+   * are set at 12 px, where 4.5:1 is the bar. This one measures 4.6:1 and stays
+   * warm. In the dark theme the amber already clears 8:1, so there both are one.
+   */
+  --accent-text: #9c6516;
 
   /*
    * The dark page palette, named once. Two rules below switch it on — the OS
@@ -57,6 +65,47 @@
   --dark-text: #ede9e3;
   --dark-text-muted: #9a9389;
   --dark-accent: #e0a33f;
+  /* On dark the amber clears 8:1 as text, so it needs no darker sibling. */
+  --dark-accent-text: #e0a33f;
+  /* A shadow that reads on near-black; far too hard on a light page. */
+  --dark-shadow-popover: 0 12px 28px rgb(0 0 0 / 35%);
+
+  /* ---------- Type ----------
+   *
+   * Seven steps, because the app had grown twenty-two values — six of them inside
+   * a single 0.08rem band, which no eye can tell apart but which meant nothing
+   * ever lined up by accident.
+   *
+   * NOT for the text inside the neck and the chord diagrams: those sizes are
+   * drawing units inside a viewBox, tied to the fret geometry, and belong to the
+   * instrument rather than to the page.
+   */
+  --text-2xs: 0.7rem;
+  --text-xs: 0.8rem;
+  --text-sm: 0.875rem;
+  --text-md: 0.95rem;
+  --text-lg: 1.05rem;
+  --text-xl: 1.3rem;
+  --text-2xl: 1.55rem;
+
+  /* No webfont is loaded and font-synthesis is off, so a system family gives us
+     three usable steps at best. Asking for a fourth just rounds to one of these. */
+  --weight-normal: 400;
+  --weight-medium: 600;
+  --weight-bold: 700;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-round: 999px;
+
+  /* Stood in the code six times, character for character. */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+  /* Light needs a softer shadow than dark: the same black at 35% turns into a
+     smudge on a near-white page. */
+  --shadow-popover: 0 10px 24px rgb(60 50 35 / 14%);
+  --transition-fast: 0.12s ease;
+  --z-popover: 20;
 }
 
 /* The OS preference — unless the reader has explicitly asked for light. */
@@ -69,6 +118,8 @@
     --text: var(--dark-text);
     --text-muted: var(--dark-text-muted);
     --accent: var(--dark-accent);
+    --accent-text: var(--dark-accent-text);
+    --shadow-popover: var(--dark-shadow-popover);
   }
 }
 
@@ -81,6 +132,8 @@
   --text: var(--dark-text);
   --text-muted: var(--dark-text-muted);
   --accent: var(--dark-accent);
+  --accent-text: var(--dark-accent-text);
+  --shadow-popover: var(--dark-shadow-popover);
 }
 
 * {
@@ -113,15 +166,15 @@ body {
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.6rem;
-  font-weight: 650;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-medium);
   letter-spacing: -0.015em;
 }
 
 .subtitle {
   margin: 0.15rem 0 0;
   color: var(--text-muted);
-  font-size: 0.95rem;
+  font-size: var(--text-md);
 }
 
 /* ---------- Setup: the instrument, set once ---------- */
@@ -138,16 +191,16 @@ body {
   gap: 0.5rem;
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--panel);
   color: var(--text-muted);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   white-space: nowrap;
   cursor: pointer;
   transition:
-    border-color 0.12s ease,
-    color 0.12s ease;
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .setup-trigger:hover,
@@ -157,7 +210,7 @@ body {
 }
 
 .setup-caret {
-  font-size: 0.65rem;
+  font-size: var(--text-2xs);
   line-height: 1;
 }
 
@@ -169,16 +222,16 @@ body {
   position: absolute;
   top: calc(100% + 0.4rem);
   right: 0;
-  z-index: 20;
+  z-index: var(--z-popover);
   display: grid;
   gap: 0.75rem;
   width: max-content;
   min-width: 13rem;
   padding: 0.9rem;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--panel);
-  box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
+  box-shadow: var(--shadow-popover);
 }
 
 /* The six per-string note pickers of a custom tuning, low string first. */
@@ -193,11 +246,11 @@ body {
   width: 100%;
   padding: 0.35rem 0.15rem;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--panel-sunken);
   color: var(--text);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   text-align: center;
   appearance: none;
   cursor: pointer;
@@ -206,7 +259,7 @@ body {
 .tuning-strings select:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 .field {
@@ -218,8 +271,8 @@ body {
 }
 
 .field > span {
-  font-size: 0.7rem;
-  font-weight: 650;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -231,7 +284,7 @@ body {
   position: absolute;
   right: 0.7rem;
   bottom: 0.72rem;
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   line-height: 1;
   color: var(--text-muted);
   pointer-events: none;
@@ -242,16 +295,16 @@ body {
   width: 100%;
   padding: 0.5rem 1.9rem 0.5rem 0.65rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--panel);
   color: var(--text);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--text-md);
   appearance: none;
   cursor: pointer;
   transition:
-    border-color 0.12s ease,
-    box-shadow 0.12s ease;
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .field select:hover,
@@ -264,7 +317,7 @@ body {
 button:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 /* Label beside the control rather than above it, for the strip on the neck. */
@@ -287,7 +340,7 @@ button:focus-visible {
 .field--inline select {
   width: auto;
   padding-block: 0.35rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
 }
 
 /* ---------- Scale strip: the key, right above the neck ---------- */
@@ -319,22 +372,22 @@ button:focus-visible {
   gap: 0.3rem;
   padding: 0.05rem 0.15rem;
   border-bottom: 1px dashed var(--border);
-  border-radius: 4px 4px 0 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   color: var(--text);
-  font-size: 1.35rem;
-  font-weight: 650;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-medium);
   letter-spacing: -0.015em;
   cursor: pointer;
   transition:
-    color 0.12s ease,
-    border-color 0.12s ease;
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
 /* The caret is what says "this headline is a control". */
 .key-select::after {
   content: '▾';
-  font-size: 0.6rem;
-  font-weight: 400;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-normal);
   color: var(--text-muted);
 }
 
@@ -355,17 +408,23 @@ button:focus-visible {
 
 .key-select:hover {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
+/*
+ * Also the darker accent, though it is a headline. It used to qualify as "large
+ * text" at weight 650, where 3:1 is enough — but 650 was a fiction on system
+ * fonts and is now 600, which is not bold, so the 4.5:1 rule applies again.
+ * Better to hold the contrast than to prop up a weight nobody was rendering.
+ */
 .key-select--root {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .key-select:focus-within {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 /* ---------- Neck bar: what the neck shows, sitting on the neck ---------- */
@@ -394,14 +453,14 @@ button:focus-visible {
   padding: 0;
   padding-left: 0.12rem; /* optically centres the triangle */
   border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  border-radius: 50%;
+  border-radius: var(--radius-round);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-  font-size: 0.72rem;
+  color: var(--accent-text);
+  font-size: var(--text-xs);
   line-height: 1;
   cursor: pointer;
   transition:
-    background 0.12s ease,
+    background var(--transition-fast),
     transform 0.08s ease;
 }
 
@@ -416,7 +475,7 @@ button:focus-visible {
 .play-button--small {
   width: 1.6rem;
   height: 1.6rem;
-  font-size: 0.62rem;
+  font-size: var(--text-2xs);
 }
 
 /* Stop reads as a filled, active control rather than another play triangle. */
@@ -437,7 +496,7 @@ button:focus-visible {
   margin-bottom: 1rem;
   padding: 0.7rem 0.9rem;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--panel-sunken);
 }
 
@@ -445,12 +504,12 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 
 .tempo output {
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
@@ -468,7 +527,7 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
@@ -479,7 +538,7 @@ button:focus-visible {
 
 .transport-note {
   margin-left: auto;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 
@@ -507,15 +566,15 @@ button:focus-visible {
   min-width: 2.6rem;
   padding: 0.25rem 0.45rem;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--panel);
   color: inherit;
   font: inherit;
   line-height: 1.15;
   cursor: pointer;
   transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .degree-chip:hover {
@@ -528,18 +587,18 @@ button:focus-visible {
 }
 
 .degree-chip .note-name {
-  font-weight: 700;
-  font-size: 0.92rem;
+  font-weight: var(--weight-bold);
+  font-size: var(--text-md);
 }
 
 .degree-chip .note-degree {
-  font-size: 0.68rem;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
 .degree-chip.is-root .note-name {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* ---------- Panels ---------- */
@@ -558,16 +617,16 @@ button:focus-visible {
 
 .panel h2 {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 650;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
 }
 
 /* Names the key a pentatonic borrowed its chords from, without competing with
    the heading it qualifies. */
 .panel-source {
   margin-left: 0.5rem;
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
   color: var(--text-muted);
 }
 
@@ -581,13 +640,13 @@ button:focus-visible {
 .hint {
   margin: 0 0 0.9rem;
   color: var(--text-muted);
-  font-size: 0.87rem;
+  font-size: var(--text-sm);
 }
 
 .hint--warn {
   padding: 0.6rem 0.75rem;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--text);
 }
@@ -596,18 +655,18 @@ button:focus-visible {
   margin-top: 2.25rem;
   padding: 0.9rem 1rem;
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: var(--text-md);
 }
 
 .link-button {
   padding: 0;
   border: none;
   background: none;
-  color: var(--accent);
+  color: var(--accent-text);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -646,15 +705,15 @@ button:focus-visible {
   height: 1.4rem;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  border-radius: 50%;
+  border-radius: var(--radius-round);
   background: var(--panel);
-  color: var(--accent);
+  color: var(--accent-text);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--text-md);
   line-height: 1;
   cursor: pointer;
   transition:
-    background 0.12s ease,
+    background var(--transition-fast),
     transform 0.08s ease;
 }
 
@@ -671,14 +730,14 @@ button:focus-visible {
   min-width: 5.5rem;
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   background: var(--panel);
   color: inherit;
   font: inherit;
   cursor: pointer;
   transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .chord-card:hover {
@@ -691,19 +750,19 @@ button:focus-visible {
 }
 
 .roman {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--accent-text);
   letter-spacing: 0.03em;
 }
 
 .chord-symbol {
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
 }
 
 .chord-notes {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--text-muted);
 }
 
@@ -719,7 +778,7 @@ button:focus-visible {
   }
 
   .app-header h1 {
-    font-size: 1.35rem;
+    font-size: var(--text-xl);
   }
 
   /* The subtitle explains the app once; on a phone that costs a line the neck wants. */
@@ -728,13 +787,13 @@ button:focus-visible {
   }
 
   .key-select {
-    font-size: 1.2rem;
+    font-size: var(--text-xl);
   }
 
   /* Small enough that the title keeps its own line instead of wrapping. */
   .setup-trigger {
     padding: 0.35rem 0.5rem;
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
 
   /*
@@ -777,7 +836,7 @@ button:focus-visible {
   .tuning-strings select {
     min-width: 0;
     padding-inline: 0.1rem;
-    font-size: 0.78rem;
+    font-size: var(--text-xs);
   }
 
   .panel {

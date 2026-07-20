@@ -6,16 +6,16 @@
 .keyfinder-trigger {
   padding: 0.3rem 0.6rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--panel);
   color: var(--text-muted);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   white-space: nowrap;
   cursor: pointer;
   transition:
-    border-color 0.12s ease,
-    color 0.12s ease;
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .keyfinder-trigger:hover,
@@ -28,13 +28,13 @@
   position: absolute;
   top: calc(100% + 0.4rem);
   left: 0;
-  z-index: 20;
+  z-index: var(--z-popover);
   width: min(22rem, 88vw);
   padding: 0.9rem;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: var(--panel);
-  box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
+  box-shadow: var(--shadow-popover);
 }
 
 .keyfinder-field {
@@ -44,8 +44,8 @@
 }
 
 .keyfinder-field > span {
-  font-size: 0.7rem;
-  font-weight: 650;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -55,28 +55,28 @@
   width: 100%;
   padding: 0.5rem 0.65rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--panel-sunken);
   color: var(--text);
   font: inherit;
-  font-size: 1rem;
+  font-size: var(--text-lg);
 }
 
 .keyfinder-field input:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 .keyfinder-note {
   margin: 0.6rem 0 0;
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   line-height: 1.35;
 }
 
 .keyfinder-note--warn {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .keyfinder-results {
@@ -94,15 +94,15 @@
   width: 100%;
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--panel-sunken);
   color: var(--text);
   font: inherit;
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .keyfinder-result:hover {
@@ -112,7 +112,7 @@
 
 .keyfinder-key {
   flex: none;
-  font-weight: 650;
+  font-weight: var(--weight-medium);
 }
 
 .keyfinder-degrees {
@@ -120,7 +120,7 @@
   flex-wrap: wrap;
   gap: 0.3rem 0.55rem;
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
 }
 
 .keyfinder-adopt {
@@ -128,14 +128,14 @@
   margin-top: 0.7rem;
   padding: 0.5rem 0.6rem;
   border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
   font: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background var(--transition-fast);
 }
 
 .keyfinder-adopt:hover {
@@ -144,7 +144,7 @@
 
 /* A chord that does not belong to the key: named, not numbered, and dimmed. */
 .keyfinder-degree.is-outsider {
-  color: var(--accent);
+  color: var(--accent-text);
   opacity: 0.85;
   text-decoration: line-through;
   text-decoration-thickness: 1px;

@@ -11,12 +11,12 @@
   margin-bottom: 0.7rem;
   padding: 0.5rem 0.6rem;
   border: 1px dashed var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .builder-empty {
   color: var(--text-muted);
-  font-size: 0.87rem;
+  font-size: var(--text-sm);
 }
 
 /* A chord in the sequence: the symbol plus a remove handle. */
@@ -25,23 +25,23 @@
   align-items: center;
   gap: 0.3rem;
   padding: 0.25rem 0.3rem 0.25rem 0.55rem;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--text);
-  font-weight: 600;
-  font-size: 0.9rem;
+  font-weight: var(--weight-medium);
+  font-size: var(--text-md);
 }
 
 /* The bar count — click to cycle 1×→2×→3×→4×. Muted so a plain 1× is quiet. */
 .builder-bars {
   padding: 0.05rem 0.3rem;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: transparent;
   color: var(--text-muted);
   font: inherit;
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
   cursor: pointer;
 }
 
@@ -58,10 +58,10 @@
   height: 1.2rem;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--radius-round);
   background: transparent;
   color: var(--text-muted);
-  font-size: 1rem;
+  font-size: var(--text-lg);
   line-height: 1;
   cursor: pointer;
 }
@@ -75,11 +75,11 @@
   margin-left: auto;
   padding: 0.2rem 0.5rem;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   cursor: pointer;
 }
 
@@ -111,14 +111,14 @@
   min-width: 2.6rem;
   padding: 0.3rem 0.4rem;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--panel-sunken);
   color: var(--text);
   font: inherit;
   cursor: pointer;
   transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .builder-diatonic-btn:hover {
@@ -127,13 +127,13 @@
 }
 
 .builder-roman {
-  font-size: 0.65rem;
+  font-size: var(--text-2xs);
   color: var(--text-muted);
 }
 
 .builder-name {
-  font-weight: 600;
-  font-size: 0.88rem;
+  font-weight: var(--weight-medium);
+  font-size: var(--text-sm);
 }
 
 .builder-type {
@@ -145,27 +145,27 @@
   width: 8.5rem;
   padding: 0.4rem 0.55rem;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--panel-sunken);
   color: var(--text);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--text-md);
 }
 
 .builder-type input:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 .builder-type-add {
   padding: 0.4rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   background: var(--panel);
   color: var(--text);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
@@ -175,6 +175,6 @@
 
 .builder-error {
   margin: 0.55rem 0 0;
-  color: var(--accent);
-  font-size: 0.83rem;
+  color: var(--accent-text);
+  font-size: var(--text-sm);
 }
