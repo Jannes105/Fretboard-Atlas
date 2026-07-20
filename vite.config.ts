@@ -3,8 +3,20 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/*
+ * GitHub Pages serves a project site from a sub-path (/Fretboard-Atlas/), not
+ * from the root. Set only for that build, so the dev server and `vite preview`
+ * keep working at "/" — a sub-path locally buys nothing and just makes every
+ * hand-typed URL longer. The workflow sets the flag.
+ *
+ * src/audio.ts already builds its sample URLs from import.meta.env.BASE_URL, so
+ * the recordings follow this without further work.
+ */
+const base = process.env.GITHUB_PAGES === 'true' ? '/Fretboard-Atlas/' : '/'
+
 // https://vite.dev/config/
 export default defineConfig({
+  base,
   plugins: [
     react(),
     VitePWA({

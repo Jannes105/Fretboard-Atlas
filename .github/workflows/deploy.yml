@@ -1,0 +1,65 @@
+# Baut die Seite und veröffentlicht sie auf GitHub Pages.
+#
+# Für öffentliche Repositories sind sowohl Pages als auch die Actions-Minuten
+# unbegrenzt und kostenlos — deshalb liegt der Deploy hier und nicht mehr bei
+# einem Anbieter mit Kontingent.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  # Erlaubt einen Deploy von Hand, ohne dafür einen Commit erfinden zu müssen.
+  workflow_dispatch:
+
+# Pages braucht diese drei Rechte; ohne sie schlägt der Deploy-Schritt fehl.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Läuft ein Deploy schon, wird er nicht abgebrochen — sonst kann eine halb
+# veröffentlichte Seite stehen bleiben. Neuere Pushes warten stattdessen.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      # Die Tests laufen mit, damit ein kaputter Stand gar nicht erst online geht.
+      - run: npm test
+
+      - run: npm run build
+        env:
+          # Schaltet in vite.config.ts den Unterpfad /Fretboard-Atlas/ ein.
+          GITHUB_PAGES: 'true'
+
+      # GitHub Pages kennt keine Weiterleitungsregeln: ein tiefer Pfad landet auf
+      # 404.html statt auf index.html. Dieselbe Datei unter beiden Namen macht
+      # daraus den SPA-Fallback, den netlify.toml per Redirect gelöst hat.
+      - run: cp dist/index.html dist/404.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
