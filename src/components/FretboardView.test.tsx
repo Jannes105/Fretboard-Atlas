@@ -145,6 +145,22 @@ describe('FretboardView — Lage im Ausschnitt', () => {
     expect(container.querySelector('.box-outline')).not.toBeNull();
   });
 
+  it('verzichtet im Ausschnitt auf den Lagen-Rahmen', () => {
+    // Der Ausschnitt IST die Lage. Ein Rahmen darin saegte ein drittes Mal, was
+    // der Zuschnitt und die gedimmten Nachbarbuende schon sagen.
+    const { container } = render(
+      <FretboardView
+        scale={aMinorPentatonic}
+        fretboard={board}
+        labelMode="note"
+        position={position}
+        zoom
+      />,
+    );
+
+    expect(container.querySelector('.box-outline')).toBeNull();
+  });
+
   it('behaelt im Ausschnitt die Saitennamen', () => {
     const { container } = render(
       <FretboardView

@@ -36,6 +36,10 @@
   --chord-stroke: #8adacf;
   --chord-text: #05201d;
 
+  /* How far a note fades when it is outside the box or outside the picked tones.
+     Named because more than one layer has to fade by exactly the same amount. */
+  --dimmed: 0.14;
+
   /* --- The page. Follows the theme. --- */
   --bg: #faf8f4;
   --panel: #ffffff;

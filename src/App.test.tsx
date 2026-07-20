@@ -784,15 +784,15 @@ describe('App — CAGED-Overlay', () => {
     window.history.replaceState(null, '', '/?root=A&scale=major&caged=E');
     const { container } = render(<App />);
 
-    expect(container.querySelector('.caged-outline')).not.toBeNull();
-    // Die E-Form von A ist der Barre-Griff im 5. Bund: sechs gegriffene Saiten,
-    // von denen jede auf einem Skalenton liegt.
+    // Die Form hat keinen eigenen Rahmen mehr — die Ringe auf den gegriffenen
+    // Toenen sagen genauer, wo der Griff liegt, als ein Bundfenster es koennte.
+    // Die E-Form von A ist der Barre-Griff im 5. Bund.
     expect(container.querySelectorAll('.note-caged').length).toBeGreaterThan(0);
   });
 
   it('zeigt ohne Auswahl kein Overlay, aber den Picker', () => {
     const { container } = render(<App />);
-    expect(container.querySelector('.caged-outline')).toBeNull();
+    expect(container.querySelectorAll('.note-caged')).toHaveLength(0);
     expect(picker(container)).not.toBeNull();
   });
 
@@ -802,13 +802,13 @@ describe('App — CAGED-Overlay', () => {
     const { container } = render(<App />);
 
     expect(picker(container)).toBeNull();
-    expect(container.querySelector('.caged-outline')).toBeNull();
+    expect(container.querySelectorAll('.note-caged')).toHaveLength(0);
   });
 
   it('ignoriert eine unbekannte Form aus der URL, statt zu stolpern', () => {
     window.history.replaceState(null, '', '/?caged=Z');
     const { container } = render(<App />);
-    expect(container.querySelector('.caged-outline')).toBeNull();
+    expect(container.querySelectorAll('.note-caged')).toHaveLength(0);
   });
 
   it('bietet in einer Molltonart nur die drei greifbaren Formen an', () => {

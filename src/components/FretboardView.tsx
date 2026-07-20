@@ -240,8 +240,14 @@ export function FretboardView({
             </>
           ) : null}
 
-          {/* Outline of the selected box, so it reads as one hand shape. */}
-          {position ? (
+          {/*
+           * Outline of the selected box, so it reads as one hand shape — but only
+           * when the whole neck is on screen and the box needs locating among
+           * twenty-four frets. Cropped, the visible area already IS the box, and
+           * the one dimmed fret of air at each edge marks where it ends. A frame
+           * there would state a third time what the crop and the dimming say.
+           */}
+          {position && !cropped ? (
             <rect
               className="box-outline"
               x={NUT_X + (position.startFret - 1) * FRET_WIDTH}
@@ -253,20 +259,12 @@ export function FretboardView({
           ) : null}
 
           {/*
-           * The CAGED form's window. Same maths as the box outline — both are "a
-           * window on the neck" — but drawn in the chord accent, because a form is
-           * about harmony while a box is about the hand.
+           * The CAGED form has no frame of its own. It used to get one, drawn like
+           * the box outline in the chord accent — but two rectangles crossing each
+           * other on one neck explain each other away: you see two frames and can
+           * read neither. The rings on the stopped notes say where the grip is, and
+           * they say it exactly, which a fret window only approximates.
            */}
-          {caged ? (
-            <rect
-              className="caged-outline"
-              x={NUT_X + (caged.startFret - 1) * FRET_WIDTH}
-              y={boardTop + 7}
-              width={(caged.endFret - caged.startFret + 1) * FRET_WIDTH}
-              height={boardFoot - boardTop - 14}
-              rx={7}
-            />
-          ) : null}
 
           {/* Fret numbers, below the board. */}
           {Array.from({ length: fretCount + 1 }, (_, fret) => fret).map((fret) => (
@@ -332,7 +330,10 @@ export function FretboardView({
                     marker, and the two can legitimately coincide. */}
                 {isCagedTone ? (
                   <circle
-                    className="note-caged"
+                    // Fades with the note it marks. A full-strength ring around a
+                    // dot at 14% opacity reads as a rendering fault, and the grip
+                    // reaches outside the box often enough for that to show.
+                    className={dimmed ? 'note-caged is-dimmed' : 'note-caged'}
                     cx={cx}
                     cy={cy}
                     r={(note.isRoot ? ROOT_RADIUS : DOT_RADIUS) + 4}

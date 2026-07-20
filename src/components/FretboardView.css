@@ -164,7 +164,7 @@
 
 /* Outside the selected box, or not among the picked tones. */
 .is-dimmed {
-  opacity: 0.14;
+  opacity: var(--dimmed);
 }
 
 .note-label {
@@ -183,20 +183,21 @@
   fill: var(--chord-text);
 }
 
-/* The CAGED form's window: the chord accent, next to the box outline's neutral. */
-.caged-outline {
-  fill: none;
-  stroke: var(--chord);
-  stroke-width: 2;
-  opacity: 0.85;
-}
-
 /* A scale tone this grip stops. */
 .note-caged {
   fill: none;
   stroke: var(--chord-stroke);
   stroke-width: 2.5;
   opacity: 0.95;
+}
+
+/*
+ * Said again, because .is-dimmed alone loses here: both are single-class
+ * selectors, so source order decided it — and .note-caged comes later. Anything
+ * that sets its own opacity has to repeat the dimmed case explicitly.
+ */
+.note-caged.is-dimmed {
+  opacity: var(--dimmed);
 }
 
 /*
