@@ -232,3 +232,42 @@ describe('FretboardView — Trefferflaeche fuer den Finger', () => {
     expect(onPlayNote).toHaveBeenCalledExactlyOnceWith(board.mapScale(aMajor)[0].midi);
   });
 });
+
+describe('FretboardView — Hinweis unter dem Hals', () => {
+  it('sagt unter dem Hals, dass ein angetippter Ton klingt', () => {
+    // Bis hierhin verriet das nur ein Hover-Title — und ein Finger schwebt nicht.
+    const { container } = render(
+      <FretboardView
+        scale={aMajor}
+        fretboard={board}
+        labelMode="note"
+        onPlayNote={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector('.fretboard-hint')?.textContent).toContain('antippen');
+  });
+
+  it('schweigt, wo es nichts abzuspielen gibt', () => {
+    const { container } = render(
+      <FretboardView scale={aMajor} fretboard={board} labelMode="note" />,
+    );
+    expect(container.querySelector('.fretboard-hint')).toBeNull();
+  });
+
+  it('verschweigt den Wisch-Hinweis, solange nichts abgeschnitten ist', () => {
+    // jsdom rechnet kein Layout: scrollWidth ist 0, also laeuft nichts ueber —
+    // genau der ruhige Fall, den der Hinweis nicht kommentieren soll.
+    const { container } = render(
+      <FretboardView
+        scale={aMajor}
+        fretboard={board}
+        labelMode="note"
+        onPlayNote={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector('.fretboard-hint')?.textContent).not.toContain('wischen');
+    expect(container.querySelector('.fretboard-scroll--more')).toBeNull();
+  });
+});

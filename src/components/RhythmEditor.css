@@ -12,8 +12,11 @@
 }
 
 .rhythm-cell {
-  width: 1.9rem;
-  height: 2.1rem;
+  /* Narrower than a fingertip on purpose: twelve of these in 6/8 already
+     scroll, and a full 44px each would double how far you have to swipe. The
+     height carries the target. */
+  width: 2.2rem;
+  height: var(--tap);
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -62,7 +65,8 @@
 }
 
 .rhythm-preset {
-  padding: 0.3rem 0.6rem;
+  min-height: var(--tap);
+  padding: 0.3rem 0.8rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--panel);

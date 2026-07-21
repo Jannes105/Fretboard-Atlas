@@ -25,6 +25,7 @@
 
 .keyfinder-field input {
   width: 100%;
+  min-height: var(--tap);
   padding: 0.5rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -64,6 +65,7 @@
   align-items: baseline;
   gap: 0.7rem;
   width: 100%;
+  min-height: var(--tap);
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -97,6 +99,7 @@
 
 .keyfinder-adopt {
   width: 100%;
+  min-height: var(--tap);
   margin-top: 0.7rem;
   padding: 0.5rem 0.6rem;
   border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);

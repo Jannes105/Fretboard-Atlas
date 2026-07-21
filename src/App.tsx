@@ -145,6 +145,10 @@ export default function App() {
   // A box number from the URL — or left over from another scale — may not exist here.
   const box = boxes.find((b) => b.number === state.boxNumber) ?? null;
 
+  // boxZoom true means the drawing is cropped to the box, so that is when the
+  // button offers the whole neck.
+  const zoomAction = state.boxZoom ? 'Ganzen Hals zeigen' : 'Nur die Lage zeigen';
+
   // The notes currently on screen, with their real pitches (tuning + capo baked
   // in). Playback derives from these, so what you hear matches what you see —
   // a box up the neck sounds higher, a capo raises everything.
@@ -292,6 +296,28 @@ export default function App() {
   // Silence the player when the app goes away. useTransport only ever stopped the
   // progression, so a scale run's timers used to outlive the component.
   useEffect(() => () => playerRef.current?.stop(), []);
+
+  /**
+   * Escape clears the highlight — the way out that does not depend on scrolling
+   * back up to the link above the neck.
+   *
+   * An open panel owns Escape first: closing the setup must not also wipe the
+   * neck. `defaultPrevented` cannot carry that, because the panels only register
+   * their listener when they open, so this one always runs first. All three
+   * panels share the `.popover` class, which makes one look enough.
+   */
+  useEffect(() => {
+    if (highlight === null) return;
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (document.querySelector('.popover')) return;
+      setHighlight(null);
+    };
+
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [highlight]);
 
   /**
    * Which note of the scale run is sounding, as an index into the sequence below.
@@ -563,17 +589,26 @@ export default function App() {
           {/* Only meaningful with a position selected — there is nothing else to
               crop to, and offering it on the whole neck would be a dead control. */}
           {box ? (
+            /*
+             * The button names the NEXT click, not the current state — which is
+             * why it carries no aria-pressed: "Nur die Lage zeigen, pressed"
+             * says two things at once. Where you are is visible on the neck.
+             */
             <button
               type="button"
-              className={state.boxZoom ? 'icon-toggle' : 'icon-toggle is-on'}
-              aria-pressed={!state.boxZoom}
-              aria-label="Ganzen Hals zeigen"
-              title="Ganzen Hals zeigen"
+              className="icon-toggle"
+              aria-label={zoomAction}
+              title={zoomAction}
               onClick={() => update('boxZoom', !state.boxZoom)}
             >
-              {/* Arrows pushing outward: widen the view past the box. */}
               <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M6.5 3.5 3 8l3.5 4.5M9.5 3.5 13 8l-3.5 4.5" />
+                {state.boxZoom ? (
+                  /* Arrows pushing outward: widen the view past the box. */
+                  <path d="M6.5 3.5 3 8l3.5 4.5M9.5 3.5 13 8l-3.5 4.5" />
+                ) : (
+                  /* And inward: pull it back to the box. */
+                  <path d="M3 3.5 6.5 8 3 12.5M13 3.5 9.5 8 13 12.5" />
+                )}
               </svg>
             </button>
           ) : null}
@@ -682,30 +717,49 @@ export default function App() {
                     </span>
                   </button>
 
-                  {/* These seven chords used to be drawn a second time inside the
-                      builder just to add them. One set, two actions instead. */}
-                  {isCustom ? (
-                    <button
-                      type="button"
-                      className="chord-add"
-                      aria-label={`${chord.name()} an die Folge anhängen`}
-                      title="An die Folge anhängen"
-                      onClick={() =>
-                        update(
-                          'progressionId',
-                          customProgId([
-                            ...(customChordSteps ?? []),
-                            { symbol: chord.name(), bars: 1 },
-                          ]),
-                        )
-                      }
-                    >
-                      +
-                    </button>
-                  ) : null}
+                  {/*
+                   * These seven chords used to be drawn a second time inside the
+                   * builder just to add them. One set, two actions instead.
+                   *
+                   * Always here, not only once a self-built progression is open:
+                   * hiding it put a discovery gate — an option at the bottom of a
+                   * dropdown — in front of the very feature it serves. From a
+                   * preset the click adopts what is on screen and appends to it,
+                   * seeded exactly as ProgressionPanel seeds "Eigene Folge", so
+                   * the two paths agree by construction.
+                   */}
+                  <button
+                    type="button"
+                    className="chord-add tap-target"
+                    aria-label={`${chord.name()} an die Folge anhängen`}
+                    title="An die Folge anhängen"
+                    onClick={() =>
+                      update(
+                        'progressionId',
+                        customProgId([
+                          ...(customChordSteps ??
+                            steps.map((step) => ({ symbol: step.chord.name(), bars: 1 }))),
+                          { symbol: chord.name(), bars: 1 },
+                        ]),
+                      )
+                    }
+                  >
+                    +
+                  </button>
                 </li>
               ))}
             </ol>
+
+            {/* The link above the neck is a long way from the card you just
+                clicked — on a phone it is off screen entirely. The way back
+                belongs where the click happened. */}
+            {picked ? (
+              <p className="chord-row-actions">
+                <button type="button" className="link-button" onClick={() => setHighlight(null)}>
+                  Hervorhebung aufheben
+                </button>
+              </p>
+            ) : null}
           </section>
 
           <ProgressionPanel

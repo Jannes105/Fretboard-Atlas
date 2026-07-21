@@ -45,8 +45,17 @@
   outline: none;
 }
 
+/* The border alone cannot carry focus here: a selected grip already has an
+   accent border, so focus would land on it invisibly. */
+.voicing-button:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
 /* The diagram itself is the play control, so the grip switch is plain text. */
 .voicing-switch {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
   margin-top: 0.15rem;
   padding: 0.15rem 0.3rem;
   border: none;
@@ -109,6 +118,11 @@
 .voicing-option:focus-visible {
   border-color: var(--accent);
   outline: none;
+}
+
+/* Same reason as .voicing-button: .is-selected below is already accent-bordered. */
+.voicing-option:focus-visible {
+  box-shadow: var(--focus-ring);
 }
 
 .voicing-option.is-selected {

@@ -103,6 +103,10 @@
   --radius-lg: 10px;
   --radius-round: 999px;
 
+  /* One fingertip. Every hit area reaches this, on every device — a hand on a
+     mouse is not a precise hand either. */
+  --tap: 2.75rem;
+
   /* Stood in the code six times, character for character. */
   --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
   /* Light needs a softer shadow than dark: the same black at 35% turns into a
@@ -194,12 +198,15 @@ body {
 .trigger {
   display: flex;
   align-items: center;
+  min-height: var(--tap);
   gap: 0.45rem;
   padding: 0.4rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--panel);
-  color: var(--text-muted);
+  /* The name is a word you act on, so it reads as text. Its current value, in
+     .trigger-value below, is the muted half of the pair. */
+  color: var(--text);
   font: inherit;
   font-size: var(--text-sm);
   white-space: nowrap;
@@ -212,7 +219,28 @@ body {
 .trigger:hover,
 .trigger.is-open {
   border-color: var(--text-muted);
-  color: var(--text);
+}
+
+/* The icon is what says WHAT opens, before the name is even read. */
+.trigger-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The name is the trigger's own word; the value is what it currently stands on. */
+.trigger-value {
+  color: var(--text-muted);
+}
+
+.trigger:hover .trigger-value,
+.trigger.is-open .trigger-value {
+  color: inherit;
 }
 
 /* The caret is what says "this opens". */
@@ -268,6 +296,7 @@ body {
 
 .tuning-strings select {
   width: 100%;
+  min-height: var(--tap);
   padding: 0.35rem 0.15rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -317,6 +346,7 @@ body {
 .field select,
 .select {
   width: 100%;
+  min-height: var(--tap);
   padding: 0.5rem 1.9rem 0.5rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -363,7 +393,6 @@ button:focus-visible {
 
 .field--inline select {
   width: auto;
-  padding-block: 0.35rem;
   font-size: var(--text-sm);
 }
 
@@ -415,13 +444,23 @@ button:focus-visible {
   color: var(--text-muted);
 }
 
-/* Invisible, but it is the real control: full size, so it takes every click and
-   stays reachable by keyboard and screen reader. */
+/*
+ * Invisible, but it is the real control: it takes every click and stays reachable
+ * by keyboard and screen reader.
+ *
+ * Taller than the text it sits on, when the text alone would fall short of a
+ * fingertip — a single letter like "A" draws a 34px line. It bleeds evenly above
+ * and below, so the dashed underline stays hugging the word while the target
+ * around it reaches --tap. Only vertically: the row beside it is another select,
+ * and a horizontal bleed would start swallowing its clicks.
+ */
 .key-select select {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
   width: 100%;
-  height: 100%;
+  height: max(100%, var(--tap));
   border: 0;
   padding: 0;
   opacity: 0;
@@ -473,12 +512,34 @@ button:focus-visible {
  * position beside it instead of standing alongside it, and a checkbox among
  * dropdowns broke the row's rhythm.
  */
+/*
+ * Reaches a fingertip without growing to one. A transparent --tap box centred on
+ * the control, for a badge that sits ON something else — a real 44px square there
+ * would cover the very card it belongs to.
+ *
+ * Everything else in the app hits --tap by simply being that big; this is the one
+ * exception, not a second way of doing it.
+ */
+.tap-target {
+  position: relative;
+}
+
+.tap-target::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--tap);
+  height: var(--tap);
+  transform: translate(-50%, -50%);
+}
+
 .icon-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.9rem;
-  height: 1.9rem;
+  width: var(--tap);
+  height: var(--tap);
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -506,13 +567,6 @@ button:focus-visible {
   color: var(--text);
 }
 
-/* Pressed means the crop is off and the whole neck is on screen. */
-.icon-toggle.is-on {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent-text);
-}
-
 /*
  * Two mutually exclusive options, both on show. A dropdown would hide one of them
  * behind a click for no gain.
@@ -526,7 +580,10 @@ button:focus-visible {
 }
 
 .segmented button {
-  padding: 0.25rem 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 0.9rem;
   border: none;
   border-radius: var(--radius-sm);
   background: none;
@@ -561,8 +618,8 @@ button:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: var(--tap);
+  height: var(--tap);
   padding: 0;
   padding-left: 0.12rem; /* optically centres the triangle */
   border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
@@ -583,12 +640,6 @@ button:focus-visible {
 
 .play-button:active {
   transform: scale(0.92);
-}
-
-.play-button--small {
-  width: 1.6rem;
-  height: 1.6rem;
-  font-size: var(--text-2xs);
 }
 
 /* Stop reads as a filled, active control rather than another play triangle. */
@@ -639,20 +690,18 @@ button:focus-visible {
 .toggle {
   display: flex;
   align-items: center;
+  min-height: var(--tap);
   gap: 0.4rem;
   font-size: var(--text-sm);
   cursor: pointer;
 }
 
 .toggle input {
+  /* The label is the real target; the box only has to be aimable. */
+  width: 1.15rem;
+  height: 1.15rem;
   accent-color: var(--accent);
   cursor: pointer;
-}
-
-.transport-note {
-  margin-left: auto;
-  font-size: var(--text-xs);
-  color: var(--text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -677,7 +726,9 @@ button:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 0.1rem;
+  justify-content: center;
   min-width: 2.6rem;
+  min-height: var(--tap);
   padding: 0.3rem 0.45rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -775,6 +826,9 @@ button:focus-visible {
 }
 
 .link-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
   padding: 0;
   border: none;
   background: none;
@@ -800,23 +854,29 @@ button:focus-visible {
   padding: 0;
 }
 
+/* The second way out of a highlight, next to the cards that start one. */
+.chord-row-actions {
+  margin: 0.6rem 0 0;
+}
+
 /* Holds the card plus its "add to progression" badge. */
 .chord-slot {
   position: relative;
   display: flex;
 }
 
-/* Only shown while a self-built progression is open — the card itself still
-   means "hear it and show it on the neck". */
+/* The card itself means "hear it and show it on the neck"; the badge appends. */
 .chord-add {
   position: absolute;
-  top: -0.4rem;
-  right: -0.4rem;
+  /* Further into the gutter than it needs to be, so more of its invisible
+     fingertip box (see .tap-target) lands beside the card rather than on it. */
+  top: -0.6rem;
+  right: -0.6rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.75rem;
+  height: 1.75rem;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
   border-radius: var(--radius-round);
@@ -915,9 +975,6 @@ button:focus-visible {
     gap: 0.5rem;
   }
 
-  /* A custom tuning's summary ("Eigene Stimmung (D-A-D-G-B-E) · 24 Bünde") is long;
-     cap the trigger and ellipsis it so it cannot push the header off-screen — the
-     full detail is in the panel anyway. */
   .setup {
     max-width: 62vw;
   }
@@ -926,10 +983,15 @@ button:focus-visible {
     max-width: 100%;
   }
 
-  .setup-trigger > span:first-child {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  /*
+   * Beside the title there is room for the name or the value, not both. The name
+   * wins: it is what you act on, and the value is one tap away inside the panel.
+   * The rhythm trigger sits in an already-wrapping row and gives up its value for
+   * the same reason.
+   */
+  .setup-trigger .trigger-value,
+  .rhythm-trigger .trigger-value {
+    display: none;
   }
 
   /* Right-anchored it would hang off the edge; the trigger is near the right rim.
@@ -944,6 +1006,18 @@ button:focus-visible {
     min-width: 0;
     padding-inline: 0.1rem;
     font-size: var(--text-xs);
+  }
+
+  /* Five controls in one row is one too many for a phone. The slider takes
+     whatever is left beside ▶ rather than a full line of its own — forcing the
+     break left ▶ alone on a line with 270px of nothing next to it. */
+  .transport {
+    gap: 0.7rem 0.9rem;
+  }
+
+  .tempo {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .panel {

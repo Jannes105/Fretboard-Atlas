@@ -122,6 +122,21 @@ describe('App — Eigene Akkordfolge', () => {
     expect(chipSymbols(container)).toEqual(['A', 'E', 'F#m', 'D']);
   });
 
+  it('hängt einen Akkord auch aus einer Vorlage heraus an und macht daraus die eigene Folge', async () => {
+    // Vorher war das „+“ unsichtbar, bis man „Eigene Folge“ unten im Dropdown
+    // gefunden hatte — eine Hürde vor genau der Funktion, für die es da ist.
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    expect(container.querySelectorAll('.chord-add')).toHaveLength(7);
+
+    // Die dritte Karte ist iii = C#m.
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-add')[2]);
+
+    expect(chipSymbols(container)).toEqual(['A', 'E', 'F#m', 'D', 'C#m']);
+    expect(window.location.search).toContain('prog=custom');
+  });
+
   it('hängt einen getippten Powerchord an und normalisiert seine Schreibung', async () => {
     const user = userEvent.setup();
     window.history.replaceState(null, '', '/?prog=custom:C,G');
@@ -247,7 +262,7 @@ describe('App — Einstellungen', () => {
     window.history.replaceState(null, '', '/?tuning=drop-d&capo=3&frets=12');
     const { container } = render(<App />);
 
-    expect(container.querySelector('.setup-trigger span')?.textContent).toBe(
+    expect(container.querySelector('.setup-trigger .trigger-value')?.textContent).toBe(
       'Drop D · Kapo 3. Bund · 12 Bünde',
     );
   });
@@ -255,7 +270,7 @@ describe('App — Einstellungen', () => {
   it('schweigt über den Kapo, solange keiner drauf ist — der Normalfall ist keine Meldung wert', () => {
     const { container } = render(<App />);
 
-    expect(container.querySelector('.setup-trigger span')?.textContent).toBe(
+    expect(container.querySelector('.setup-trigger .trigger-value')?.textContent).toBe(
       'Standard · 24 Bünde',
     );
   });
@@ -357,6 +372,67 @@ describe('App — Tonlänge', () => {
   });
 });
 
+describe('App — Klick', () => {
+  it('stellt den Klick zu Tempo und Wiederholen, statt ihn im Rhythmus zu vergraben', async () => {
+    // Ein Metronom sucht keiner hinter „4/4 · Viertel“.
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    expect(container.querySelector('.transport [aria-label="Klick"]')).not.toBeNull();
+
+    await user.click(container.querySelector<HTMLButtonElement>('.rhythm-trigger')!);
+    expect(container.querySelector('.rhythm-panel [aria-label="Klick"]')).toBeNull();
+  });
+
+  it('gibt den gewählten Klick an den Transport weiter', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.selectOptions(
+      container.querySelector<HTMLSelectElement>('[aria-label="Klick"]')!,
+      'metronome',
+    );
+    expect(window.location.search).toContain('click=metronome');
+
+    const transport = [...container.querySelectorAll<HTMLButtonElement>('.play-button')].find(
+      (button) => /Akkordfolge/.test(button.getAttribute('aria-label') ?? ''),
+    )!;
+    await user.click(transport);
+
+    expect(player.startProgression.mock.calls.at(-1)?.[1]?.click).toBe('metronome');
+  });
+});
+
+describe('App — Auslöser', () => {
+  it('nennt den Einstellungs-Auslöser beim Namen, ohne den Wert zu verstecken', () => {
+    // „Standard · 24 Bünde“ allein verrät nie, dass hell/dunkel dahinter liegt.
+    const { container } = render(<App />);
+    const trigger = container.querySelector('.setup-trigger')!;
+
+    expect(trigger.textContent).toContain('Instrument');
+    expect(trigger.textContent).toContain('Standard · 24 Bünde');
+  });
+
+  it('nennt auch den Rhythmus-Auslöser beim Namen', () => {
+    const { container } = render(<App />);
+    const trigger = container.querySelector('.rhythm-trigger')!;
+
+    expect(trigger.textContent).toContain('Rhythmus');
+    expect(trigger.textContent).toContain('4/4');
+  });
+
+  it('gibt den beiden ▶ unterscheidbare Beschriftungen', () => {
+    const { container } = render(<App />);
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>('.play-button')];
+
+    // Gleiches Dreieck, verschiedene Aufgabe — der Unterschied muss aus der
+    // Beschriftung kommen, nicht aus der Position auf der Seite.
+    const labels = buttons.map((b) => b.getAttribute('aria-label'));
+    expect(new Set(labels).size).toBe(buttons.length);
+    expect(buttons.every((b) => (b.title ?? '') !== '')).toBe(true);
+  });
+});
+
 describe('App — Hervorhebung', () => {
   it('hebt beim Klick auf einen Stufen-Chip genau diese Tonklasse hervor', async () => {
     const user = userEvent.setup();
@@ -417,6 +493,45 @@ describe('App — Hervorhebung', () => {
     expect(card.getAttribute('aria-pressed')).toBe('true');
     expect(player.play).toHaveBeenCalledTimes(2);
   });
+
+  it('hebt die Hervorhebung mit Escape auf', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[3]);
+    expect(container.querySelectorAll('.note-dot--picked').length).toBeGreaterThan(0);
+
+    await user.keyboard('{Escape}');
+    expect(container.querySelectorAll('.note-dot--picked')).toHaveLength(0);
+  });
+
+  it('bietet das Aufheben auch unten bei den Akkordkarten an, nicht nur über dem Hals', async () => {
+    // Der Link über dem Hals ist vom Klick auf eine Karte weit weg — auf dem
+    // Handy steht er außerhalb des Bildes.
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    expect(container.querySelector('.chord-row-actions')).toBeNull();
+
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[3]);
+    await user.click(container.querySelector<HTMLButtonElement>('.chord-row-actions .link-button')!);
+
+    expect(container.querySelectorAll('.note-dot--picked')).toHaveLength(0);
+  });
+
+  it('lässt Escape bei offenem Setup nur das Panel schließen, die Hervorhebung bleibt', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.degree-chip')[2]);
+    await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
+
+    await user.keyboard('{Escape}');
+
+    // Ein Escape, eine Wirkung: das Panel geht zu, der Hals bleibt wie er war.
+    expect(container.querySelectorAll('.setup-panel')).toHaveLength(0);
+    expect(container.querySelectorAll('.note-dot--picked').length).toBeGreaterThan(0);
+  });
 });
 
 describe('App — Klick = hören', () => {
@@ -469,6 +584,24 @@ describe('App — Lage', () => {
     // nicht alle.
     expect(dimmed).toBeGreaterThan(0);
     expect(dimmed).toBeLessThan(all);
+  });
+
+  it('sagt am Lupen-Knopf, was der nächste Klick tut, statt immer dasselbe zu behaupten', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.selectOptions(container.querySelector<HTMLSelectElement>('[aria-label="Lage"]')!, '1');
+
+    // Frisch gewählt ist die Lage beschnitten, der Knopf bietet also den ganzen Hals an.
+    const zoom = () => container.querySelector<HTMLButtonElement>('.icon-toggle')!;
+    expect(zoom().title).toBe('Ganzen Hals zeigen');
+
+    await user.click(zoom());
+
+    // Jetzt liegt der ganze Hals offen — und der Knopf bietet den Weg zurück an,
+    // statt weiter zu versprechen, was schon zu sehen ist.
+    expect(zoom().title).toBe('Nur die Lage zeigen');
+    expect(zoom().getAttribute('aria-label')).toBe('Nur die Lage zeigen');
   });
 });
 

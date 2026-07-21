@@ -11,6 +11,17 @@ import { ProgressionBuilder } from './ProgressionBuilder';
 import { ProgressionChord } from './ProgressionChord';
 import { RhythmControls } from './RhythmControls';
 
+/**
+ * The click track. 'Einzähler' counts you in and then leaves you to the guitar;
+ * 'Metronom' keeps going. Both count in, because a click that starts on the same
+ * beat as the music gives you nothing to come in on.
+ */
+const CLICKS: readonly { value: ClickMode; label: string }[] = [
+  { value: 'off', label: 'aus' },
+  { value: 'countIn', label: 'Einzähler' },
+  { value: 'metronome', label: 'Metronom' },
+];
+
 interface ProgressionPanelProps {
   /** The presets that fit this key, plus "Eigene Folge". */
   progressions: readonly Progression[];
@@ -124,6 +135,8 @@ export function ProgressionPanel({
           className={isPlaying ? 'play-button is-playing' : 'play-button'}
           onClick={onToggleTransport}
           aria-label={isPlaying ? 'Akkordfolge stoppen' : 'Akkordfolge abspielen'}
+          // The scale has a ▶ too. On hover the two say which is which.
+          title={isPlaying ? 'Akkordfolge stoppen' : 'Akkordfolge abspielen'}
         >
           {isPlaying ? '■' : '▶'}
         </button>
@@ -153,17 +166,33 @@ export function ProgressionPanel({
           <span>Wiederholen</span>
         </label>
 
+        {/* Out here rather than behind the rhythm trigger: you reach for the
+            metronome while practising, not once at setup — and nobody looks for
+            it under a time signature. */}
+        <label className="field field--inline">
+          <span>Klick</span>
+          <select
+            aria-label="Klick"
+            value={click}
+            onChange={(e) => onClickChange(e.target.value as ClickMode)}
+          >
+            {CLICKS.map((entry) => (
+              <option key={entry.value} value={entry.value}>
+                {entry.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <RhythmControls
           beatsPerBar={beatsPerBar}
           rhythm={rhythm}
           strum={strum}
           sustain={sustain}
-          click={click}
           onBeatsPerBarChange={onBeatsPerBarChange}
           onRhythmChange={onRhythmChange}
           onStrumChange={onStrumChange}
           onSustainChange={onSustainChange}
-          onClickChange={onClickChange}
         />
       </div>
 

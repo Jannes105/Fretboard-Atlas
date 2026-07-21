@@ -2,19 +2,20 @@
   overflow-x: auto;
   width: 100%;
   padding-bottom: 0.5rem;
+}
 
-  /*
-   * Fades the neck out on the RIGHT, where it continues off-screen. Not on the
-   * left: that edge holds the nut and the string names, and a fade there simply
-   * ate them.
-   */
+/*
+ * Fades the neck out on the RIGHT, and only while neck is actually left to see:
+ * an edge that keeps fading once you have scrolled all the way right promises
+ * more that is not there. Never on the left — that edge holds the nut and the
+ * string names, and a fade there simply ate them.
+ */
+.fretboard-scroll--more {
   mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
 }
 
-/* A cropped box does not continue off-screen, so a fade there would just dim its
-   last fret for no reason. */
-.fretboard-scroll--zoomed {
-  mask-image: none;
+.fretboard-hint {
+  margin-top: 0.35rem;
 }
 
 /* The browser's default scrollbar is a slab; this one belongs to the design. */

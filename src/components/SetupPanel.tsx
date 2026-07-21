@@ -27,9 +27,15 @@ interface SetupPanelProps {
 /**
  * The instrument itself — tuning, capo, fret count, voice — plus how the page is
  * lit. All of it is set once and then left alone, so it lives behind a trigger
- * that spells out its value rather than five dropdowns competing with the key for
- * attention. The theme is not the instrument, but it shares that "set and forget"
- * character, and it has nowhere better to live.
+ * rather than five dropdowns competing with the key for attention. The theme is
+ * not the instrument, but it shares that "set and forget" character, and it has
+ * nowhere better to live.
+ *
+ * The trigger carries a NAME as well as its value. The value alone read as
+ * "Standard · 24 Bünde", which tells you what the tuning is but never that the
+ * light/dark switch is in there — nobody goes looking for it under a tuning. On a
+ * phone there is no room for both and the value is what gives way: a name you can
+ * act on beats a value you already chose.
  */
 export function SetupPanel({
   tuning,
@@ -84,7 +90,12 @@ export function SetupPanel({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <span>{summary}</span>
+        <svg className="trigger-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="2.4" />
+          <path d="M8 1.6v1.8M8 12.6v1.8M14.4 8h-1.8M3.4 8H1.6M12.5 3.5l-1.3 1.3M4.8 11.2l-1.3 1.3M12.5 12.5l-1.3-1.3M4.8 4.8 3.5 3.5" />
+        </svg>
+        Instrument &amp; Darstellung
+        <span className="trigger-value">{summary}</span>
         <span className="trigger-caret" aria-hidden="true">
           ▾
         </span>

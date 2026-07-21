@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  type ClickMode,
   type NoteLength,
   PATTERN_PRESETS,
   serializePattern,
@@ -14,12 +13,10 @@ interface RhythmControlsProps {
   rhythm: string;
   strum: StrumStyle;
   sustain: NoteLength;
-  click: ClickMode;
   onBeatsPerBarChange: (beatsPerBar: number) => void;
   onRhythmChange: (rhythm: string) => void;
   onStrumChange: (strum: StrumStyle) => void;
   onSustainChange: (sustain: NoteLength) => void;
-  onClickChange: (click: ClickMode) => void;
 }
 
 /**
@@ -38,17 +35,6 @@ const STRUMS: readonly { value: StrumStyle; label: string }[] = [
  * How long a note lasts. Sits directly under the playing style because the two are
  * one decision about the strumming hand: what it does, and whether it lets go.
  */
-/**
- * The click track. 'Einzaehler' counts you in and then leaves you to the guitar;
- * 'Metronom' keeps going. Both count in, because a click that starts on the same
- * beat as the music gives you nothing to come in on.
- */
-const CLICKS: readonly { value: ClickMode; label: string }[] = [
-  { value: 'off', label: 'aus' },
-  { value: 'countIn', label: 'Einzähler' },
-  { value: 'metronome', label: 'Metronom' },
-];
-
 const LENGTHS: readonly { value: NoteLength; label: string }[] = [
   { value: 'ring', label: 'ausklingen' },
   { value: 'stopped', label: 'abgestoppt' },
@@ -71,20 +57,23 @@ function patternName(rhythm: string, beatsPerBar: number): string {
 
 /**
  * Time signature and strum pattern: set once, then left alone — so they sit behind
- * one trigger that spells out their value ("4/4 · Viertel") instead of taking two
- * permanent rows next to the transport. Same idiom as the setup panel.
+ * one trigger instead of taking two permanent rows next to the transport. Same
+ * idiom as the setup panel, down to the name in front of the value: "4/4 · Viertel"
+ * alone never suggested a strum pattern editor was behind it.
+ *
+ * The click track used to live in here and no longer does. It is not set-and-forget
+ * — you reach for the metronome mid-practice — and nobody goes hunting for it
+ * behind a time signature. It sits in the transport row now, with tempo and loop.
  */
 export function RhythmControls({
   beatsPerBar,
   rhythm,
   strum,
   sustain,
-  click,
   onBeatsPerBarChange,
   onRhythmChange,
   onStrumChange,
   onSustainChange,
-  onClickChange,
 }: RhythmControlsProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -117,8 +106,13 @@ export function RhythmControls({
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
+        {/* Two strokes, down and up — the same language the pattern grid speaks. */}
+        <svg className="trigger-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d="M5 2v10M2.6 9.6 5 12.4l2.4-2.8M11 14V4M8.6 6.4 11 3.6l2.4 2.8" />
+        </svg>
+        Rhythmus
         {/* Naming the pattern would be a lie under an arpeggio, which has none. */}
-        <span>
+        <span className="trigger-value">
           {meter} · {strum === 'arpeggio' ? 'Arpeggio' : patternName(rhythm, beatsPerBar)}
         </span>
         <span className="trigger-caret" aria-hidden="true">
@@ -166,21 +160,6 @@ export function RhythmControls({
               onChange={(event) => onSustainChange(event.target.value as NoteLength)}
             >
               {LENGTHS.map((entry) => (
-                <option key={entry.value} value={entry.value}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field field--inline">
-            <span>Klick</span>
-            <select
-              aria-label="Klick"
-              value={click}
-              onChange={(event) => onClickChange(event.target.value as ClickMode)}
-            >
-              {CLICKS.map((entry) => (
                 <option key={entry.value} value={entry.value}>
                   {entry.label}
                 </option>

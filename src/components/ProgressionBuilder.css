@@ -7,7 +7,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
-  min-height: 2.2rem;
+  /* Matches a full chip, so an empty sequence does not look shrunken. */
+  min-height: var(--tap);
   margin-bottom: 0.7rem;
   padding: 0.5rem 0.6rem;
   border: 1px dashed var(--border);
@@ -23,8 +24,9 @@
 .builder-chip {
   display: inline-flex;
   align-items: center;
+  min-height: var(--tap);
   gap: 0.3rem;
-  padding: 0.25rem 0.3rem 0.25rem 0.55rem;
+  padding: 0 0.2rem 0 0.7rem;
   border-radius: var(--radius-round);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--text);
@@ -34,7 +36,10 @@
 
 /* The bar count — click to cycle 1×→2×→3×→4×. Muted so a plain 1× is quiet. */
 .builder-bars {
-  padding: 0.05rem 0.3rem;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 0.55rem;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
   border-radius: var(--radius-round);
   background: transparent;
@@ -54,8 +59,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.2rem;
-  height: 1.2rem;
+  width: var(--tap);
+  height: var(--tap);
   padding: 0;
   border: 0;
   border-radius: var(--radius-round);
@@ -73,7 +78,8 @@
 
 .builder-clear {
   margin-left: auto;
-  padding: 0.2rem 0.5rem;
+  min-height: var(--tap);
+  padding: 0.2rem 0.6rem;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -143,6 +149,7 @@
 
 .builder-type input {
   width: 8.5rem;
+  min-height: var(--tap);
   padding: 0.4rem 0.55rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -159,7 +166,8 @@
 }
 
 .builder-type-add {
-  padding: 0.4rem 0.7rem;
+  min-height: var(--tap);
+  padding: 0.4rem 0.9rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--panel);

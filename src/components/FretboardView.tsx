@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CagedPlacement, Fretboard, Scale, ScalePosition } from '../theory';
 import {
   DOT_RADIUS,
@@ -129,293 +129,333 @@ export function FretboardView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [positionNumber, cropped, width]);
 
+  /**
+   * Whether there is neck to the right of what is on screen. The fading edge and
+   * the swipe hint hang off this rather than being always-on: an edge that fades
+   * even when you have scrolled all the way right promises more that is not there.
+   */
+  const [overflows, setOverflows] = useState(false);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    // jsdom has no layout — scrollWidth is 0, so this stays false and the hint
+    // simply says less. Same caution as the scroll effect above.
+    if (!el) return;
+
+    const measure = () => setOverflows(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    measure();
+
+    el.addEventListener('scroll', measure, { passive: true });
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(el);
+
+    return () => {
+      el.removeEventListener('scroll', measure);
+      observer?.disconnect();
+    };
+  }, [width, cropped, fretCount]);
+
   return (
-    <div
-      ref={scrollRef}
-      className={cropped ? 'fretboard-scroll fretboard-scroll--zoomed' : 'fretboard-scroll'}
-    >
-      <svg
-        className={onPlayNote ? 'fretboard fretboard--playable' : 'fretboard'}
-        viewBox={layout.viewBox}
-        // Tie the minimum width to what is actually shown, not to the fret count:
-        // a 12-fret neck then fits a phone where a 24-fret one cannot, and a
-        // cropped box is not stretched to the width of a neck it does not show.
-        style={{ minWidth: `${(layout.visibleFrets + 2) * 42}px` }}
-        role="img"
-        aria-label={`Griffbrett: ${described.join(', ')}`}
+    <>
+      <div
+        ref={scrollRef}
+        className={overflows ? 'fretboard-scroll fretboard-scroll--more' : 'fretboard-scroll'}
       >
-        <defs>
-          {/* Hints at the curvature of the board without pretending to be wood. */}
-          <linearGradient id="board-face" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--board-top)" />
-            <stop offset="45%" stopColor="var(--board)" />
-            <stop offset="100%" stopColor="var(--board-edge)" />
-          </linearGradient>
+        <svg
+          className={onPlayNote ? 'fretboard fretboard--playable' : 'fretboard'}
+          viewBox={layout.viewBox}
+          // Tie the minimum width to what is actually shown, not to the fret count:
+          // a 12-fret neck then fits a phone where a 24-fret one cannot, and a
+          // cropped box is not stretched to the width of a neck it does not show.
+          style={{ minWidth: `${(layout.visibleFrets + 2) * 42}px` }}
+          role="img"
+          aria-label={`Griffbrett: ${described.join(', ')}`}
+        >
+          <defs>
+            {/* Hints at the curvature of the board without pretending to be wood. */}
+            <linearGradient id="board-face" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--board-top)" />
+              <stop offset="45%" stopColor="var(--board)" />
+              <stop offset="100%" stopColor="var(--board-edge)" />
+            </linearGradient>
 
-          {/*
-           * Keeps the neck off the left margin. A crop reserves a gutter there for
-           * the string names, and that gutter sits INSIDE the view — so without
-           * this, dots and fret numbers from a fret just outside the box would be
-           * drawn over the names. Full height, so the fret numbers under the board
-           * survive.
-           */}
-          <clipPath id="board-window">
-            <rect x={boardLeft} y={0} width={width - boardLeft} height={layout.height} />
-          </clipPath>
-        </defs>
+            {/*
+             * Keeps the neck off the left margin. A crop reserves a gutter there for
+             * the string names, and that gutter sits INSIDE the view — so without
+             * this, dots and fret numbers from a fret just outside the box would be
+             * drawn over the names. Full height, so the fret numbers under the board
+             * survive.
+             */}
+            <clipPath id="board-window">
+              <rect x={boardLeft} y={0} width={width - boardLeft} height={layout.height} />
+            </clipPath>
+          </defs>
 
-        <g clipPath="url(#board-window)">
-          {/* The board itself. Everything below is drawn on top of it. */}
-          <rect
-            className="board"
-            x={boardLeft}
-            y={boardTop}
-            width={width - boardLeft - 8}
-            height={boardFoot - boardTop}
-            rx={6}
-          />
-
-          {/* Inlays sit in the wood, under the strings. */}
-          {inlays.map(({ fret, double }) =>
-            double ? (
-              <g key={fret}>
-                <circle
-                  className="inlay"
-                  cx={fretCenterX(fret)}
-                  cy={inlayY - DOUBLE_INLAY_OFFSET}
-                  r={6}
-                />
-                <circle
-                  className="inlay"
-                  cx={fretCenterX(fret)}
-                  cy={inlayY + DOUBLE_INLAY_OFFSET}
-                  r={6}
-                />
-              </g>
-            ) : (
-              <circle key={fret} className="inlay" cx={fretCenterX(fret)} cy={inlayY} r={6} />
-            ),
-          )}
-
-          {/* Fret wires — light metal on dark wood, the way a neck actually looks. */}
-          {Array.from({ length: fretCount }, (_, i) => i + 1).map((fret) => (
-            <line
-              key={fret}
-              className="fret-wire"
-              x1={NUT_X + fret * FRET_WIDTH}
-              y1={boardTop + 4}
-              x2={NUT_X + fret * FRET_WIDTH}
-              y2={boardFoot - 4}
-            />
-          ))}
-
-          {/* The nut: bone, and thicker than any fret. */}
-          <line className="nut" x1={NUT_X} y1={boardTop + 2} x2={NUT_X} y2={boardFoot - 2} />
-
-          {/* Strings — the low ones are drawn thicker, as they are. */}
-          {Array.from({ length: stringCount }, (_, stringIndex) => (
-            <line
-              key={stringIndex}
-              className="string"
-              x1={boardLeft}
-              y1={stringY(stringIndex, stringCount)}
-              x2={width - 8}
-              y2={stringY(stringIndex, stringCount)}
-              strokeWidth={3.2 - stringIndex * 0.35}
-            />
-          ))}
-
-          {/* Everything behind the capo is out of reach. */}
-          {capo > 0 ? (
-            <>
-              <rect
-                className="capo-dead-zone"
-                x={boardLeft}
-                y={boardTop}
-                width={capoX - boardLeft}
-                height={boardFoot - boardTop}
-                rx={6}
-              />
-              <line className="capo" x1={capoX} y1={boardTop - 3} x2={capoX} y2={boardFoot + 3} />
-            </>
-          ) : null}
-
-          {/*
-           * Outline of the selected box, so it reads as one hand shape — but only
-           * when the whole neck is on screen and the box needs locating among
-           * twenty-four frets. Cropped, the visible area already IS the box, and
-           * the one dimmed fret of air at each edge marks where it ends. A frame
-           * there would state a third time what the crop and the dimming say.
-           */}
-          {position && !cropped ? (
+          <g clipPath="url(#board-window)">
+            {/* The board itself. Everything below is drawn on top of it. */}
             <rect
-              className="box-outline"
-              x={NUT_X + (position.startFret - 1) * FRET_WIDTH}
-              y={boardTop + 3}
-              width={(position.endFret - position.startFret + 1) * FRET_WIDTH}
-              height={boardFoot - boardTop - 6}
-              rx={7}
+              className="board"
+              x={boardLeft}
+              y={boardTop}
+              width={width - boardLeft - 8}
+              height={boardFoot - boardTop}
+              rx={6}
             />
-          ) : null}
+
+            {/* Inlays sit in the wood, under the strings. */}
+            {inlays.map(({ fret, double }) =>
+              double ? (
+                <g key={fret}>
+                  <circle
+                    className="inlay"
+                    cx={fretCenterX(fret)}
+                    cy={inlayY - DOUBLE_INLAY_OFFSET}
+                    r={6}
+                  />
+                  <circle
+                    className="inlay"
+                    cx={fretCenterX(fret)}
+                    cy={inlayY + DOUBLE_INLAY_OFFSET}
+                    r={6}
+                  />
+                </g>
+              ) : (
+                <circle key={fret} className="inlay" cx={fretCenterX(fret)} cy={inlayY} r={6} />
+              ),
+            )}
+
+            {/* Fret wires — light metal on dark wood, the way a neck actually looks. */}
+            {Array.from({ length: fretCount }, (_, i) => i + 1).map((fret) => (
+              <line
+                key={fret}
+                className="fret-wire"
+                x1={NUT_X + fret * FRET_WIDTH}
+                y1={boardTop + 4}
+                x2={NUT_X + fret * FRET_WIDTH}
+                y2={boardFoot - 4}
+              />
+            ))}
+
+            {/* The nut: bone, and thicker than any fret. */}
+            <line className="nut" x1={NUT_X} y1={boardTop + 2} x2={NUT_X} y2={boardFoot - 2} />
+
+            {/* Strings — the low ones are drawn thicker, as they are. */}
+            {Array.from({ length: stringCount }, (_, stringIndex) => (
+              <line
+                key={stringIndex}
+                className="string"
+                x1={boardLeft}
+                y1={stringY(stringIndex, stringCount)}
+                x2={width - 8}
+                y2={stringY(stringIndex, stringCount)}
+                strokeWidth={3.2 - stringIndex * 0.35}
+              />
+            ))}
+
+            {/* Everything behind the capo is out of reach. */}
+            {capo > 0 ? (
+              <>
+                <rect
+                  className="capo-dead-zone"
+                  x={boardLeft}
+                  y={boardTop}
+                  width={capoX - boardLeft}
+                  height={boardFoot - boardTop}
+                  rx={6}
+                />
+                <line className="capo" x1={capoX} y1={boardTop - 3} x2={capoX} y2={boardFoot + 3} />
+              </>
+            ) : null}
+
+            {/*
+             * Outline of the selected box, so it reads as one hand shape — but only
+             * when the whole neck is on screen and the box needs locating among
+             * twenty-four frets. Cropped, the visible area already IS the box, and
+             * the one dimmed fret of air at each edge marks where it ends. A frame
+             * there would state a third time what the crop and the dimming say.
+             */}
+            {position && !cropped ? (
+              <rect
+                className="box-outline"
+                x={NUT_X + (position.startFret - 1) * FRET_WIDTH}
+                y={boardTop + 3}
+                width={(position.endFret - position.startFret + 1) * FRET_WIDTH}
+                height={boardFoot - boardTop - 6}
+                rx={7}
+              />
+            ) : null}
+
+            {/*
+             * The CAGED form has no frame of its own. It used to get one, drawn like
+             * the box outline in the chord accent — but two rectangles crossing each
+             * other on one neck explain each other away: you see two frames and can
+             * read neither. The rings on the stopped notes say where the grip is, and
+             * they say it exactly, which a fret window only approximates.
+             */}
+
+            {/* Fret numbers, below the board. */}
+            {Array.from({ length: fretCount + 1 }, (_, fret) => fret).map((fret) => (
+              <text
+                key={fret}
+                className={fret < capo ? 'fret-number is-muted' : 'fret-number'}
+                x={numberX(fret)}
+                y={boardFoot + 24}
+                textAnchor="middle"
+              >
+                {fret}
+              </text>
+            ))}
+
+            {/* Scale notes. The root is bigger AND warmer — colour is never the only cue. */}
+            {notes.map((note) => {
+              const cx = noteX(note.fret);
+              const cy = stringY(note.stringIndex, stringCount);
+              const label = labelMode === 'note' ? note.note.name() : note.degree;
+
+              const outsideBox = !inBox(note.fret);
+              const isPicked = picked?.has(note.pitchClass) ?? false;
+              // The box is the stronger filter: a picked tone outside it still fades.
+              const dimmed = outsideBox || (picked !== null && !isPicked);
+
+              const classes = [
+                'note-dot',
+                note.isRoot ? 'note-dot--root' : '',
+                isPicked && !note.isRoot && !outsideBox ? 'note-dot--picked' : '',
+                dimmed ? 'is-dimmed' : '',
+              ]
+                .filter(Boolean)
+                .join(' ');
+
+              const isSounding = sounding?.has(positionKey(note)) ?? false;
+              // A scale dot the grip actually stops — where the shape and the scale
+              // are the same note under the same finger.
+              const isCagedTone = caged?.frets[note.stringIndex] === note.fret;
+
+              return (
+                <g
+                  key={positionKey(note)}
+                  className="note"
+                  onClick={onPlayNote ? () => onPlayNote(note.midi) : undefined}
+                >
+                  {/* A title makes the pitch discoverable on hover and to a screen reader. */}
+                  {onPlayNote ? <title>{`${note.note.name()} — anhören`}</title> : null}
+                  {/*
+                   * The marker, as its own ring UNDER the dot rather than a class on
+                   * it: the dot already carries a root/picked/dimmed cascade, and a
+                   * fourth state fighting that would be a colour puzzle. Drawn first,
+                   * so the dot stays legible on top of it.
+                   */}
+                  {isSounding ? (
+                    <circle
+                      className="note-halo"
+                      cx={cx}
+                      cy={cy}
+                      r={(note.isRoot ? ROOT_RADIUS : DOT_RADIUS) + 7}
+                    />
+                  ) : null}
+                  {/* Also a ring, and also under the dot — same reasoning as the
+                      marker, and the two can legitimately coincide. */}
+                  {isCagedTone ? (
+                    <circle
+                      // Fades with the note it marks. A full-strength ring around a
+                      // dot at 14% opacity reads as a rendering fault, and the grip
+                      // reaches outside the box often enough for that to show.
+                      className={dimmed ? 'note-caged is-dimmed' : 'note-caged'}
+                      cx={cx}
+                      cy={cy}
+                      r={(note.isRoot ? ROOT_RADIUS : DOT_RADIUS) + 4}
+                    />
+                  ) : null}
+                  {/*
+                   * The tap target. A dot of r=13 renders around 19 CSS px on a
+                   * phone, well under a fingertip. A RECTANGLE rather than a bigger
+                   * circle: circles wide enough to help would overlap on adjacent
+                   * strings, and the note drawn last would steal its neighbour's
+                   * tap — a wrong-note bug that is miserable to track down. One
+                   * fret by one string spacing tiles the neck exactly.
+                   *
+                   * `fill` must be transparent, not none: an unpainted shape takes
+                   * no pointer events at all.
+                   */}
+                  {onPlayNote ? (
+                    <rect
+                      className="note-hit"
+                      x={cx - FRET_WIDTH / 2}
+                      y={cy - STRING_GAP / 2}
+                      width={FRET_WIDTH}
+                      height={STRING_GAP}
+                    />
+                  ) : null}
+                  <circle
+                    className={classes}
+                    cx={cx}
+                    cy={cy}
+                    r={note.isRoot ? ROOT_RADIUS : DOT_RADIUS}
+                  />
+                  <text
+                    className={[
+                      'note-label',
+                      note.isRoot ? 'note-label--root' : '',
+                      isPicked && !note.isRoot && !outsideBox ? 'note-label--picked' : '',
+                      dimmed ? 'is-dimmed' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    x={cx}
+                    y={cy}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                  >
+                    {label}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
 
           {/*
-           * The CAGED form has no frame of its own. It used to get one, drawn like
-           * the box outline in the chord accent — but two rectangles crossing each
-           * other on one neck explain each other away: you see two frames and can
-           * read neither. The rings on the stopped notes say where the grip is, and
-           * they say it exactly, which a fret window only approximates.
+           * Outside the clip, like the string names: it is an annotation above the
+           * board, not part of it. A crop that starts at or past the capo would
+           * otherwise slice the word in half, since it is centred on the bar. Nudged
+           * right where it would run off the left edge, so it stays readable.
            */}
-
-          {/* Fret numbers, below the board. */}
-          {Array.from({ length: fretCount + 1 }, (_, fret) => fret).map((fret) => (
+          {capo > 0 ? (
             <text
-              key={fret}
-              className={fret < capo ? 'fret-number is-muted' : 'fret-number'}
-              x={numberX(fret)}
-              y={boardFoot + 24}
+              className="capo-label"
+              x={Math.max(capoX, layout.labelX + 26)}
+              y={boardTop - 10}
               textAnchor="middle"
             >
-              {fret}
+              Kapo {capo}
+            </text>
+          ) : null}
+
+          {/* Outside the clip: the names live in the left margin, not on the wood. */}
+          {Array.from({ length: stringCount }, (_, stringIndex) => (
+            <text
+              key={stringIndex}
+              className="string-label"
+              x={layout.labelX}
+              y={stringY(stringIndex, stringCount)}
+              dominantBaseline="central"
+            >
+              {labels[stringIndex]}
             </text>
           ))}
+        </svg>
+      </div>
 
-          {/* Scale notes. The root is bigger AND warmer — colour is never the only cue. */}
-          {notes.map((note) => {
-            const cx = noteX(note.fret);
-            const cy = stringY(note.stringIndex, stringCount);
-            const label = labelMode === 'note' ? note.note.name() : note.degree;
-
-            const outsideBox = !inBox(note.fret);
-            const isPicked = picked?.has(note.pitchClass) ?? false;
-            // The box is the stronger filter: a picked tone outside it still fades.
-            const dimmed = outsideBox || (picked !== null && !isPicked);
-
-            const classes = [
-              'note-dot',
-              note.isRoot ? 'note-dot--root' : '',
-              isPicked && !note.isRoot && !outsideBox ? 'note-dot--picked' : '',
-              dimmed ? 'is-dimmed' : '',
-            ]
-              .filter(Boolean)
-              .join(' ');
-
-            const isSounding = sounding?.has(positionKey(note)) ?? false;
-            // A scale dot the grip actually stops — where the shape and the scale
-            // are the same note under the same finger.
-            const isCagedTone = caged?.frets[note.stringIndex] === note.fret;
-
-            return (
-              <g
-                key={positionKey(note)}
-                className="note"
-                onClick={onPlayNote ? () => onPlayNote(note.midi) : undefined}
-              >
-                {/* A title makes the pitch discoverable on hover and to a screen reader. */}
-                {onPlayNote ? <title>{`${note.note.name()} — anhören`}</title> : null}
-                {/*
-                 * The marker, as its own ring UNDER the dot rather than a class on
-                 * it: the dot already carries a root/picked/dimmed cascade, and a
-                 * fourth state fighting that would be a colour puzzle. Drawn first,
-                 * so the dot stays legible on top of it.
-                 */}
-                {isSounding ? (
-                  <circle
-                    className="note-halo"
-                    cx={cx}
-                    cy={cy}
-                    r={(note.isRoot ? ROOT_RADIUS : DOT_RADIUS) + 7}
-                  />
-                ) : null}
-                {/* Also a ring, and also under the dot — same reasoning as the
-                    marker, and the two can legitimately coincide. */}
-                {isCagedTone ? (
-                  <circle
-                    // Fades with the note it marks. A full-strength ring around a
-                    // dot at 14% opacity reads as a rendering fault, and the grip
-                    // reaches outside the box often enough for that to show.
-                    className={dimmed ? 'note-caged is-dimmed' : 'note-caged'}
-                    cx={cx}
-                    cy={cy}
-                    r={(note.isRoot ? ROOT_RADIUS : DOT_RADIUS) + 4}
-                  />
-                ) : null}
-                {/*
-                 * The tap target. A dot of r=13 renders around 19 CSS px on a
-                 * phone, well under a fingertip. A RECTANGLE rather than a bigger
-                 * circle: circles wide enough to help would overlap on adjacent
-                 * strings, and the note drawn last would steal its neighbour's
-                 * tap — a wrong-note bug that is miserable to track down. One
-                 * fret by one string spacing tiles the neck exactly.
-                 *
-                 * `fill` must be transparent, not none: an unpainted shape takes
-                 * no pointer events at all.
-                 */}
-                {onPlayNote ? (
-                  <rect
-                    className="note-hit"
-                    x={cx - FRET_WIDTH / 2}
-                    y={cy - STRING_GAP / 2}
-                    width={FRET_WIDTH}
-                    height={STRING_GAP}
-                  />
-                ) : null}
-                <circle
-                  className={classes}
-                  cx={cx}
-                  cy={cy}
-                  r={note.isRoot ? ROOT_RADIUS : DOT_RADIUS}
-                />
-                <text
-                  className={[
-                    'note-label',
-                    note.isRoot ? 'note-label--root' : '',
-                    isPicked && !note.isRoot && !outsideBox ? 'note-label--picked' : '',
-                    dimmed ? 'is-dimmed' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  x={cx}
-                  y={cy}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                >
-                  {label}
-                </text>
-              </g>
-            );
-          })}
-        </g>
-
-        {/*
-         * Outside the clip, like the string names: it is an annotation above the
-         * board, not part of it. A crop that starts at or past the capo would
-         * otherwise slice the word in half, since it is centred on the bar. Nudged
-         * right where it would run off the left edge, so it stays readable.
-         */}
-        {capo > 0 ? (
-          <text
-            className="capo-label"
-            x={Math.max(capoX, layout.labelX + 26)}
-            y={boardTop - 10}
-            textAnchor="middle"
-          >
-            Kapo {capo}
-          </text>
-        ) : null}
-
-        {/* Outside the clip: the names live in the left margin, not on the wood. */}
-        {Array.from({ length: stringCount }, (_, stringIndex) => (
-          <text
-            key={stringIndex}
-            className="string-label"
-            x={layout.labelX}
-            y={stringY(stringIndex, stringCount)}
-            dominantBaseline="central"
-          >
-            {labels[stringIndex]}
-          </text>
-        ))}
-      </svg>
-    </div>
+      {/*
+       * Tapping a dot sounds it — which the neck said only through a hover title,
+       * and a finger never hovers. One line, where the neck ends.
+       */}
+      {onPlayNote ? (
+        <p className="hint fretboard-hint">
+          Einen Ton antippen: du hörst ihn.
+          {overflows ? ' Der Hals geht rechts weiter — seitlich wischen.' : ''}
+        </p>
+      ) : null}
+    </>
   );
 }
