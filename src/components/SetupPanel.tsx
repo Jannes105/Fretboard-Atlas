@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Timbre } from '../audio';
-import type { ThemeChoice } from '../hooks/useTheme';
-import { pitchClassName, Tuning } from '../theory';
+import { pitchClassName, Tuning, withAccidentals } from '../theory';
 import { customTuningId, MAX_CAPO } from '../urlState';
 
 /** The twelve notes offered per string in the custom-tuning editor. */
@@ -16,26 +15,22 @@ interface SetupPanelProps {
   capo: number;
   fretCount: number;
   sound: Timbre;
-  theme: ThemeChoice;
   onTuningIdChange: (tuningId: string) => void;
   onCapoChange: (capo: number) => void;
   onFretCountChange: (fretCount: number) => void;
   onSoundChange: (sound: Timbre) => void;
-  onThemeChange: (theme: ThemeChoice) => void;
 }
 
 /**
- * The instrument itself — tuning, capo, fret count, voice — plus how the page is
- * lit. All of it is set once and then left alone, so it lives behind a trigger
- * rather than five dropdowns competing with the key for attention. The theme is
- * not the instrument, but it shares that "set and forget" character, and it has
- * nowhere better to live.
+ * The instrument itself — tuning, capo, fret count, voice. All of it is set once
+ * and then left alone, so it lives behind a trigger rather than four dropdowns
+ * competing with the key for attention.
  *
- * The trigger carries a NAME as well as its value. The value alone read as
- * "Standard · 24 Bünde", which tells you what the tuning is but never that the
- * light/dark switch is in there — nobody goes looking for it under a tuning. On a
- * phone there is no room for both and the value is what gives way: a name you can
- * act on beats a value you already chose.
+ * The light/dark switch used to be in here too, which is why the trigger was
+ * called "Instrument & Darstellung" and why this comment used to concede that the
+ * theme "has nowhere better to live". It does: the page foot. Everything in this
+ * drawer now describes the instrument and nothing describes the reader, so the
+ * trigger can simply say what it opens.
  */
 export function SetupPanel({
   tuning,
@@ -44,12 +39,10 @@ export function SetupPanel({
   capo,
   fretCount,
   sound,
-  theme,
   onTuningIdChange,
   onCapoChange,
   onFretCountChange,
   onSoundChange,
-  onThemeChange,
 }: SetupPanelProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -74,8 +67,14 @@ export function SetupPanel({
 
   // A custom tuning shows its notes; a preset just its name. A capo only earns a
   // mention when there is one — the normal case is no capo.
+  // A custom tuning spells its six strings out, and withAccidentals converts one
+  // name at a time — so it is applied per note token rather than to the sentence.
+  const tuningLabel = isCustomTuning
+    ? tuning.description.replace(/[A-G][#b]{1,2}/g, withAccidentals)
+    : tuning.name;
+
   const summary = [
-    isCustomTuning ? tuning.description : tuning.name,
+    tuningLabel,
     capo > 0 ? `Kapo ${capo}. Bund` : null,
     `${fretCount} Bünde`,
   ]
@@ -94,7 +93,7 @@ export function SetupPanel({
           <circle cx="8" cy="8" r="2.4" />
           <path d="M8 1.6v1.8M8 12.6v1.8M14.4 8h-1.8M3.4 8H1.6M12.5 3.5l-1.3 1.3M4.8 11.2l-1.3 1.3M12.5 12.5l-1.3-1.3M4.8 4.8 3.5 3.5" />
         </svg>
-        Instrument &amp; Darstellung
+        Instrument
         <span className="trigger-value">{summary}</span>
         <span className="trigger-caret" aria-hidden="true">
           ▾
@@ -141,8 +140,9 @@ export function SetupPanel({
                   }}
                 >
                   {NOTE_OPTIONS.map((note) => (
+                    // The value is the ASCII name the tuning id is built from.
                     <option key={note} value={note}>
-                      {note}
+                      {withAccidentals(note)}
                     </option>
                   ))}
                 </select>
@@ -180,15 +180,6 @@ export function SetupPanel({
             <select value={sound} onChange={(e) => onSoundChange(e.target.value as Timbre)}>
               <option value="clean">Clean</option>
               <option value="electric">Overdrive</option>
-            </select>
-          </label>
-
-          <label className="field">
-            <span>Darstellung</span>
-            <select value={theme} onChange={(e) => onThemeChange(e.target.value as ThemeChoice)}>
-              <option value="system">Automatisch</option>
-              <option value="light">Hell</option>
-              <option value="dark">Dunkel</option>
             </select>
           </label>
         </div>

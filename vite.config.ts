@@ -35,8 +35,12 @@ export default defineConfig({
         scope: '.',
         display: 'standalone',
         orientation: 'any',
-        background_color: '#1b1a18',
-        theme_color: '#1b1a18',
+        // --dark-bg. These paint the OS chrome around an installed app, so they
+        // belong to the PAGE, not to a surface on it. They used to carry the old
+        // --dark-panel-sunken, a token that no longer exists — and a sunken panel
+        // was never the right thing to match anyway.
+        background_color: '#171614',
+        theme_color: '#171614',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },

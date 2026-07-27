@@ -2,6 +2,9 @@
   overflow-x: auto;
   width: 100%;
   padding-bottom: 0.5rem;
+  /* The stage. What is above it is a caption and what is below it is a
+     consequence, and neither should crowd the instrument. */
+  margin-bottom: 0.75rem;
 }
 
 /*
@@ -59,8 +62,15 @@
 
 /* ---------- The instrument ---------- */
 
+/*
+ * The binding: the light strip along the rim of a bound fretboard, and the only
+ * reason the neck still reads as an object on a near-black page. See the palette
+ * comment in App.css for why the fill could not do this job.
+ */
 .board {
   fill: url(#board-face);
+  stroke: var(--board-rim);
+  stroke-width: 2;
 }
 
 .nut {
@@ -115,13 +125,20 @@
 .string-label,
 .fret-number {
   fill: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
 }
 
 .fret-number.is-muted {
   opacity: 0.35;
+}
+
+/* The accidental's family, again — an SVG tspan inherits none of the page rule
+   in App.css, and the size comes from the element's own fontSize attribute. */
+.fretboard .accidental,
+.chord-diagram .accidental {
+  font-family: 'Segoe UI Symbol', 'Apple Symbols', 'Noto Music', 'Noto Sans Symbols 2', sans-serif;
 }
 
 /* ---------- Notes ---------- */
@@ -168,16 +185,23 @@
   opacity: var(--dimmed);
 }
 
+/*
+ * The names on the neck are what the whole picture is FOR, and they used to be
+ * the smallest type on the page — 9 px next to a 13 px hint underneath them.
+ * These are drawing units, so the size that lands on screen is this times the
+ * scale factor; the minimum width in FretboardView.tsx now keeps that at or
+ * above 1, which makes this the real size rather than a ceiling.
+ */
 .note-label {
   fill: var(--note-text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: var(--weight-bold);
   pointer-events: none;
 }
 
 .note-label--root {
   fill: var(--root-text);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .note-label--picked {

@@ -14,6 +14,7 @@ import {
   STRING_GAP,
   stringY,
 } from './neckGeometry';
+import { NoteTspans } from './NoteText';
 import './FretboardView.css';
 
 /** Show the note name on each dot, or its scale degree. */
@@ -168,7 +169,13 @@ export function FretboardView({
           // Tie the minimum width to what is actually shown, not to the fret count:
           // a 12-fret neck then fits a phone where a 24-fret one cannot, and a
           // cropped box is not stretched to the width of a neck it does not show.
-          style={{ minWidth: `${(layout.visibleFrets + 2) * 42}px` }}
+          //
+          // FRET_WIDTH, not some smaller number: this floor is what decides how
+          // small the neck may be squeezed, and at 42 it drew the drawing at 0.74
+          // of its own scale — the note names, the whole point of the picture,
+          // came out at 9 px on every phone. At 1:1 they are the size they were
+          // drawn to be, and the neck simply scrolls a little further.
+          style={{ minWidth: `${(layout.visibleFrets + 2) * FRET_WIDTH}px` }}
           role="img"
           aria-label={`Griffbrett: ${described.join(', ')}`}
         >
@@ -193,13 +200,20 @@ export function FretboardView({
           </defs>
 
           <g clipPath="url(#board-window)">
-            {/* The board itself. Everything below is drawn on top of it. */}
+            {/*
+             * The board itself. Everything below is drawn on top of it.
+             *
+             * Inset by one unit all round so its binding (a stroke, see the .board
+             * rule) lies fully inside the clip window — centred on the very edge,
+             * the left half of that stroke would be clipped away and the neck
+             * would carry a thinner rim on one side than on the other three.
+             */}
             <rect
               className="board"
-              x={boardLeft}
-              y={boardTop}
-              width={width - boardLeft - 8}
-              height={boardFoot - boardTop}
+              x={boardLeft + 1}
+              y={boardTop + 1}
+              width={width - boardLeft - 10}
+              height={boardFoot - boardTop - 2}
               rx={6}
             />
 
@@ -407,7 +421,7 @@ export function FretboardView({
                     textAnchor="middle"
                     dominantBaseline="central"
                   >
-                    {label}
+                    <NoteTspans name={label} />
                   </text>
                 </g>
               );

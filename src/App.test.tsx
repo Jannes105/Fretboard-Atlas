@@ -271,7 +271,7 @@ describe('App — Einstellungen', () => {
     const { container } = render(<App />);
 
     expect(container.querySelector('.setup-trigger .trigger-value')?.textContent).toBe(
-      'Standard · 24 Bünde',
+      'Standard · 15 Bünde',
     );
   });
 
@@ -280,8 +280,11 @@ describe('App — Einstellungen', () => {
     const { container } = render(<App />);
 
     await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
-    // Stimmung, Kapo, Bünde, Klang, Darstellung.
-    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(5);
+    // Stimmung, Kapo, Bünde, Klang — vier, und alle vier beschreiben das
+    // Instrument. Die Darstellung ist raus: sie beschreibt den Betrachter und
+    // steht jetzt im Fuß der Seite.
+    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(4);
+    expect(container.querySelector('.app-footer select')).not.toBeNull();
 
     await user.keyboard('{Escape}');
     expect(container.querySelectorAll('.setup-panel')).toHaveLength(0);
@@ -404,13 +407,15 @@ describe('App — Klick', () => {
 });
 
 describe('App — Auslöser', () => {
-  it('nennt den Einstellungs-Auslöser beim Namen, ohne den Wert zu verstecken', () => {
-    // „Standard · 24 Bünde“ allein verrät nie, dass hell/dunkel dahinter liegt.
+  it('nennt den Einstellungs-Auslöser beim Namen', () => {
+    // „Standard · 15 Bünde“ allein verrät nie, dass hell/dunkel dahinter liegt,
+    // also steht der Name immer da. Der Wert steht nicht mehr daneben: mit ihm
+    // war der Auslöser 351px breit und damit das schwerste Element im Header,
+    // schwerer als die Tonart darunter. Er wohnt jetzt im Panel (siehe App.css).
     const { container } = render(<App />);
     const trigger = container.querySelector('.setup-trigger')!;
 
     expect(trigger.textContent).toContain('Instrument');
-    expect(trigger.textContent).toContain('Standard · 24 Bünde');
   });
 
   it('nennt auch den Rhythmus-Auslöser beim Namen', () => {
@@ -438,14 +443,15 @@ describe('App — Hervorhebung', () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    // 3. Chip = Terz von A-Dur = C#.
+    // 3. Chip = Terz von A-Dur = C#. Auf dem Hals steht sie als C♯ — die ASCII-
+    // Schreibweise bleibt der URL vorbehalten, siehe theory/format.ts.
     const chips = container.querySelectorAll<HTMLButtonElement>('.degree-chip');
     await user.click(chips[2]);
 
     expect(chips[2].getAttribute('aria-pressed')).toBe('true');
     const labels = pickedLabels(container);
     expect(labels.length).toBeGreaterThan(0);
-    expect(new Set(labels)).toEqual(new Set(['C#']));
+    expect(new Set(labels)).toEqual(new Set(['C♯']));
   });
 
   it('löst beim Klick auf eine Akkordkarte die Stufen-Hervorhebung ab', async () => {
@@ -464,7 +470,7 @@ describe('App — Hervorhebung', () => {
 
     // A ist der Skalengrundton und behält bewusst seine Grundton-Farbe, statt als
     // Akkordton eingefärbt zu werden — gepickt (teal) sind daher nur Terz und Quinte.
-    expect(new Set(pickedLabels(container))).toEqual(new Set(['C#', 'E']));
+    expect(new Set(pickedLabels(container))).toEqual(new Set(['C♯', 'E']));
     // Aber es gibt weiterhin Grundton-Punkte (A) auf dem Hals.
     expect(container.querySelectorAll('.note-dot--root').length).toBeGreaterThan(0);
   });
@@ -517,6 +523,39 @@ describe('App — Hervorhebung', () => {
     await user.click(container.querySelector<HTMLButtonElement>('.chord-row-actions .link-button')!);
 
     expect(container.querySelectorAll('.note-dot--picked')).toHaveLength(0);
+  });
+
+  it('zeigt genau einen Weg zurück, und zwar dort, wo geklickt wurde', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    const undos = () => container.querySelectorAll('.link-button');
+
+    expect(undos()).toHaveLength(0);
+
+    // Eine Stufe wird an der Legende unter dem Hals aufgehoben …
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.degree-chip')[2]);
+    expect(undos()).toHaveLength(1);
+    expect(container.querySelector('.neck-legend .link-button')).not.toBeNull();
+
+    // … ein Akkord bei den Karten, die ihn ausgelöst haben. Nie beide zugleich:
+    // zwei Links für einen Zustand lasen sich wie zwei verschiedene Aktionen.
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[2]);
+    expect(undos()).toHaveLength(1);
+    expect(container.querySelector('.chord-row-actions .link-button')).not.toBeNull();
+    expect(container.querySelector('.neck-legend .link-button')).toBeNull();
+  });
+
+  it('stellt die Stufen-Chips unter den Hals, nicht darüber', async () => {
+    const { container } = render(<App />);
+
+    // Die Chips sind die Legende des Halses: gleiche Töne, gleiche Rollen, und
+    // ein Klick greift oben ins Bild. Eine Legende steht bei ihrem Bild.
+    const neck = container.querySelector('.fretboard-scroll')!;
+    const chips = container.querySelector('.degree-chips')!;
+
+    expect(container.querySelector('.scale-strip .degree-chips')).toBeNull();
+    expect(neck.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('lässt Escape bei offenem Setup nur das Panel schließen, die Hervorhebung bleibt', async () => {
@@ -787,7 +826,7 @@ describe('App — Transport der Akkordfolge', () => {
     act(() => onChord(2));
     const marked = container.querySelectorAll('.progression-chord.is-playing');
     expect(marked).toHaveLength(1);
-    expect(marked[0].querySelector('.chord-symbol')?.textContent).toBe('F#m'); // vi in A-Dur
+    expect(marked[0].querySelector('.chord-symbol')?.textContent).toBe('F♯m'); // vi in A-Dur
 
     // Ende der Wiedergabe räumt die Markierung ab.
     act(() => onChord(null));

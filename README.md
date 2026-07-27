@@ -33,6 +33,7 @@ das DOM:
 | `Chord.ts` | Leitereigene Akkorde durch Terzschichtung |
 | `ChordShape.ts` | Greifbare Akkordformen je Stimmung |
 | `Progression.ts` | Gängige Akkordfolgen |
+| `format.ts` | Namen für die Anzeige: `#`/`b` werden zu ♯/♭ |
 
 ### Zwei Entscheidungen, die den Rest tragen
 
@@ -40,6 +41,11 @@ das DOM:
 Tonarten nicht korrekt buchstabieren: F#-Dur braucht ein **E#**, kein F, und
 Gb-Dur ein **Cb**, kein B. Ein Test prüft für alle 14 Dur-Tonarten, dass jeder
 Buchstabe genau einmal vorkommt.
+
+Auf dem Schirm steht dann **F♯** und **C♭**. Das ist bewusst eine eigene Schicht
+(`format.ts`) und keine Änderung an `name()`: die ASCII-Schreibweise trägt die
+URL (`?root=Eb`, `prog=custom:C,G,Am,F`) und wird von `parse()` wieder
+eingelesen. Ein ♭ an dieser Stelle hätte jeden geteilten Link zerlegt.
 
 **Akkordformen hängen an den Intervallen zwischen den Saiten, nicht an den
 Tonhöhen.** Deshalb sind die Formen nach Intervallmuster gruppiert

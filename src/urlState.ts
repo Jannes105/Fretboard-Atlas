@@ -63,7 +63,14 @@ export const DEFAULT_STATE: AppState = {
   scaleTypeId: 'major',
   tuningId: 'standard',
   capo: 0,
-  fretCount: 24,
+  /*
+   * Fifteen, not twenty-four. A 24-fret neck is 1486 drawing units wide and gets
+   * squeezed to 0.76 of its scale to fit the page, which put the note names — the
+   * thing you came to read — at 9 px. Fifteen frets fit at full size and then
+   * some, and they still hold every box of every scale on offer bar the topmost.
+   * Whoever wants the full two octaves is one click away in the setup panel.
+   */
+  fretCount: 15,
   labelMode: 'note',
   chordSize: 3,
   progressionId: 'I-V-vi-IV',
@@ -267,7 +274,7 @@ export function writeState(state: AppState): string {
 
 /** Below this width the CSS switches to its phone layout (see App.css). */
 export const NARROW_VIEWPORT = 700;
-/** A 24-fret neck cannot be read on a phone; twelve frets can. */
+/** Even fifteen frets are more than a phone can hold at readable size; twelve fit. */
 export const NARROW_FRET_COUNT = 12;
 
 /**
@@ -276,11 +283,11 @@ export const NARROW_FRET_COUNT = 12;
  *
  * Kept apart from readState so that stays a pure function of its string — a
  * property urlState.test.ts pins down in its very first assertion, and the reason
- * DEFAULT_STATE.fretCount stays at 24 no matter what device is asking.
+ * DEFAULT_STATE.fretCount stays at 15 no matter what device is asking.
  *
  * The seed does not create a hidden mode: writeState omits only DEFAULTS, so the
  * moment it applies, `frets=12` lands in the URL. A phone user's link is therefore
- * explicit and opens as twelve frets anywhere. A desktop link at 24 (unwritten)
+ * explicit and opens as twelve frets anywhere. A desktop link at 15 (unwritten)
  * opening on a phone as 12 is the correct reading of "the sender did not say".
  */
 export function initialState(search: string, viewportWidth: number): AppState {

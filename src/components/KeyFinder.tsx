@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Chord, type KeyMatch, matchKeys } from '../theory';
+import { Chord, type KeyMatch, matchKeys, withAccidentals } from '../theory';
+import { NoteText } from './NoteText';
 import './KeyFinder.css';
 
 interface KeyFinderProps {
@@ -143,7 +144,7 @@ export function KeyFinder({ onPick, onAdopt }: KeyFinderProps) {
               {analysis.matches.map((match) => (
                 <li key={keyLabel(match)}>
                   <button type="button" className="keyfinder-result" onClick={() => pick(match)}>
-                    <span className="keyfinder-key">{keyLabel(match)}</span>
+                    <span className="keyfinder-key">{withAccidentals(keyLabel(match))}</span>
                     <span className="keyfinder-degrees">
                       {analysis.chords.map((chord, i) => {
                         const degree = match.degrees[i];
@@ -157,7 +158,11 @@ export function KeyFinder({ onPick, onAdopt }: KeyFinderProps) {
                             }
                             title={chord.name()}
                           >
-                            {degree === null ? chord.name() : chord.romanNumeral(degree)}
+                            {degree === null ? (
+                              <NoteText name={chord.name()} />
+                            ) : (
+                              chord.romanNumeral(degree)
+                            )}
                           </span>
                         );
                       })}

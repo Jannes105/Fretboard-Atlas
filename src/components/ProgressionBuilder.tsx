@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Chord } from '../theory';
 import type { CustomStep } from '../urlState';
+import { NoteText } from './NoteText';
 import './ProgressionBuilder.css';
 
 /** One chord may be held up to this many bars. */
@@ -54,7 +55,7 @@ export function ProgressionBuilder({ steps, onChange }: ProgressionBuilderProps)
         ) : (
           steps.map((step, i) => (
             <span key={`${step.symbol}#${i}`} className="builder-chip">
-              {step.symbol}
+              <NoteText name={step.symbol} />
               <button
                 type="button"
                 className="builder-bars"

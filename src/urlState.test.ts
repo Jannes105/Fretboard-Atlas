@@ -209,7 +209,8 @@ describe('writeState', () => {
       scaleTypeId: 'dorian',
       tuningId: 'drop-d',
       capo: 5,
-      fretCount: 15,
+      // Not the default, or the round trip would not prove this field survives it.
+      fretCount: 24,
       labelMode: 'degree' as const,
       chordSize: 4 as const,
       progressionId: 'ii-V-I',
@@ -227,8 +228,8 @@ describe('initialState — Startwert je nach Geraet', () => {
     expect(initialState('', 375).fretCount).toBe(12);
   });
 
-  it('laesst breite Bildschirme beim vollen Hals', () => {
-    expect(initialState('', 1280).fretCount).toBe(24);
+  it('laesst breite Bildschirme beim Standardhals', () => {
+    expect(initialState('', 1280).fretCount).toBe(15);
   });
 
   it('laesst eine ausdrueckliche Angabe in der URL immer gewinnen', () => {

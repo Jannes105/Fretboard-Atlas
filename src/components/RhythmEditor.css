@@ -18,7 +18,7 @@
   width: 2.2rem;
   height: var(--tap);
   padding: 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-sm);
   background: var(--panel-sunken);
   color: var(--text-muted);
@@ -67,7 +67,7 @@
 .rhythm-preset {
   min-height: var(--tap);
   padding: 0.3rem 0.8rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-md);
   background: var(--panel);
   color: var(--text-muted);

@@ -1,5 +1,6 @@
-import type { ProgressionStep, Voicing } from '../theory';
+import { type ProgressionStep, type Voicing, withAccidentals } from '../theory';
 import { ChordDiagram } from './ChordDiagram';
+import { NoteText } from './NoteText';
 import './ProgressionChord.css';
 
 interface ProgressionChordProps {
@@ -49,9 +50,11 @@ export function ProgressionChord({
     return (
       <li className="progression-chord">
         <span className="roman">{step.roman}</span>
-        <span className="chord-symbol">{step.chord.name()}</span>
+        <span className="chord-symbol">
+          <NoteText name={step.chord.name()} />
+        </span>
         <span className="chord-notes">
-          {step.chord.notes.map((note) => note.name()).join(' ')}
+          {step.chord.notes.map((note) => note.name()).map(withAccidentals).join(' ')}
         </span>
         <span className="no-shape">kein Griff hinterlegt</span>
       </li>
@@ -61,7 +64,9 @@ export function ProgressionChord({
   return (
     <li className={isPlaying ? 'progression-chord is-playing' : 'progression-chord'}>
       <span className="roman">{step.roman}</span>
-      <span className="chord-symbol">{step.chord.name()}</span>
+      <span className="chord-symbol">
+        <NoteText name={step.chord.name()} />
+      </span>
 
       <button
         type="button"

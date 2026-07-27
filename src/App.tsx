@@ -3,10 +3,11 @@ import { type AudioPlayer, createAudioPlayer, LOOSE_ARPEGGIO_GAP, prefetchSample
 import { FretboardView } from './components/FretboardView';
 import { positionKey } from './components/neckGeometry';
 import { KeyFinder } from './components/KeyFinder';
+import { NoteText } from './components/NoteText';
 import { ProgressionPanel } from './components/ProgressionPanel';
 import { SetupPanel } from './components/SetupPanel';
 import { useAppState } from './hooks/useAppState';
-import { useTheme } from './hooks/useTheme';
+import { type ThemeChoice, useTheme } from './hooks/useTheme';
 import { useTransport } from './hooks/useTransport';
 import {
   buildProgression,
@@ -35,6 +36,7 @@ import {
   type Voicing,
   voicingMidi,
   voicingsFor,
+  withAccidentals,
 } from './theory';
 import {
   customProgId,
@@ -440,12 +442,10 @@ export default function App() {
           capo={capo}
           fretCount={fretCount}
           sound={sound}
-          theme={theme}
           onTuningIdChange={(next) => update('tuningId', next)}
           onCapoChange={(next) => update('capo', next)}
           onFretCountChange={(next) => update('fretCount', next)}
           onSoundChange={(next) => update('sound', next)}
-          onThemeChange={setTheme}
         />
       </header>
 
@@ -464,11 +464,15 @@ export default function App() {
            * headline leaves the underline and caret trailing off into space.
            */}
           <span className="key-select key-select--root">
-            <span className="key-select-text" aria-hidden="true">{root}</span>
+            <span className="key-select-text" aria-hidden="true">
+              <NoteText name={root} />
+            </span>
             <select aria-label="Grundton" value={root} onChange={(e) => update('root', e.target.value)}>
               {ROOT_CHOICES.map((choice) => (
+                // The value stays ASCII — it is the state, and it is what lands
+                // in the URL. Only what the reader sees gets the real accidental.
                 <option key={choice} value={choice}>
-                  {choice}
+                  {withAccidentals(choice)}
                 </option>
               ))}
             </select>
@@ -527,36 +531,6 @@ export default function App() {
             }
           />
         </div>
-
-        <ul className="degree-chips">
-          {scale.notes.map((note, i) => (
-            <li key={note.name()}>
-              <button
-                type="button"
-                className={[
-                  'degree-chip',
-                  i === 0 ? 'is-root' : '',
-                  isDegreeActive(i) ? 'is-active' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                aria-pressed={isDegreeActive(i)}
-                onClick={() => pickDegree(i)}
-              >
-                <span className="note-name">{note.name()}</span>
-                <span className="note-degree">{scale.degreeLabelOf(note.pitchClass)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        {picked ? (
-          <span className="picked-actions">
-            <button type="button" className="link-button" onClick={() => setHighlight(null)}>
-              {picked.label} hervorgehoben — aufheben
-            </button>
-          </span>
-        ) : null}
       </section>
 
       {/*
@@ -674,6 +648,58 @@ export default function App() {
         onPlayNote={(midi) => player().playNote(midi)}
       />
 
+      {/*
+       * The neck's legend, and below it rather than above.
+       *
+       * These chips show the same notes in the same roles as the dots on the
+       * board, and clicking one picks that tone out up there — so they explain
+       * the picture and they act on it. A legend belongs beside the thing it
+       * explains; up in the key line they were separated from it by the whole
+       * neck bar, and they put a third row of controls between the headline and
+       * the instrument.
+       */}
+      <section className="neck-legend" aria-label="Töne der Tonart">
+        <ul className="degree-chips">
+          {scale.notes.map((note, i) => (
+            <li key={note.name()}>
+              <button
+                type="button"
+                className={[
+                  'degree-chip',
+                  i === 0 ? 'is-root' : '',
+                  isDegreeActive(i) ? 'is-active' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                aria-pressed={isDegreeActive(i)}
+                onClick={() => pickDegree(i)}
+              >
+                <span className="note-name">
+                  <NoteText name={note.name()} />
+                </span>
+                <span className="note-degree">
+                  <NoteText name={scale.degreeLabelOf(note.pitchClass) ?? ''} />
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        {/*
+         * Only for a highlight that STARTED here. The chord panel further down
+         * carries its own way out, and showing both at once meant two links for
+         * one state — 765 px apart and worded differently, so they did not even
+         * read as the same action. Each now sits where the click happened.
+         */}
+        {highlight?.kind === 'degree' && picked ? (
+          <p className="picked-actions">
+            <button type="button" className="link-button" onClick={() => setHighlight(null)}>
+              Hervorhebung aufheben
+            </button>
+          </p>
+        ) : null}
+      </section>
+
       {chords.length > 0 ? (
         <>
           <section className="panel">
@@ -681,7 +707,7 @@ export default function App() {
               <h2>
                 Leitereigene Akkorde
                 {isBorrowedHarmony ? (
-                  <span className="panel-source">aus {chordScale.name()}</span>
+                  <span className="panel-source">aus {withAccidentals(chordScale.name())}</span>
                 ) : null}
               </h2>
               <select
@@ -711,9 +737,11 @@ export default function App() {
                     onClick={() => pickChord(i)}
                   >
                     <span className="roman">{chord.romanNumeral(i)}</span>
-                    <span className="chord-symbol">{chord.name()}</span>
+                    <span className="chord-symbol">
+                      <NoteText name={chord.name()} />
+                    </span>
                     <span className="chord-notes">
-                      {chord.notes.map((note) => note.name()).join(' ')}
+                      {chord.notes.map((note) => note.name()).map(withAccidentals).join(' ')}
                     </span>
                   </button>
 
@@ -750,10 +778,10 @@ export default function App() {
               ))}
             </ol>
 
-            {/* The link above the neck is a long way from the card you just
-                clicked — on a phone it is off screen entirely. The way back
-                belongs where the click happened. */}
-            {picked ? (
+            {/* The way back belongs where the click happened — and only there.
+                Same wording as the one under the neck, because it is the same
+                action; only one of the two is ever on screen. */}
+            {highlight?.kind === 'chord' ? (
               <p className="chord-row-actions">
                 <button type="button" className="link-button" onClick={() => setHighlight(null)}>
                   Hervorhebung aufheben
@@ -818,6 +846,32 @@ export default function App() {
           Stufenakkorde borgen ließen. Wähl eine Dur-, Moll- oder Kirchentonart.
         </p>
       )}
+
+      {/*
+       * The one setting that is not about the music.
+       *
+       * It used to sit in the setup drawer between the tuning and the fret count,
+       * which is the very distinction this app draws everywhere else: every field
+       * in AppState describes the instrument or the music, and the theme is the
+       * only preference that describes the READER — which is exactly why it lives
+       * in localStorage and not in the shareable URL. Filing it with the tuning
+       * contradicted that, and forced the drawer to be called "Instrument &
+       * Darstellung" to cover it.
+       *
+       * Down here rather than in the header: it is set once per device and never
+       * again, and the top of this page belongs to the neck. The foot of a page is
+       * also where people look for it.
+       */}
+      <footer className="app-footer">
+        <label className="field field--inline">
+          <span>Darstellung</span>
+          <select value={theme} onChange={(e) => setTheme(e.target.value as ThemeChoice)}>
+            <option value="system">Automatisch</option>
+            <option value="light">Hell</option>
+            <option value="dark">Dunkel</option>
+          </select>
+        </label>
+      </footer>
     </main>
   );
 }

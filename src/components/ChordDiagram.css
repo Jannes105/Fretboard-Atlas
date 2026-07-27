@@ -16,8 +16,11 @@
   color: var(--text-muted);
 }
 
+/* The same binding as the neck, at the scale of a grip diagram. */
 .chord-diagram .board {
   fill: var(--board);
+  stroke: var(--board-rim);
+  stroke-width: 1;
 }
 
 .chord-diagram .nut {
@@ -45,10 +48,12 @@
   stroke-linecap: round;
 }
 
+/* Drawing units again, and the same mistake in miniature: 11 units on a diagram
+   scaled to 0.83 rendered at 9 px. */
 .chord-diagram .marker,
 .chord-diagram .base-fret {
   fill: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: var(--weight-medium);
   font-variant-numeric: tabular-nums;
 }

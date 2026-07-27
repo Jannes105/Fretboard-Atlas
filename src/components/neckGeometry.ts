@@ -14,9 +14,19 @@ export const LABEL_X = 16;
 export const OPEN_OFFSET = 32;
 export const NUT_X = 74;
 export const FRET_WIDTH = 58;
-export const STRING_GAP = 36;
+/**
+ * Also the height of a note's hit area. At 36 the target measured 26 px on a
+ * 1440-px screen — the app promises --tap (44 px) everywhere else, and the neck
+ * was the one place that quietly did not keep it.
+ *
+ * 43 is what keeps that promise where the neck is drawn SMALLEST, which is a
+ * phone: there the minimum width holds the drawing at roughly 1:1, so a unit is
+ * a pixel and 43 units is 44 px. On a wide screen it scales up from there.
+ */
+export const STRING_GAP = 43;
 export const TOP_Y = 44;
-export const DOT_RADIUS = 13;
+/** Wide enough that a two-character label with an accidental is not up against the rim. */
+export const DOT_RADIUS = 14;
 export const ROOT_RADIUS = 16;
 /** A real neck is wider than the span of its strings. */
 export const BOARD_MARGIN = 18;
