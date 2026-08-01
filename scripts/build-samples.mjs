@@ -16,20 +16,19 @@ import lame from '@breezystack/lamejs';
 
 const ZIP = '.samples-src/shinyguitar.zip';
 const WORK = '.samples-src/Shinyguitar';
-const FREEPATS = '.samples-src/dist2/EGuitarFSBS-bridge-dist2-SFZ-20220911';
 const OUT = 'public/samples';
 
 /**
- * The two voices, each from its own recording.
+ * The one voice this ships, from Karoryfer's Shinyguitar (CC0-1.0), an archtop
+ * through its magnetic pickup.
  *
- * `electric` is Karoryfer's Shinyguitar (CC0-1.0), an archtop through its magnetic
- * pickup. `dist` is FreePats' EGuitarFSBS bridge dist2 (CC0-1.0), a Fender recorded
- * *through a real amplifier and effects rack*.
- *
- * That second one exists because simulating the overdrive kept failing. A WaveShaper
- * distorts each note on its own, where an amplifier distorts the sum of all six
- * strings — and there was no speaker cabinet, which is what tames the fizz above
- * 5 kHz. Both are baked into a recording and neither is worth rebuilding.
+ * A second recording — FreePats' EGuitarFSBS bridge dist2, a Fender recorded
+ * *through a real amplifier and effects rack* — lived here for a while, as the
+ * overdrive: simulating one kept failing, because a WaveShaper distorts each note on
+ * its own where an amplifier distorts the sum of all six strings, and there was no
+ * speaker cabinet to tame the fizz above 5 kHz. Both problems are solved now with a
+ * real amplifier modelled on the bus (src/synth/amp.ts), fed by this same recording,
+ * so the second one was retired rather than kept as a standing point of comparison.
  */
 const VOICES = [
   {
@@ -40,14 +39,6 @@ const VOICES = [
     /** Its wavs live in the zip and are pulled out on demand. */
     fromZip: true,
     root: join(WORK, 'Samples'),
-  },
-  {
-    id: 'dist',
-    program: join(FREEPATS, 'EGuitarFSBS-bridge-dist2-20220911.sfz'),
-    // The hard layer where the library splits, and the single layer where it does not.
-    velocity: (lo, hi) => lo >= 93 || (lo === 1 && hi === 127),
-    fromZip: false,
-    root: FREEPATS,
   },
 ];
 

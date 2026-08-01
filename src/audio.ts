@@ -42,8 +42,6 @@ export type PlayMode = 'sequence' | 'strum';
  *
  * - `clean` — Karoryfer Shinyguitar, an archtop through its magnetic pickup.
  * - `electric` — the same recording through the amplifier in src/synth/amp.ts.
- * - `recorded` — FreePats EGuitarFSBS, a Fender recorded *through a real amplifier
- *   and effects rack*, so its overdrive is played rather than computed.
  *
  * The overdrive has been rebuilt twice, and the two failures are the reason it is
  * shaped the way it is now.
@@ -55,18 +53,21 @@ export type PlayMode = 'sequence' | 'strum';
  * the shaper to 2.4 on a domain that clamps at 1, so it was a hard clipper wearing a
  * tanh's name. See AMP.preGain.)
  *
- * Moving the distortion into a recording fixed the cabinet and NOT the sum — six
+ * Moving the distortion into a recording (FreePats EGuitarFSBS, a Fender recorded
+ * through a real amplifier and effects rack) fixed the cabinet and NOT the sum — six
  * separately distorted recordings added together are still six separately distorted
  * strings, which is why chords stayed muddy. So the distortion is back in the graph,
- * but now on the BUS, where one stage sees every string at once. The recording keeps
- * its place beside it as `recorded`, because it is a genuinely different guitar.
+ * but now on the BUS, where one stage sees every string at once. That recording had a
+ * turn as a third voice, `recorded`, to compare the two side by side; once the bus
+ * version held up it was retired rather than kept as a permanent third option — a
+ * choice that exists only to be compared against the thing it replaced is not one a
+ * player needs. It falls back to `clean`, so old links keep working.
  *
  * A fourth voice, `soft`, was the microphone take of the same archtop as `clean`. It
  * measured 6.7 dB away across third-octave bands and still did not sound like a
- * second instrument — because it was not one. It now falls back to `clean`, so old
- * links keep working.
+ * second instrument — because it was not one. It also falls back to `clean`.
  */
-export type Timbre = 'clean' | 'electric' | 'recorded';
+export type Timbre = 'clean' | 'electric';
 
 /** One resonance: where, how narrow, how much. */
 interface Resonance {
@@ -78,15 +79,14 @@ interface Resonance {
 /**
  * How each voice is put together.
  *
- * The tone shaping is deliberately light, and for the two overdriven voices there is
- * none at all: `recorded` arrives with its own amplifier and speaker already on it,
- * and `electric` gets its voicing from the amplifier it is about to go through.
+ * The tone shaping is deliberately light, and for `electric` there is none at all —
+ * it gets its voicing from the amplifier it is about to go through.
  */
 const VOICES: Record<
   Timbre,
   {
     /** Which recorded set feeds it, keyed as in public/samples/manifest.json. */
-    readonly recording: 'electric' | 'dist';
+    readonly recording: 'electric';
     readonly tone: readonly Resonance[];
     /** Loudness trim, measured — not set by ear. */
     readonly gain: number;
@@ -110,14 +110,6 @@ const VOICES: Record<
     gain: 1,
     amp: true,
   },
-  recorded: {
-    recording: 'dist',
-    tone: [],
-    // A distorted recording is heavily compressed, so it carries far more energy at
-    // the same peak level. Measured at 2.97x the clean set's RMS.
-    gain: 0.34,
-    amp: false,
-  },
 };
 
 /** Filters kept in the sum for tone shaping. Unused ones sit flat and pass through. */
@@ -130,9 +122,6 @@ const TONE_FILTERS = 2;
 const STRINGS: Record<Timbre, Omit<PluckOptions, 'random'>> = {
   clean: { damping: 0.08, pickPosition: 0.19, pickNoise: 0.07, sustainSeconds: 6 },
   electric: { damping: 0.02, pickPosition: 0.1, pickNoise: 0.05, sustainSeconds: 8 },
-  // The same string as `electric`: the difference between those two voices is the
-  // amplifier, and this one is going through it either way.
-  recorded: { damping: 0.02, pickPosition: 0.1, pickNoise: 0.05, sustainSeconds: 8 },
 };
 
 /** How much of a fallback note is rendered; longer than anything the app holds. */

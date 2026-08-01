@@ -180,7 +180,6 @@ export function SetupPanel({
             <select value={sound} onChange={(e) => onSoundChange(e.target.value as Timbre)}>
               <option value="clean">Clean</option>
               <option value="electric">Overdrive</option>
-              <option value="recorded">Amp-Aufnahme</option>
             </select>
           </label>
         </div>
