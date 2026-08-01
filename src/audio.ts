@@ -220,6 +220,37 @@ export const LOOSE_ARPEGGIO_GAP = 0.14;
  * were sagging.
  */
 const HOLD_SUSTAIN = 0.3;
+/**
+ * Where a held note's brightness ends up, as a multiple of its own fundamental.
+ *
+ * The loop hands the note a spectrum and then never changes it, so the harmonics
+ * have to be taken away by hand or the note stops sounding struck. Measured on the
+ * recordings: while a note dies, its spectral centroid falls by about a third — the
+ * low E from 348 Hz to 225 Hz, the E above middle C from 886 Hz to 518 Hz. Tied to
+ * the fundamental rather than fixed in hertz, because that fall is roughly the same
+ * proportion whatever the pitch, and a fixed corner would gut a low note and leave a
+ * high one untouched.
+ */
+const HOLD_TONE_FLOOR = 5;
+/**
+ * Where it starts, also as a multiple of the fundamental.
+ *
+ * High enough to be very nearly no filter at all: measured on the recordings, under
+ * half a percent of a note's energy sits above the twentieth harmonic. That matters
+ * because it means the filter can simply BE there from the first sample, at this
+ * setting, rather than being opened wide and then dropped into place when the loop
+ * arrives — a step in a cutoff is as audible as a step in a gain.
+ */
+const HOLD_TONE_OPEN = 20;
+/**
+ * How much faster the brightness fades than the loudness.
+ *
+ * On the recordings the two do not keep step: a note loses about a third of its
+ * centroid inside its first second while it is still plainly loud. Sharing the
+ * level's time constant outright was the first attempt and did nothing at all —
+ * starting from wide open, the cutoff was still above 13 kHz after six seconds.
+ */
+const HOLD_TONE_SHARE = 0.25;
 /** How long the other held notes take to step aside when one more joins them. */
 const HOLD_ADJUST = 0.025;
 /**
@@ -734,7 +765,14 @@ export function createAudioPlayer(): AudioPlayer {
     at: number,
     peak: number,
     sustain = false,
-  ): { source: AudioBufferSourceNode; gain: GainNode; loopFrom: number; level: number } => {
+  ): {
+    source: AudioBufferSourceNode;
+    gain: GainNode;
+    /** Only built for a held note — the thing that keeps it from going static. */
+    colour: BiquadFilterNode | null;
+    loopFrom: number;
+    level: number;
+  } => {
     const recorded = recordingFor(midi);
     const held = sustain ? sustainedFor(ctx, midi) : null;
 
@@ -760,9 +798,34 @@ export function createAudioPlayer(): AudioPlayer {
     const level = peak * VOICES[timbre].gain;
     gain.gain.setValueAtTime(level, at);
 
-    // Straight through. The overdrive was a WaveShaper here once and is now on the
-    // bus in ensureContext, where it can distort the sum rather than each string.
-    source.connect(gain).connect(master!);
+    /*
+     * The one filter that is per note rather than on the bus, and only for a held
+     * one.
+     *
+     * A loop freezes the spectrum it was cut from, and a frozen spectrum is what
+     * gives a held note away: measured on the recordings, a plucked string loses
+     * a third of its brightness while it dies (the low E's spectral centroid falls
+     * from 348 Hz to 225 Hz), where the looped note sat at 225 Hz for as long as it
+     * was held, to the hertz. That unchanging tone is the sound of an oscillator,
+     * not a string.
+     *
+     * So the harmonics are taken away again by hand, from where the loop takes over.
+     * Wide open until then, so nothing touches the attack or the recording's own
+     * decay — everything the microphone caught is heard as it was caught.
+     *
+     * On the bus this could not work: the sweep belongs to one note's age, and two
+     * notes held at different moments are at different points in it.
+     */
+    const colour = sustain && held ? ctx.createBiquadFilter() : null;
+    if (colour) {
+      colour.type = 'lowpass';
+      colour.Q.value = webAudioQ('lowpass', 0.707);
+      colour.frequency.value = midiToFrequency(midi) * HOLD_TONE_OPEN;
+    }
+
+    // Straight through otherwise. The overdrive was a WaveShaper here once and is now
+    // on the bus in ensureContext, where it can distort the sum rather than each string.
+    (colour ? source.connect(colour) : source).connect(gain).connect(master!);
     source.start(at);
 
     source.addEventListener('ended', () => {
@@ -770,10 +833,11 @@ export function createAudioPlayer(): AudioPlayer {
       // A looping progression builds a few hundred of these per pass; letting go
       // explicitly is cheaper than leaning on the graph to notice.
       gain.disconnect();
+      colour?.disconnect();
     });
     live.push(source);
 
-    return { source, gain, loopFrom, level };
+    return { source, gain, colour, loopFrom, level };
   };
 
   const voice = (
@@ -876,7 +940,13 @@ export function createAudioPlayer(): AudioPlayer {
     const at = ctx.currentTime + 0.02;
 
     const voiceGain = VOICES[timbre].gain;
-    const { source, gain, loopFrom, level } = buildVoice(ctx, midi, at, voicePeak(held.size + 1), true);
+    const { source, gain, colour, loopFrom, level } = buildVoice(
+      ctx,
+      midi,
+      at,
+      voicePeak(held.size + 1),
+      true,
+    );
 
     /**
      * The slow decay that keeps a held note a guitar.
@@ -897,11 +967,30 @@ export function createAudioPlayer(): AudioPlayer {
      */
     const looping = Number.isFinite(loopFrom);
     // Slower the lower the note, the way a wound string outrings a plain one.
-    const fade = holdDecaySeconds(midiToFrequency(midi));
+    const frequency = midiToFrequency(midi);
+    const fade = holdDecaySeconds(frequency);
     const decay = (from: number, top: number) => {
       if (looping) gain.gain.setTargetAtTime(top * HOLD_SUSTAIN, from, fade);
     };
     decay(at + loopFrom, level);
+
+    /*
+     * And the brightness goes with it, on the same clock but faster. A string does
+     * not merely get quieter — it gets darker, and losing that is what made a held
+     * note sound like an oscillator once the loop had taken over.
+     *
+     * The clock is shared because a low string keeps both its loudness and its
+     * harmonics longer than a high one; HOLD_TONE_SHARE is there because the two do
+     * not fade at the same RATE, and the measurements it comes from are written out
+     * where it is defined.
+     */
+    if (colour && looping) {
+      colour.frequency.setTargetAtTime(
+        frequency * HOLD_TONE_FLOOR,
+        at + loopFrom,
+        fade * HOLD_TONE_SHARE,
+      );
+    }
 
     /** Where this note is now, as a fraction of the level it was given. */
     let peakNow = level;

@@ -45,7 +45,21 @@ export interface LoopOptions {
 
 /** Matches shape() in scripts/build-samples.mjs. */
 const TAIL_FADE = 0.08;
-const EARLIEST = 0.8;
+/**
+ * Not before here: the loop belongs in the sustain and not in the attack.
+ *
+ * It was 0.8 s first, and that was late enough to hurt. Whatever the loop is cut
+ * from is what a held note sounds like for as long as it is held, and by 0.8 s a
+ * low string has lost nearly all of its harmonics: measured on the low E, only
+ * 4 % of the looped note's energy was left above the third harmonic — a sine in
+ * all but name, and holding a sine for ten seconds is exactly what "you can hear
+ * the oscillation" sounds like. Cut at 0.5 s the same note keeps 18.5 %.
+ *
+ * Not earlier than this, though. Before half a second the note is still visibly
+ * settling, and a loop cut out of a moving target neither flattens cleanly nor
+ * holds still afterwards.
+ */
+const EARLIEST = 0.5;
 const MIN_SECONDS = 0.2;
 /**
  * Long enough that the repetition does not become a character of its own. It can

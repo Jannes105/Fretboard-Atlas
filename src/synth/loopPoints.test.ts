@@ -113,8 +113,11 @@ describe('findLoop', () => {
       const loop = findLoop(samples, SAMPLE_RATE, frequency)!;
 
       expect(loop.end).toBeLessThanOrEqual(samples.length / SAMPLE_RATE - 0.08);
-      // ...and clear of the attack at the other end.
-      expect(loop.start).toBeGreaterThanOrEqual(0.8);
+      // ...and clear of the attack at the other end. Not much further, though:
+      // whatever the loop is cut from is what a held note sounds like forever, and
+      // a string that has been decaying for a second has no harmonics left to give.
+      expect(loop.start).toBeGreaterThanOrEqual(0.5);
+      expect(loop.start).toBeLessThan(0.7);
       expect(loop.end).toBeGreaterThan(loop.start);
     }
   });
@@ -129,8 +132,10 @@ describe('findLoop', () => {
 
   it('gives up rather than loop something too short', () => {
     const frequency = hz(52);
-    // A buffer that is all attack and fade, with no sustain to take a loop from.
-    expect(findLoop(recorded(frequency, 0.85), SAMPLE_RATE, frequency)).toBeNull();
+    // A buffer that is all attack and fade, with no sustain to take a loop from:
+    // the window runs from 0.5 s to 0.08 s before the end, and what is left of this
+    // one is under the shortest loop worth having.
+    expect(findLoop(recorded(frequency, 0.6), SAMPLE_RATE, frequency)).toBeNull();
     expect(findLoop(new Float32Array(0), SAMPLE_RATE, frequency)).toBeNull();
     expect(findLoop(recorded(frequency), SAMPLE_RATE, 0)).toBeNull();
   });
