@@ -460,22 +460,35 @@ export function createAudioPlayer(): AudioPlayer {
     });
   };
 
-  /** Crossfades the amplifier in or out for the current voice. */
+  /**
+   * Crossfades the amplifier in or out for the current voice.
+   *
+   * Only ever called while something might be sounding. Setting the pair up in the
+   * first place is a plain assignment (see ensureContext) rather than a ramp of zero
+   * length: nothing is ringing yet, so there is nothing to be smooth about, and a
+   * ramp whose end lands on the same instant as its start is a degenerate thing to
+   * ask an AudioParam for.
+   */
   const applyAmp = (seconds = 0.02) => {
     if (!context || !dry || !wet) return;
-    const driven = VOICES[timbre].amp;
     const at = context.currentTime;
 
     // Short, but a ramp and not a jump: switching the voice while a chord rings is
     // an ordinary thing to do, and a step in a gain is a click.
-    for (const [node, target] of [
-      [dry, driven ? 0 : 1],
-      [wet, driven ? 1 : 0],
-    ] as const) {
+    for (const [node, target] of ampLevels()) {
       node.gain.cancelScheduledValues(at);
       node.gain.setValueAtTime(node.gain.value, at);
       node.gain.linearRampToValueAtTime(target, at + seconds);
     }
+  };
+
+  /** Where the dry and wet gains belong for the current voice. */
+  const ampLevels = (): readonly (readonly [GainNode, number])[] => {
+    const driven = VOICES[timbre].amp;
+    return [
+      [dry!, driven ? 0 : 1],
+      [wet!, driven ? 1 : 0],
+    ];
   };
 
   const decodeAll = async (ctx: AudioContext) => {
@@ -553,9 +566,6 @@ export function createAudioPlayer(): AudioPlayer {
 
       wet = context.createGain();
       dry = context.createGain();
-      // Clean is the default voice, so the amplifier starts shut.
-      wet.gain.value = 0;
-      dry.gain.value = 1;
 
       shaped
         .connect(stage('lowshelf', AMP.tight))
@@ -573,7 +583,10 @@ export function createAudioPlayer(): AudioPlayer {
       shaped.connect(dry).connect(ceiling);
 
       applyTone();
-      applyAmp(0);
+      // Straight assignment, not a crossfade: the voice may already be the overdrive
+      // when the first note arrives, and there is nothing ringing yet to ease it in
+      // for.
+      for (const [node, level] of ampLevels()) node.gain.value = level;
       // First gesture: the bytes are usually already here, so this only decodes.
       void decodeAll(context);
     }
