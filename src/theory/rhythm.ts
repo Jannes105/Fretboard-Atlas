@@ -130,6 +130,50 @@ export const HARD_RELEASE = 0.012;
 export const SOFT_RELEASE = 0.08;
 
 /**
+ * Time constant of a held note's decay at HOLD_DECAY_HZ, in seconds. Far longer
+ * than any real string, because a finger on a fret is asking to hear the note.
+ */
+const HOLD_DECAY = 4;
+/** Where that figure applies. Chosen at the top of the neck — see holdDecaySeconds. */
+const HOLD_DECAY_HZ = 1000;
+/**
+ * How the decay stretches as the pitch falls: the exponent on the frequency.
+ *
+ * Measured off the recordings themselves, which is the only honest source for
+ * how THIS guitar behaves. Across the sustain of each of the twelve, the low E
+ * loses 5.7 dB per second and the C two and a half octaves above it loses
+ * 24.9 dB per second.
+ *
+ * The number is not clean, and pretending otherwise would be the easy lie:
+ * least squares over all twelve gives 0.44 at a correlation of 0.81, while the
+ * two extremes taken alone give 0.58. The spread is real rather than noise —
+ * individual strings differ, and the wound-to-plain change partway up the set
+ * is a step, not a slope. 0.5 sits inside that band and is the roundest number
+ * that does. rhythm.test.ts pins it to the band, not to a decimal.
+ */
+const HOLD_DECAY_TILT = 0.5;
+
+/**
+ * How slowly a held note dies away, as a time constant in seconds.
+ *
+ * A held note loops, and looping takes the recording's own decay away — see
+ * src/synth/loopPoints.ts — so this is what puts it back. It cannot be one
+ * number for the whole neck, and that was the first attempt: a low E and a high
+ * E then faded at exactly the same rate, and the low one sounded like it was
+ * sagging. Two reasons, pointing the same way. A wound low string really does
+ * ring several times longer than a plain high one, so equal fading is wrong
+ * about the instrument. And the ear is less sensitive down there, so the same
+ * few decibels cost more loudness on a low note than on a high one.
+ *
+ * Anchored at the top rather than the middle, so that nothing on a normal neck
+ * fades faster than it used to — this only ever lengthens.
+ */
+export function holdDecaySeconds(frequency: number): number {
+  if (!(frequency > 0)) return HOLD_DECAY;
+  return HOLD_DECAY * Math.pow(HOLD_DECAY_HZ / frequency, HOLD_DECAY_TILT);
+}
+
+/**
  * How long one note sounds, and how sharply it ends.
  *
  * The release belongs here rather than in the audio code, because half of what makes

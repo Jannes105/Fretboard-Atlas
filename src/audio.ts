@@ -8,6 +8,7 @@ import {
   clickTimes,
   countInBars,
   dropHighest,
+  holdDecaySeconds,
   midiToFrequency,
   STANDARD_STRUM_GAP,
   type StrumSlot,
@@ -223,9 +224,13 @@ export const LOOSE_ARPEGGIO_GAP = 0.14;
  * is what goes back in its place: far slower than a real string, so a held fret is
  * actually held, but unmistakably there, so it is still a struck note and not a
  * drone. `SUSTAIN` is where it settles, as a share of where it started.
+ *
+ * How FAST it gets there depends on the pitch and lives in theory/rhythm.ts with
+ * the other decisions about how a note ends — a low string rings far longer than
+ * a high one, and giving them the same fade made the low ones sound like they
+ * were sagging.
  */
 const HOLD_SUSTAIN = 0.3;
-const HOLD_DECAY = 4;
 /** How long the other held notes take to step aside when one more joins them. */
 const HOLD_ADJUST = 0.025;
 /**
@@ -889,8 +894,10 @@ export function createAudioPlayer(): AudioPlayer {
      * decay and simply runs out, which is the honest thing for it to do.
      */
     const looping = Number.isFinite(loopFrom);
+    // Slower the lower the note, the way a wound string outrings a plain one.
+    const fade = holdDecaySeconds(midiToFrequency(midi));
     const decay = (from: number, top: number) => {
-      if (looping) gain.gain.setTargetAtTime(top * HOLD_SUSTAIN, from, HOLD_DECAY);
+      if (looping) gain.gain.setTargetAtTime(top * HOLD_SUSTAIN, from, fade);
     };
     decay(at + loopFrom, level);
 

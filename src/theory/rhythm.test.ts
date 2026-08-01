@@ -8,6 +8,7 @@ import {
   clickTimes,
   countInBars,
   dropHighest,
+  holdDecaySeconds,
   strumOffsets,
   noteSeconds,
   serializePattern,
@@ -124,6 +125,53 @@ describe('noteSeconds', () => {
     const slow = noteSeconds('standard', 'stopped', BAR, SLOT).seconds;
     const fast = noteSeconds('standard', 'stopped', BAR / 2, SLOT / 2).seconds;
     expect(fast).toBeCloseTo(slow / 2, 6);
+  });
+});
+
+describe('holdDecaySeconds', () => {
+  /** The pitches at the two ends of a standard neck. */
+  const LOW_E = 82.4;
+  const HIGH = 1046.5;
+
+  it('laesst tiefe Toene deutlich laenger stehen als hohe', () => {
+    // Der Grund, warum es diese Funktion gibt: ein Wert fuer den ganzen Hals
+    // liess die tiefen Toene wegsacken, waehrend die hohen richtig klangen.
+    expect(holdDecaySeconds(LOW_E)).toBeGreaterThan(3 * holdDecaySeconds(HIGH));
+  });
+
+  it('faellt monoton mit der Tonhoehe', () => {
+    let previous = Infinity;
+    for (let hz = 70; hz < 1400; hz += 10) {
+      const seconds = holdDecaySeconds(hz);
+      expect(seconds).toBeLessThan(previous);
+      previous = seconds;
+    }
+  });
+
+  it('bleibt in dem Band, das die Aufnahmen hergeben', () => {
+    /*
+     * Gemessen ueber den Sustain aller zwoelf Aufnahmen. Das Ergebnis ist keine
+     * saubere Zahl: der Ausgleich ueber alle ergibt den Exponenten 0,44 bei
+     * einer Korrelation von 0,81, die beiden Extreme allein 0,58. Also wird hier
+     * das Band geprueft und keine Nachkommastelle — eine engere Zusicherung
+     * waere genauer, als die Messung ist.
+     */
+    const span = HIGH / LOW_E;
+    const ratio = holdDecaySeconds(LOW_E) / holdDecaySeconds(HIGH);
+
+    expect(ratio).toBeGreaterThanOrEqual(Math.pow(span, 0.44));
+    expect(ratio).toBeLessThanOrEqual(Math.pow(span, 0.58));
+  });
+
+  it('macht auf einem normalen Hals nichts schneller als die vier Sekunden davor', () => {
+    // Oben verankert, damit diese Aenderung nur verlaengert. Der hoechste Ton
+    // eines 24-Bund-Halses in Standardstimmung ist E6, knapp 1319 Hz.
+    for (const hz of [LOW_E, 220, 440, 880]) expect(holdDecaySeconds(hz)).toBeGreaterThan(4);
+  });
+
+  it('faellt bei einer unsinnigen Frequenz auf den Grundwert zurueck', () => {
+    expect(holdDecaySeconds(0)).toBe(4);
+    expect(holdDecaySeconds(Number.NaN)).toBe(4);
   });
 });
 
