@@ -43,11 +43,13 @@ const RECORDED_MIDI = [40, 42, 45, 48, 51, 54, 57, 63, 66, 72, 78, 84];
 const hz = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
 
 const rms = (samples: Float32Array, from: number, seconds: number) => {
-  const first = Math.round(from * SAMPLE_RATE);
-  const count = Math.round(seconds * SAMPLE_RATE);
+  const first = Math.max(0, Math.round(from * SAMPLE_RATE));
+  // renderSustain trims the buffer to the loop's end, so a window that reaches it
+  // can run a sample or two past — clamped rather than left to read undefined.
+  const last = Math.min(samples.length, first + Math.round(seconds * SAMPLE_RATE));
   let sum = 0;
-  for (let i = first; i < first + count; i++) sum += samples[i] * samples[i];
-  return Math.sqrt(sum / count);
+  for (let i = first; i < last; i++) sum += samples[i] * samples[i];
+  return Math.sqrt(sum / Math.max(1, last - first));
 };
 
 describe('findLoop', () => {
@@ -122,11 +124,45 @@ describe('findLoop', () => {
     }
   });
 
-  it('loops long enough not to pulse', () => {
+  it('repeats too fast to be heard as a pulse, and too slow to be a buzz', () => {
+    /*
+     * The instinct is that a long loop repeats less obviously; it is the wrong way
+     * round. Flattening removes the region's overall decay but not the differences
+     * inside it, so a long loop repeats a long, structured pattern — and through
+     * the amplifier, whose compression lifts everything quiet, that pattern is what
+     * you hear. Measured on the low E: modulation of 82 at half a second against 6
+     * at a fifth.
+     *
+     * So the repetition has to sit above the few hertz the ear reads as flutter,
+     * while the loop still has to hold enough periods of the lowest string to be a
+     * waveform at all.
+     */
     for (const midi of RECORDED_MIDI) {
       const frequency = hz(midi);
       const loop = findLoop(recorded(frequency), SAMPLE_RATE, frequency)!;
-      expect(loop.end - loop.start).toBeGreaterThan(0.2);
+      const seconds = loop.end - loop.start;
+
+      // The exact length inside this range is not fixed — it is chosen per
+      // recording by how steady the stretch is, because which length is quiet
+      // depends on the note. What the range guarantees is that the repetition
+      // never drops back to the couple of hertz that made the low E throb, and
+      // that there are always several periods of the string to hold a waveform.
+      expect(seconds).toBeLessThanOrEqual(0.22);
+      expect(seconds * frequency).toBeGreaterThan(4);
+    }
+  });
+
+  it('honours a caller that narrows the range', () => {
+    // The search chooses within the range; it does not get to leave it.
+    for (const midi of RECORDED_MIDI) {
+      const frequency = hz(midi);
+      const loop = findLoop(recorded(frequency), SAMPLE_RATE, frequency, {
+        minSeconds: 0.05,
+        maxSeconds: 0.09,
+      })!;
+
+      expect(loop.end - loop.start).toBeGreaterThanOrEqual(0.05);
+      expect(loop.end - loop.start).toBeLessThanOrEqual(0.09);
     }
   });
 
@@ -149,10 +185,13 @@ describe('findLoop', () => {
 describe('renderSustain', () => {
   it('takes the decay out of the loop, so a lap does not restart louder', () => {
     /*
-     * The whole reason this function exists. Unflattened the step was 2.3 dB
-     * every third of a second, which is a tremolo at the rate the ear notices
-     * most. The decay is not lost — audio.ts puts it back on the gain, where it
-     * can be shaped.
+     * The whole reason this function exists: a lap that starts above where the
+     * last one ended is a sawtooth on the level, heard as a tremolo at the loop's
+     * own rate. The decay is not lost — audio.ts puts it back on the gain, where
+     * it can be shaped and made to depend on the pitch.
+     *
+     * The windows are cut from the loop rather than fixed in seconds. The loop is
+     * a tenth of a second now, and two 50 ms windows would be the whole of it.
      */
     for (const midi of RECORDED_MIDI) {
       const frequency = hz(midi);
@@ -160,11 +199,13 @@ describe('renderSustain', () => {
       const loop = findLoop(samples, SAMPLE_RATE, frequency)!;
       const sustained = renderSustain(samples, SAMPLE_RATE, loop);
 
-      const before = rms(samples, loop.start, 0.05) / rms(samples, loop.end - 0.05, 0.05);
-      const after = rms(sustained, loop.start, 0.05) / rms(sustained, loop.end - 0.05, 0.05);
+      const window = (loop.end - loop.start) / 4;
+      const step = (signal: Float32Array) =>
+        20 * Math.log10(rms(signal, loop.start, window) / rms(signal, loop.end - window, window));
 
-      expect(20 * Math.log10(before)).toBeGreaterThan(1);
-      expect(Math.abs(20 * Math.log10(after))).toBeLessThan(0.5);
+      // Flatter than it was, and flat enough that a lap does not announce itself.
+      expect(Math.abs(step(sustained))).toBeLessThan(Math.abs(step(samples)));
+      expect(Math.abs(step(sustained))).toBeLessThan(0.3);
     }
   });
 

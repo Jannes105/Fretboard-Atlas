@@ -39,8 +39,8 @@ export interface LoopOptions {
   readonly earliest?: number;
   /** Give up below this — a loop this short pulses rather than sustains. */
   readonly minSeconds?: number;
-  /** Aim for about this long. Longer is more natural, shorter steps less. */
-  readonly targetSeconds?: number;
+  /** Never longer than this, whatever the search would prefer. */
+  readonly maxSeconds?: number;
 }
 
 /** Matches shape() in scripts/build-samples.mjs. */
@@ -60,16 +60,110 @@ const TAIL_FADE = 0.08;
  * holds still afterwards.
  */
 const EARLIEST = 0.5;
-const MIN_SECONDS = 0.2;
+/** Give up below this — under a couple of periods there is no waveform to hold. */
+const MIN_SECONDS = 0.04;
 /**
- * Long enough that the repetition does not become a character of its own. It can
- * afford to be this long because renderSustain takes the decay out of the region
- * afterwards, which is what would otherwise force it short.
+ * How long the loop runs, and the one number that decides whether a held note
+ * throbs.
+ *
+ * The instinct is that a longer loop repeats less obviously. It is exactly wrong,
+ * and the amplifier is what makes it wrong. Flattening takes the region's overall
+ * decay out but not the differences WITHIN it — harmonics fade at their own rates,
+ * and the two polarisations of a string beat against each other — so a long loop
+ * repeats a long, structured pattern. Clean, that pattern sits far enough down to
+ * pass. Driven it does not, because saturation compresses the loud parts and lifts
+ * everything underneath, and what it lifts is the pattern.
+ *
+ * Measured on the low E through the amplifier, as modulation at the loop's own
+ * repetition rate: 82 at half a second, 41 at a third, 6 at a fifth, 2 at a
+ * twentieth. Not a slope but a cliff, between 0.2 s and 0.35 s — and it lines up
+ * with the ear, which is most alive to flutter at a few hertz and stops hearing it
+ * as flutter above about fifteen.
+ *
+ * A tenth of a second puts the repetition near 10 Hz and the modulation at a
+ * fourteenth of what it was, while still leaving eight periods of the lowest
+ * string to hold a waveform, and room for the seam to be crossfaded inside it.
  */
-const TARGET_SECONDS = 0.5;
+const TARGET_SECONDS = 0.1;
+/**
+ * The longest the search may go. Past here the repetition drops back into the few
+ * hertz the ear reads as flutter, and the measurements above say what that costs.
+ */
+const MAX_SECONDS = 0.22;
 
-/** How much of the loop is spent easing across the seam. */
+/**
+ * How much of the loop is spent easing across the seam.
+ *
+ * Capped as a share as well, because the loop is now short enough that a fixed
+ * 30 ms could otherwise be most of it — and a crossfade that long stops being a
+ * join and starts being the sound.
+ */
 const CROSSFADE = 0.03;
+const CROSSFADE_SHARE = 0.25;
+
+/**
+ * How many samples the seam gets, for a loop of this length.
+ *
+ * Shared by the search and the render on purpose: findLoop picks the end by how
+ * well these two stretches match, and renderSustain then blends exactly those.
+ * If the two disagreed about the length, the search would be optimising a window
+ * that is not the one actually crossfaded.
+ *
+ * `available` is what lies before the loop starts — the crossfade reaches back
+ * into it, so it can never be longer than that.
+ */
+function crossfadeSamples(loopSamples: number, available: number, sampleRate: number): number {
+  return Math.max(
+    0,
+    Math.min(Math.round(CROSSFADE * sampleRate), Math.floor(loopSamples * CROSSFADE_SHARE), available),
+  );
+}
+
+/**
+ * How steadily a stretch holds its level, ignoring the decay running through it.
+ * Lower is steadier; the return is the spread of what is left once the decay has
+ * been taken out, in nepers, so it can be compared between stretches.
+ *
+ * This is the thing renderSustain cannot fix and the loop therefore repeats: a
+ * region's overall slope is straightened, but a string beating against itself
+ * inside that region is not, and every lap plays that beat again. Which is why
+ * the loop length is chosen by this rather than set to a number — how steady a
+ * stretch is depends on the recording, and a length that suits one note leaves
+ * another throbbing.
+ */
+function unsteadiness(samples: Float32Array, from: number, length: number, period: number): number {
+  const window = Math.max(1, Math.round(4 * period));
+  const levels: number[] = [];
+  for (let i = from; i + window <= from + length; i += window) {
+    const value = level(samples, i, window);
+    // Silence carries no information about steadiness, and its log is -Infinity.
+    if (value <= 0) return Infinity;
+    levels.push(Math.log(value));
+  }
+  if (levels.length < 3) return Infinity;
+
+  // Least squares against index, which is the decay; the residual is the wobble.
+  const n = levels.length;
+  let sx = 0;
+  let sy = 0;
+  let sxx = 0;
+  let sxy = 0;
+  for (let i = 0; i < n; i++) {
+    sx += i;
+    sy += levels[i];
+    sxx += i * i;
+    sxy += i * levels[i];
+  }
+  const slope = (n * sxy - sx * sy) / Math.max(1e-12, n * sxx - sx * sx);
+  const intercept = (sy - slope * sx) / n;
+
+  let residual = 0;
+  for (let i = 0; i < n; i++) {
+    const difference = levels[i] - (slope * i + intercept);
+    residual += difference * difference;
+  }
+  return Math.sqrt(residual / n);
+}
 
 /** The first upward zero crossing at or after `from`, or -1. */
 function risingCrossing(samples: Float32Array, from: number, until: number): number {
@@ -97,7 +191,7 @@ export function findLoop(
     tailFade = TAIL_FADE,
     earliest = EARLIEST,
     minSeconds = MIN_SECONDS,
-    targetSeconds = TARGET_SECONDS,
+    maxSeconds = MAX_SECONDS,
   } = options;
 
   if (frequency <= 0) return null;
@@ -107,14 +201,38 @@ export function findLoop(
   const start = risingCrossing(samples, Math.round(earliest * sampleRate), limit);
   if (start < 0) return null;
 
-  // Whole periods only: a loop that is not an exact number of them restarts the
-  // wave mid-swing, which is heard as a click and, once a lap, as a pitch bend.
+  /*
+   * Whole periods only: a loop that is not an exact number of them restarts the
+   * wave mid-swing, which is heard as a click and, once a lap, as a pitch bend.
+   *
+   * Which whole number is chosen by measurement rather than set. Every candidate
+   * length inside the allowed range is scored by how steadily it holds its level
+   * once its decay is taken out, and the steadiest wins — because that leftover
+   * wobble is exactly what the loop repeats, and what the amplifier then lifts
+   * into earshot. A fixed length cannot do this: measured through the amplifier,
+   * a tenth of a second is thirteen times quieter than half a second on the low E
+   * and twice as loud on the D sharp two octaves up. It depends on the recording.
+   */
   const room = limit - start;
-  const laps = Math.min(
-    Math.floor(room / period),
-    Math.max(1, Math.round((targetSeconds * sampleRate) / period)),
-  );
-  if (laps < 1 || laps * period < minSeconds * sampleRate) return null;
+  const most = Math.min(Math.floor(room / period), Math.floor((maxSeconds * sampleRate) / period));
+  const fewest = Math.max(1, Math.ceil((minSeconds * sampleRate) / period));
+  if (most < fewest) return null;
+
+  let laps = fewest;
+  let steadiest = Infinity;
+  for (let candidate = fewest; candidate <= most; candidate++) {
+    const score = unsteadiness(samples, start, Math.round(candidate * period), period);
+    // Ties go to the shorter loop: it repeats faster, and the faster it repeats
+    // the further the repetition sits from where the ear hears flutter.
+    if (score < steadiest * 0.98) {
+      steadiest = score;
+      laps = candidate;
+    }
+  }
+  if (!Number.isFinite(steadiest)) {
+    // Nothing measurable to choose between — fall back to the preferred length.
+    laps = Math.max(fewest, Math.min(most, Math.round((TARGET_SECONDS * sampleRate) / period)));
+  }
 
   /*
    * Land the end where the waveform is doing what it was doing at the start.
@@ -129,7 +247,7 @@ export function findLoop(
    */
   const aim = start + laps * period;
   const search = Math.floor(period / 2);
-  const match = Math.min(Math.round(CROSSFADE * sampleRate), start);
+  const match = crossfadeSamples(laps * period, start, sampleRate);
   let end = Math.round(aim);
   let best = Infinity;
 
@@ -184,7 +302,6 @@ export function renderSustain(
   samples: Float32Array,
   sampleRate: number,
   loop: LoopRegion,
-  crossfadeSeconds = CROSSFADE,
   // Backed by an explicit ArrayBuffer so the type matches copyToChannel, which
   // rejects the ArrayBufferLike that slicing a decoded buffer infers.
 ): Float32Array<ArrayBuffer> {
@@ -193,8 +310,10 @@ export function renderSustain(
   const out = new Float32Array(new ArrayBuffer(end * Float32Array.BYTES_PER_ELEMENT));
   out.set(samples.subarray(0, end));
 
+  // A third of the loop at most, so the two windows the level is read from cannot
+  // overlap — on a short loop a fixed 50 ms would swallow the whole region.
   const measure = Math.min(Math.round(0.05 * sampleRate), Math.floor((end - start) / 3));
-  const crossfade = Math.min(Math.round(crossfadeSeconds * sampleRate), start, end - start - measure);
+  const crossfade = crossfadeSamples(end - start, start, sampleRate);
   if (measure <= 0) return out;
 
   /*
