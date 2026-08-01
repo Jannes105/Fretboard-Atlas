@@ -19,6 +19,14 @@ export type SampleSet = readonly SampleEntry[];
 export interface SampleChoice {
   readonly file: string;
   /**
+   * The pitch the file was RECORDED at, not the one being played.
+   *
+   * Anything that reads the waveform itself needs this rather than the target
+   * pitch — a loop point has to line up with the periods actually in the buffer,
+   * and `playbackRate` is applied to the buffer afterwards.
+   */
+  readonly midi: number;
+  /**
    * How much to speed the recording up or down. 1 plays it as recorded; 2 is an
    * octave up. Web Audio changes pitch and tempo together here, exactly like
    * speeding up a record — which is why the stretch has to stay small.
@@ -42,6 +50,7 @@ export function sampleFor(midi: number, set: SampleSet): SampleChoice | null {
 
   return {
     file: best.file,
+    midi: best.midi,
     // Twelve equal semitones to the octave, so each one is a factor of 2^(1/12).
     playbackRate: Math.pow(2, (midi - best.midi) / 12),
   };

@@ -72,6 +72,8 @@ export {
   clickTimes,
   countInBars,
   SOFT_RELEASE,
+  HARD_RELEASE,
+  holdDecaySeconds,
 } from './rhythm';
 export {
   PROGRESSIONS,

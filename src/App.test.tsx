@@ -8,13 +8,20 @@ import { Fretboard, MAJOR, Note, positionsAtPitch, Scale } from './theory';
 
 // The audio engine is replaced by a spy: the tests check that the UI asks for the
 // right notes, without a real AudioContext (which jsdom has not got anyway).
-const { player, transport } = vi.hoisted(() => {
+const { player, transport, noteHandles } = vi.hoisted(() => {
   const transport = { stop: vi.fn() };
+  /** Every handle holdNote has given out, so a test can check it was let go of. */
+  const noteHandles: { release: ReturnType<typeof vi.fn> }[] = [];
   return {
     transport,
+    noteHandles,
     player: {
       play: vi.fn(),
-      playNote: vi.fn(),
+      holdNote: vi.fn((_midi: number) => {
+        const handle = { release: vi.fn() };
+        noteHandles.push(handle);
+        return handle;
+      }),
       // Typed params, so the recorded calls stay inspectable in the tests below.
       startProgression: vi.fn(
         (_chords: readonly (readonly number[])[], _options: ProgressionOptions) => transport,
@@ -39,6 +46,8 @@ beforeEach(() => {
   // Each test starts from a clean URL, or App would inherit the previous state.
   window.history.replaceState(null, '', '/');
   vi.clearAllMocks();
+  // clearAllMocks resets the spies but not the array they pushed into.
+  noteHandles.length = 0;
 });
 
 afterEach(cleanup);
@@ -701,14 +710,18 @@ describe('App — Audio-Verdrahtung', () => {
     expect(options?.stack).toBeFalsy();
   });
 
-  it('spielt beim Klick auf einen Notenkreis dessen einzelne Tonhöhe', async () => {
+  it('haelt beim Druck auf einen Notenkreis dessen einzelne Tonhöhe und laesst sie wieder los', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
+    // user.click feuert pointerdown und pointerup — also genau ein kurz
+    // gehaltener Ton, vom Anfassen bis zum Loslassen.
     await user.click(container.querySelector<SVGGElement>('.fretboard .note')!);
 
-    expect(player.playNote).toHaveBeenCalledTimes(1);
-    expect(typeof player.playNote.mock.calls[0][0]).toBe('number');
+    expect(player.holdNote).toHaveBeenCalledTimes(1);
+    expect(typeof player.holdNote.mock.calls[0][0]).toBe('number');
+    expect(noteHandles).toHaveLength(1);
+    expect(noteHandles[0].release).toHaveBeenCalledOnce();
   });
 });
 

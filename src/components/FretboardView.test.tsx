@@ -48,22 +48,22 @@ describe('FretboardView', () => {
     expect(dimmed).toBe(dots(container).length - pickedCount);
   });
 
-  it('spielt beim Klick auf einen Notenkreis dessen echte Tonhöhe', () => {
-    const onPlayNote = vi.fn();
+  it('spielt beim Druck auf einen Notenkreis dessen echte Tonhöhe', () => {
+    const onHoldNote = vi.fn(() => ({ release: vi.fn() }));
     const { container } = render(
       <FretboardView
         scale={aMajor}
         fretboard={board}
         labelMode="note"
-        onPlayNote={onPlayNote}
+        onHoldNote={onHoldNote}
       />,
     );
 
     // Die Notengruppen werden in der Reihenfolge von mapScale gezeichnet.
     const firstNote = board.mapScale(aMajor)[0];
-    fireEvent.click(container.querySelector('.note')!);
+    fireEvent.pointerDown(container.querySelector('.note')!, { pointerId: 1 });
 
-    expect(onPlayNote).toHaveBeenCalledExactlyOnceWith(firstNote.midi);
+    expect(onHoldNote).toHaveBeenCalledExactlyOnceWith(firstNote.midi);
   });
 
   it('markiert das Griffbrett nur als spielbar, wenn ein Handler da ist', () => {
@@ -73,7 +73,7 @@ describe('FretboardView', () => {
     expect(without.querySelector('.fretboard--playable')).toBeNull();
 
     const { container: withHandler } = render(
-      <FretboardView scale={aMajor} fretboard={board} labelMode="note" onPlayNote={() => {}} />,
+      <FretboardView scale={aMajor} fretboard={board} labelMode="note" onHoldNote={() => ({ release: () => {} })} />,
     );
     expect(withHandler.querySelector('.fretboard--playable')).not.toBeNull();
   });
@@ -202,7 +202,7 @@ describe('FretboardView — Trefferflaeche fuer den Finger', () => {
         scale={aMajor}
         fretboard={board}
         labelMode="note"
-        onPlayNote={() => {}}
+        onHoldNote={() => ({ release: () => {} })}
       />,
     );
     expect(container.querySelectorAll('.note-hit')).toHaveLength(
@@ -218,34 +218,151 @@ describe('FretboardView — Trefferflaeche fuer den Finger', () => {
   });
 
   it('spielt beim Treffer der Flaeche denselben Ton wie beim Treffer des Punktes', () => {
-    const onPlayNote = vi.fn();
+    const onHoldNote = vi.fn(() => ({ release: vi.fn() }));
     const { container } = render(
       <FretboardView
         scale={aMajor}
         fretboard={board}
         labelMode="note"
-        onPlayNote={onPlayNote}
+        onHoldNote={onHoldNote}
       />,
     );
 
-    fireEvent.click(container.querySelector('.note-hit')!);
-    expect(onPlayNote).toHaveBeenCalledExactlyOnceWith(board.mapScale(aMajor)[0].midi);
+    fireEvent.pointerDown(container.querySelector('.note-hit')!, { pointerId: 1 });
+    expect(onHoldNote).toHaveBeenCalledExactlyOnceWith(board.mapScale(aMajor)[0].midi);
+  });
+});
+
+describe('FretboardView — Halten und Loslassen', () => {
+  /** Renders a neck and hands back the handles it has given out. */
+  function playable() {
+    const handles: { release: ReturnType<typeof vi.fn> }[] = [];
+    const onHoldNote = vi.fn(() => {
+      const handle = { release: vi.fn() };
+      handles.push(handle);
+      return handle;
+    });
+
+    const view = render(
+      <FretboardView
+        scale={aMajor}
+        fretboard={board}
+        labelMode="note"
+        onHoldNote={onHoldNote}
+      />,
+    );
+
+    return { ...view, handles, onHoldNote, notes: [...view.container.querySelectorAll('.note')] };
+  }
+
+  it('laesst den Ton los, wenn der Finger hochgeht', () => {
+    const { notes, handles } = playable();
+
+    fireEvent.pointerDown(notes[0], { pointerId: 1 });
+    expect(handles[0].release).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(notes[0], { pointerId: 1 });
+    expect(handles[0].release).toHaveBeenCalledOnce();
+  });
+
+  it('laesst genau einmal los, egal wie viele Ereignisse dasselbe Anheben melden', () => {
+    // pointerup und lostpointercapture kommen fuer ein Anheben regulaer beide, weil
+    // die Erfassung danach implizit faellt. Ein zweites release waere ein zweites
+    // Ausblenden auf einem Ton, den es nicht mehr gibt.
+    const { notes, handles } = playable();
+
+    fireEvent.pointerDown(notes[0], { pointerId: 1 });
+    fireEvent.pointerUp(notes[0], { pointerId: 1 });
+    fireEvent.lostPointerCapture(notes[0], { pointerId: 1 });
+    fireEvent.pointerCancel(notes[0], { pointerId: 1 });
+
+    expect(handles[0].release).toHaveBeenCalledOnce();
+  });
+
+  it('haelt mehrere Toene gleichzeitig, einen je Finger', () => {
+    const { notes, handles, onHoldNote } = playable();
+
+    fireEvent.pointerDown(notes[0], { pointerId: 1 });
+    fireEvent.pointerDown(notes[1], { pointerId: 2 });
+    expect(onHoldNote).toHaveBeenCalledTimes(2);
+
+    // Ein Finger geht hoch und nimmt nur seinen eigenen Ton mit.
+    fireEvent.pointerUp(notes[0], { pointerId: 1 });
+    expect(handles[0].release).toHaveBeenCalledOnce();
+    expect(handles[1].release).not.toHaveBeenCalled();
+  });
+
+  it('schneidet den Ton ab, wenn der Browser die Geste als Wischen abbricht', () => {
+    // Der Hals scrollt seitlich, also beginnt manche Wischgeste auf einem Punkt.
+    // Kurz abgeschnitten hinterlaesst das ein Klicken statt eines Tons.
+    const { notes, handles } = playable();
+
+    fireEvent.pointerDown(notes[0], { pointerId: 1 });
+    fireEvent.pointerCancel(notes[0], { pointerId: 1 });
+
+    expect(handles[0].release).toHaveBeenCalledOnce();
+    // Kuerzer als das Ausblenden beim gewollten Loslassen.
+    expect(handles[0].release.mock.calls[0][0]).toBeLessThan(0.05);
+  });
+
+  it('laesst beim Verschwinden des Halses alles los, was noch gehalten wird', () => {
+    const { notes, handles, unmount } = playable();
+
+    fireEvent.pointerDown(notes[0], { pointerId: 1 });
+    unmount();
+
+    expect(handles[0].release).toHaveBeenCalledOnce();
+  });
+
+  it('spielt den Ton auch, wenn die Pointer-Erfassung fehlschlaegt', () => {
+    /*
+     * setPointerCapture wirft NotFoundError, sobald der Zeiger zum Zeitpunkt des
+     * Handlers nicht mehr aktiv ist. Stand der Aufruf vor dem Ton, fiel damit der
+     * ganze Ton aus — ein stummer Punkt ist weit schlimmer als ein pointerup, das
+     * woanders ankommt.
+     */
+    const { notes, onHoldNote, handles } = playable();
+    Object.defineProperty(notes[0], 'setPointerCapture', {
+      configurable: true,
+      value: () => {
+        throw new Error('NotFoundError');
+      },
+    });
+
+    expect(() => fireEvent.pointerDown(notes[0], { pointerId: 1 })).not.toThrow();
+    expect(onHoldNote).toHaveBeenCalledOnce();
+
+    // Und er laesst sich danach ganz normal wieder los.
+    fireEvent.pointerUp(notes[0], { pointerId: 1 });
+    expect(handles[0].release).toHaveBeenCalledOnce();
+  });
+
+  it('kommt ohne Pointer-Erfassung aus', () => {
+    // jsdom hat weder setPointerCapture noch releasePointerCapture noch
+    // hasPointerCapture. Ungeprueft aufgerufen stirbt der Handler beim ersten
+    // Finger — genau die Umgebung, in der diese Tests laufen.
+    const { notes } = playable();
+
+    expect(
+      (notes[0] as SVGGElement & { setPointerCapture?: unknown }).setPointerCapture,
+    ).toBeUndefined();
+    expect(() => fireEvent.pointerDown(notes[0], { pointerId: 1 })).not.toThrow();
   });
 });
 
 describe('FretboardView — Hinweis unter dem Hals', () => {
-  it('sagt unter dem Hals, dass ein angetippter Ton klingt', () => {
+  it('sagt unter dem Hals, dass ein gehaltener Ton klingt', () => {
     // Bis hierhin verriet das nur ein Hover-Title — und ein Finger schwebt nicht.
     const { container } = render(
       <FretboardView
         scale={aMajor}
         fretboard={board}
         labelMode="note"
-        onPlayNote={vi.fn()}
+        onHoldNote={vi.fn(() => ({ release: vi.fn() }))}
       />,
     );
 
-    expect(container.querySelector('.fretboard-hint')?.textContent).toContain('antippen');
+    expect(container.querySelector('.fretboard-hint')?.textContent).toContain('halten');
   });
 
   it('schweigt, wo es nichts abzuspielen gibt', () => {
@@ -263,7 +380,7 @@ describe('FretboardView — Hinweis unter dem Hals', () => {
         scale={aMajor}
         fretboard={board}
         labelMode="note"
-        onPlayNote={vi.fn()}
+        onHoldNote={vi.fn(() => ({ release: vi.fn() }))}
       />,
     );
 

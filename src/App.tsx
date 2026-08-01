@@ -645,7 +645,7 @@ export default function App() {
         caged={caged}
         highlight={picked?.pitchClasses ?? null}
         highlightLabel={picked?.label ?? null}
-        onPlayNote={(midi) => player().playNote(midi)}
+        onHoldNote={(midi) => player().holdNote(midi)}
       />
 
       {/*
