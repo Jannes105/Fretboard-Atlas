@@ -73,31 +73,55 @@ export const AMP = {
   tight: { frequency: 180, q: 0.707, gain: -8 } satisfies AmpStage,
 
   /**
-   * Level into the shaper — a NORMALISATION, not a drive control.
+   * Level into the shaper, and the number that decides whether this is an
+   * amplifier at all.
+   *
+   * It was 1.75 first, sized so the loudest PEAK of a chord landed near the top
+   * of the shaper's domain. That was the wrong question, and the answer was
+   * inaudible: a strummed chord measures 20 dB of crest factor, so peak-aligned
+   * meant the sustained part of it sat at an RMS of 0.053, where this curve
+   * still has 96 % of its small-signal slope. Only the pick attacks bent at all,
+   * for a few milliseconds each. Clean and overdrive sounded the same because
+   * they very nearly were the same.
+   *
+   * An amplifier is driven so its SUSTAIN saturates and its peaks get flattened;
+   * that flattening is what overdrive is. So this is sized from the RMS, and the
+   * peaks now run past the shaper's edge — where the curve is already flat, see
+   * `drive`. Measured on the real recordings: a six-string chord goes from 7 %
+   * nonlinear content to 48 %, and its crest factor from 20 dB to about 7 dB.
+   */
+  preGain: 6,
+
+  /**
+   * Steepness of the valve's curve — where the saturation comes from, rather
+   * than from running out of domain.
    *
    * A WaveShaperNode clamps its input to [-1, 1] *before* it looks anything up
-   * in the curve. The overdrive removed in 0662993 ran a preGain of 2.5 into
-   * samples normalised to 0.97, so it sat at 2.4 — pinned at the last entry of
-   * its own curve for most of every note. That is a hard clipper with a
-   * discontinuous derivative, not the tanh it was written as, and it is the
-   * third reason the old overdrive failed that nobody wrote down.
+   * in the curve, so a signal outside that is hard-clipped at the last entry of
+   * the table rather than shaped. The overdrive removed in 0662993 ran at 2.4
+   * and was, for most of every note, exactly that: a hard clipper wearing a
+   * tanh's name, with a discontinuous derivative. It is the third reason it
+   * failed that nobody wrote down.
    *
-   * So the drive lives in the shape of the curve, over the domain the shaper
-   * actually has, and this only lines the signal up with that domain.
-   * amp.test.ts guards it: under 2 % of a six-string chord may reach |x| >= 1.
+   * Driving this hard makes the curve dead flat well before the edge — at 0.999
+   * its slope is a few hundred-thousandths of the small-signal slope — so the
+   * clamp lands on a part that was already horizontal and adds no corner. The
+   * fix for clipping was never less level; it was a curve that has finished
+   * bending by the time the level gets there. amp.test.ts measures that slope.
    */
-  preGain: 1.75,
-
-  /** Steepness of the valve's curve. Level-dependence comes free: a single note
-   *  reaches the near-linear part, a chord the bend. */
-  drive: 2.2,
+  drive: 6,
   /**
    * How far the curve sits off centre. A valve is biased, so it compresses one
    * half of the wave harder than the other, and that asymmetry is where the
    * even harmonics — the warmth — come from. `bias: 0` is a clean symmetric
    * tanh with no second harmonic at all; amp.test.ts asserts both.
+   *
+   * It has to be read against `drive`, because what matters is the offset in the
+   * curve's own steepness. It was 0.05 when the drive was 2.2 and the two ends
+   * of the curve then sat 1.9 dB apart. Left there at a drive of 6 they would
+   * sit 5.2 dB apart, which is not warmth but a lopsided, gated-sounding wave.
    */
-  bias: 0.05,
+  bias: 0.02,
 
   /**
    * Mandatory, not decorative. An asymmetric curve has a non-zero mean for a
@@ -132,9 +156,11 @@ export const AMP = {
    * volume. Measured, not set by ear — but measured in a browser, on the real
    * recordings, and that distinction turned out to matter.
    *
-   * The reference below said 0.41. An OfflineAudioContext rendering an open E
-   * major from the actual mp3s through the actual graph said the amplifier was
-   * still 2.3 dB hot at that figure, so the number here is the browser's.
+   * An OfflineAudioContext rendering an open E major from the actual mp3s
+   * through the actual graph is what set it, and it has to be re-measured after
+   * any change to preGain or drive — an amplifier turned up is louder as well as
+   * dirtier, and here that is 13.3 dB of it. The reference below disagreed by
+   * 2.3 dB even before that, and the reason is worth keeping:
    *
    * The gap is not the reference being sloppy, and it is worth knowing because
    * it will reappear for anyone who retunes this: pluck() and a recorded guitar
@@ -142,14 +168,16 @@ export const AMP = {
    * same peak level, the model's crest factor is 7.95 dB and the recording's is
    * 13.02 dB. Five decibels quieter for the same peak means the recording spends
    * far more of its time in the straight part of the curve and is compressed
-   * much less — so it comes out louder, from the same amplifier.
+   * much less — so it comes out louder, from the same amplifier. Saturation
+   * widens that gap rather than narrowing it: at the drive above the two now
+   * disagree by 6.6 dB, where at a drive of 2.2 they disagreed by 2.3.
    *
    * Which makes the reference the right tool for shape and the wrong one for
    * level: it can show that the curve intermodulates, that the cabinet slopes at
    * 24 dB per octave and that the signal stays inside the shaper, and it cannot
    * set this. amp.test.ts asserts only a sane range for it, and says so.
    */
-  makeup: 0.31,
+  makeup: 0.067,
 };
 
 /**

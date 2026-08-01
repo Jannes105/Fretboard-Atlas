@@ -254,36 +254,61 @@ describe('renderAmp', () => {
     expect(Math.abs(mean(renderAmp(input, SAMPLE_RATE)))).toBeLessThan(1e-4);
   });
 
-  it('stays inside the shaper it is driving', () => {
+  it('bends where the chord actually sits, not only on its attacks', () => {
     /*
-     * The regression guard for the bug that killed the old overdrive: a
-     * WaveShaper clamps its input to [-1, 1] before it indexes the curve, so a
-     * signal that lives outside that is not being shaped at all — it is being
-     * hard-clipped at the last entry of the table. The removed version ran at
-     * 2.4 and spent most of every note there.
+     * The test that should have existed first. The amplifier was once set up so
+     * that the loudest PEAK of a chord reached the top of the curve — and it was
+     * inaudible, because a strummed chord has 20 dB of crest factor, so
+     * everything except the pick attacks sat where the curve is still a straight
+     * line. Clean and overdrive measured 0.4 dB apart and sounded identical.
+     *
+     * So the level that matters is the RMS, and what it has to do is bend: at
+     * the level the chord SUSTAINS at, the curve must have visibly given up
+     * slope. A peak-based check cannot see this failure at all.
      */
     const driven = ampInput(chord(E_MAJOR), SAMPLE_RATE);
-    const over = driven.reduce((count, value) => count + (Math.abs(value) >= 1 ? 1 : 0), 0);
 
-    expect(over / driven.length).toBeLessThan(0.02);
-    // And it does reach the bend — an amplifier that never leaves the linear
-    // part is a wire.
-    expect(peak(driven)).toBeGreaterThan(0.6);
+    let sum = 0;
+    for (const value of driven) sum += value * value;
+    const level = Math.sqrt(sum / driven.length);
+
+    const slope = (x: number) => (ampShape(x + 1e-4) - ampShape(x - 1e-4)) / 2e-4;
+    expect(slope(level) / slope(0)).toBeLessThan(0.75);
   });
 
-  it('lands in the same range as the clean path', () => {
+  it('has finished bending before the shaper runs out of domain', () => {
     /*
-     * A range and not a figure, deliberately. The trim in AMP.makeup was set from
-     * a browser rendering the real recordings, because a synthesised string and a
-     * recorded one drive a curve differently enough to move the level by 2.3 dB —
-     * the reasoning is written out where the number lives. What this test is for
-     * is catching a change that puts the amplifier in a different league
-     * altogether, which is the failure worth having a test for.
+     * What makes it safe to drive that hard. A WaveShaper clamps its input to
+     * [-1, 1] before it indexes the curve, so anything past the edge is
+     * hard-clipped at the last entry of the table — that is what the overdrive
+     * removed in 0662993 was doing, with a curve still steep at the edge and a
+     * corner in the waveform to show for it.
+     *
+     * A curve that is already flat there has nothing left to clip: the clamp
+     * lands on a horizontal stretch and the join is smooth. That is the property
+     * that has to hold, not some ceiling on the level going in.
+     */
+    const slope = (x: number) => (ampShape(x) - ampShape(x - 2e-3)) / 2e-3;
+    expect(slope(0.999) / slope(1e-4)).toBeLessThan(0.001);
+  });
+
+  it('is neither silent nor off the scale', () => {
+    /*
+     * A very coarse bound, and deliberately so: this test cannot set the level
+     * and should not pretend to. AMP.makeup comes from a browser rendering the
+     * real recordings, because a synthesised string saturates differently from a
+     * recorded one — the two disagree by 6.6 dB here, and the reason is written
+     * out where the number lives.
+     *
+     * What is worth catching is a makeup that lost a decimal point, which is a
+     * real way to break this and one the ear would meet as silence or as a wall
+     * of noise. Everything else this file measures is shape, which the reference
+     * IS entitled to speak about.
      */
     const clean = chord(E_MAJOR);
     const driven = renderAmp(clean, SAMPLE_RATE);
 
-    expect(Math.abs(dB(rms(driven) / rms(clean)))).toBeLessThan(4);
+    expect(Math.abs(dB(rms(driven) / rms(clean)))).toBeLessThan(12);
   });
 
   it('keeps a single note and a whole chord in the same room', () => {
