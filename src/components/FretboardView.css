@@ -49,6 +49,22 @@
   /* Kills the browser's 300 ms wait for a possible double-tap zoom, which on a
      phone made every note feel like it answered late. */
   touch-action: manipulation;
+
+  /*
+   * A note is held down, and holding is exactly the gesture a phone reads as
+   * "select this text". On Android the label under the finger highlighted, the
+   * Google search bar slid up — and starting a selection CANCELS the pointer,
+   * which fired pointercancel and took the held note with it. The note stopped
+   * at the moment you were asking it to keep going.
+   *
+   * Inherited, so it covers the labels, the fret numbers and the string names in
+   * one go. Nothing drawn on a neck diagram is text anyone wants to select, and
+   * screen readers are unaffected by this — it only governs the mouse and finger.
+   */
+  -webkit-user-select: none;
+  user-select: none;
+  /* The same gesture on iOS raises the callout menu instead. Same answer. */
+  -webkit-touch-callout: none;
 }
 
 /*
