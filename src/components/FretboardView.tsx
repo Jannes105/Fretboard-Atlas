@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { CagedPlacement, Fretboard, Scale, ScalePosition } from '../theory';
+import { HARD_RELEASE, type CagedPlacement, type Fretboard, type Scale, type ScalePosition } from '../theory';
 import {
   DOT_RADIUS,
   DOUBLE_INLAY_OFFSET,
@@ -33,8 +33,15 @@ interface FretboardViewProps {
   highlight?: readonly number[] | null;
   /** Only used for the accessible label, so the picked-out tones have a name. */
   highlightLabel?: string | null;
-  /** Sound a single position when its dot is tapped, at its real pitch. */
-  onPlayNote?: (midi: number) => void;
+  /**
+   * Sound a single position at its real pitch for as long as it is held down,
+   * and hand back the handle that ends it.
+   *
+   * Declared structurally rather than as the audio module's NoteHandle: the view
+   * owns the finger, whoever passes this owns the note, and the neck has no
+   * business knowing there is an audio module at all.
+   */
+  onHoldNote?: (midi: number) => { release(fade?: number): void };
   /**
    * Crop the drawing to the selected position instead of showing the whole neck
    * dimmed around it. Without a position there is nothing to crop to.
@@ -59,7 +66,7 @@ export function FretboardView({
   position = null,
   highlight = null,
   highlightLabel = null,
-  onPlayNote,
+  onHoldNote,
   zoom = false,
   sounding = null,
   caged = null,
@@ -107,6 +114,34 @@ export function FretboardView({
    */
   const scrollRef = useRef<HTMLDivElement>(null);
   const positionNumber = position?.number ?? null;
+
+  /*
+   * The notes with a finger on them, by pointer id, so several fingers hold
+   * several notes — a chord under the hand rather than one note at a time.
+   *
+   * A ref and not state: nothing on screen depends on it, and a re-render per
+   * finger-down on a neck of several hundred dots would be felt.
+   */
+  const holds = useRef(new Map<number, { release(fade?: number): void }>());
+
+  const releaseHold = (pointerId: number, fade?: number) => {
+    const handle = holds.current.get(pointerId);
+    // pointerup and lostpointercapture both arrive for one lift, in that order —
+    // capture is dropped implicitly. Whichever gets here first ends the note.
+    if (!handle) return;
+    holds.current.delete(pointerId);
+    handle.release(fade);
+  };
+
+  // A finger still down when the neck goes away would otherwise sound for good:
+  // its pointerup has nothing left to arrive at.
+  useEffect(() => {
+    const sounding = holds.current;
+    return () => {
+      for (const handle of sounding.values()) handle.release(HARD_RELEASE);
+      sounding.clear();
+    };
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -164,7 +199,7 @@ export function FretboardView({
         className={overflows ? 'fretboard-scroll fretboard-scroll--more' : 'fretboard-scroll'}
       >
         <svg
-          className={onPlayNote ? 'fretboard fretboard--playable' : 'fretboard'}
+          className={onHoldNote ? 'fretboard fretboard--playable' : 'fretboard'}
           viewBox={layout.viewBox}
           // Tie the minimum width to what is actually shown, not to the fret count:
           // a 12-fret neck then fits a phone where a 24-fret one cannot, and a
@@ -350,10 +385,58 @@ export function FretboardView({
                 <g
                   key={positionKey(note)}
                   className="note"
-                  onClick={onPlayNote ? () => onPlayNote(note.midi) : undefined}
+                  /*
+                   * Held, not tapped: the note sounds while the finger is down and
+                   * stops when it lifts, which is what an instrument does.
+                   *
+                   * Pointer capture is what makes a finger that slides off the dot
+                   * still deliver its own pointerup here. It comes AFTER the note
+                   * and inside a try, because it is an improvement to the note and
+                   * never a condition for it: setPointerCapture throws outright if
+                   * the pointer is no longer active by the time the handler runs,
+                   * and a dot that stays silent because of that is a far worse bug
+                   * than one whose pointerup arrives somewhere else. jsdom has none
+                   * of the capture methods at all, hence the typeof as well.
+                   *
+                   * Deliberately NOT gated on event.isPrimary: the extra fingers of
+                   * a chord are exactly the non-primary pointers.
+                   */
+                  onPointerDown={
+                    onHoldNote
+                      ? (event) => {
+                          if (holds.current.has(event.pointerId)) return;
+                          holds.current.set(event.pointerId, onHoldNote(note.midi));
+
+                          const target = event.currentTarget;
+                          if (typeof target.setPointerCapture !== 'function') return;
+                          try {
+                            target.setPointerCapture(event.pointerId);
+                          } catch {
+                            // No active pointer with that id — the note still sounds.
+                          }
+                        }
+                      : undefined
+                  }
+                  onPointerUp={
+                    onHoldNote ? (event) => releaseHold(event.pointerId) : undefined
+                  }
+                  onLostPointerCapture={
+                    onHoldNote ? (event) => releaseHold(event.pointerId) : undefined
+                  }
+                  /*
+                   * The browser sends this when it decides the gesture was a scroll
+                   * after all — the neck pans sideways, so a swipe often starts on a
+                   * dot. Cut rather than faded, so that leaves a click and not a note.
+                   * (The alternative, waiting to see whether a touch becomes a swipe,
+                   * would make the instrument answer late — which the touch-action
+                   * comment in the stylesheet says was fixed once already.)
+                   */
+                  onPointerCancel={
+                    onHoldNote ? (event) => releaseHold(event.pointerId, HARD_RELEASE) : undefined
+                  }
                 >
                   {/* A title makes the pitch discoverable on hover and to a screen reader. */}
-                  {onPlayNote ? <title>{`${note.note.name()} — anhören`}</title> : null}
+                  {onHoldNote ? <title>{`${note.note.name()} — halten zum Hören`}</title> : null}
                   {/*
                    * The marker, as its own ring UNDER the dot rather than a class on
                    * it: the dot already carries a root/picked/dimmed cascade, and a
@@ -392,7 +475,7 @@ export function FretboardView({
                    * `fill` must be transparent, not none: an unpainted shape takes
                    * no pointer events at all.
                    */}
-                  {onPlayNote ? (
+                  {onHoldNote ? (
                     <rect
                       className="note-hit"
                       x={cx - FRET_WIDTH / 2}
@@ -461,12 +544,14 @@ export function FretboardView({
       </div>
 
       {/*
-       * Tapping a dot sounds it — which the neck said only through a hover title,
-       * and a finger never hovers. One line, where the neck ends.
+       * Holding a dot sounds it — which the neck said only through a hover title,
+       * and a finger never hovers. One line, where the neck ends. It has to say
+       * "halten" rather than "antippen", because a tap that is let go of at once
+       * now gives a short note rather than a whole one.
        */}
-      {onPlayNote ? (
+      {onHoldNote ? (
         <p className="hint fretboard-hint">
-          Einen Ton antippen: du hörst ihn.
+          Einen Ton gedrückt halten: du hörst ihn, solange du hältst.
           {overflows ? ' Der Hals geht rechts weiter — seitlich wischen.' : ''}
         </p>
       ) : null}

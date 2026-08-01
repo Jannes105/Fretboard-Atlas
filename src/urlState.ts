@@ -88,7 +88,9 @@ export const DEFAULT_STATE: AppState = {
 };
 
 const FRET_COUNTS = [12, 15, 24];
-const SOUNDS: readonly Timbre[] = ['clean', 'electric'];
+// Read by name and not by index, so adding a voice leaves every existing link
+// pointing at the voice it always did.
+const SOUNDS: readonly Timbre[] = ['clean', 'electric', 'recorded'];
 const STRUMS: readonly StrumStyle[] = ['standard', 'arpeggio'];
 const SUSTAINS: readonly NoteLength[] = ['ring', 'stopped'];
 const CLICKS: readonly ClickMode[] = ['off', 'countIn', 'metronome'];

@@ -39,9 +39,20 @@ describe('sampleFor', () => {
   it('plays a recorded note at its own speed', () => {
     for (const [, set] of VOICES) {
       for (const entry of set) {
-        expect(sampleFor(entry.midi, set)).toEqual({ file: entry.file, playbackRate: 1 });
+        expect(sampleFor(entry.midi, set)).toEqual({
+          file: entry.file,
+          midi: entry.midi,
+          playbackRate: 1,
+        });
       }
     }
+  });
+
+  it('reports the pitch the file was recorded at, not the one asked for', () => {
+    const set: SampleSet = [{ midi: 60, file: 'a.mp3' }];
+
+    // Loop points are cut from the buffer, so they need the buffer's own period.
+    expect(sampleFor(67, set)?.midi).toBe(60);
   });
 
   it('takes the nearest recording, above or below', () => {

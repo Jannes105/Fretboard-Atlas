@@ -119,8 +119,13 @@ export type NoteLength = 'ring' | 'stopped';
 
 /** Share of the gap to the next strum that a stopped note actually sounds for. */
 const STOPPED_SHARE = 0.45;
-/** A stopped note is cut, not faded — this is short enough to hear as damping. */
-const HARD_RELEASE = 0.012;
+/**
+ * A stopped note is cut, not faded — this is short enough to hear as damping.
+ *
+ * Also what a held note gets when the browser takes the finger away mid-gesture:
+ * a swipe across the neck should leave a click, not a note.
+ */
+export const HARD_RELEASE = 0.012;
 /** A ringing note fades out gently, so the tail does not end on an edge. */
 export const SOFT_RELEASE = 0.08;
 

@@ -1,3 +1,5 @@
+import { AMP, type AmpStage, ampShape, type StageKind, webAudioQ } from './synth/amp';
+import { findLoop, type LoopRegion, renderSustain } from './synth/loopPoints';
 import { pluck, type PluckOptions } from './synth/pluck';
 import { sampleFor, type SampleSet } from './synth/sampleSet';
 import {
@@ -35,24 +37,35 @@ import {
 export type PlayMode = 'sequence' | 'strum';
 
 /**
- * The instrument's voice. Both are recordings, and of different guitars:
+ * The instrument's voice.
  *
  * - `clean` — Karoryfer Shinyguitar, an archtop through its magnetic pickup.
- * - `electric` — FreePats EGuitarFSBS, a Fender recorded *through a real amplifier
- *   and effects rack*, so the overdrive is played rather than computed.
+ * - `electric` — the same recording through the amplifier in src/synth/amp.ts.
+ * - `recorded` — FreePats EGuitarFSBS, a Fender recorded *through a real amplifier
+ *   and effects rack*, so its overdrive is played rather than computed.
  *
- * The overdrive used to be a WaveShaper on the clean recording, and three rounds of
- * tuning it never sounded like an amplifier. Two reasons, both structural: a shaper
- * per note distorts each string separately where an amplifier distorts the sum of
- * all six, and there was no speaker cabinet to tame the fizz above 5 kHz. Both come
- * free with a recording.
+ * The overdrive has been rebuilt twice, and the two failures are the reason it is
+ * shaped the way it is now.
  *
- * A third voice, `soft`, was the microphone take of the same archtop as `clean`. It
+ * It began as a WaveShaper on every note, and three rounds of tuning never made it
+ * sound like an amplifier. Two structural reasons: a shaper per note distorts each
+ * string separately where an amplifier distorts the sum of all six, and there was no
+ * speaker cabinet to tame the fizz above 5 kHz. (A third, found only later: it drove
+ * the shaper to 2.4 on a domain that clamps at 1, so it was a hard clipper wearing a
+ * tanh's name. See AMP.preGain.)
+ *
+ * Moving the distortion into a recording fixed the cabinet and NOT the sum — six
+ * separately distorted recordings added together are still six separately distorted
+ * strings, which is why chords stayed muddy. So the distortion is back in the graph,
+ * but now on the BUS, where one stage sees every string at once. The recording keeps
+ * its place beside it as `recorded`, because it is a genuinely different guitar.
+ *
+ * A fourth voice, `soft`, was the microphone take of the same archtop as `clean`. It
  * measured 6.7 dB away across third-octave bands and still did not sound like a
  * second instrument — because it was not one. It now falls back to `clean`, so old
  * links keep working.
  */
-export type Timbre = 'clean' | 'electric';
+export type Timbre = 'clean' | 'electric' | 'recorded';
 
 /** One resonance: where, how narrow, how much. */
 interface Resonance {
@@ -64,9 +77,9 @@ interface Resonance {
 /**
  * How each voice is put together.
  *
- * The tone shaping is deliberately light, and for the overdrive there is none at
- * all: a recording arrives with its own guitar, its own pickup and — for the
- * overdrive — its own amplifier and speaker. There is nothing here left to build.
+ * The tone shaping is deliberately light, and for the two overdriven voices there is
+ * none at all: `recorded` arrives with its own amplifier and speaker already on it,
+ * and `electric` gets its voicing from the amplifier it is about to go through.
  */
 const VOICES: Record<
   Timbre,
@@ -76,19 +89,33 @@ const VOICES: Record<
     readonly tone: readonly Resonance[];
     /** Loudness trim, measured — not set by ear. */
     readonly gain: number;
+    /** Whether the sum goes through the amplifier in src/synth/amp.ts. */
+    readonly amp: boolean;
   }
 > = {
   clean: {
     recording: 'electric',
     tone: [{ frequency: 2600, q: 0.8, gain: 2 }],
     gain: 1,
+    amp: false,
   },
   electric: {
+    // The CLEAN recording — feeding a pre-distorted one into a second amplifier is
+    // just mud, and the whole point is that the distortion happens after the sum.
+    recording: 'electric',
+    tone: [],
+    // Full level: the amplifier's own trim, AMP.makeup, is what balances this voice
+    // against the others, and it was measured against exactly this input.
+    gain: 1,
+    amp: true,
+  },
+  recorded: {
     recording: 'dist',
     tone: [],
     // A distorted recording is heavily compressed, so it carries far more energy at
     // the same peak level. Measured at 2.97x the clean set's RMS.
     gain: 0.34,
+    amp: false,
   },
 };
 
@@ -102,6 +129,9 @@ const TONE_FILTERS = 2;
 const STRINGS: Record<Timbre, Omit<PluckOptions, 'random'>> = {
   clean: { damping: 0.08, pickPosition: 0.19, pickNoise: 0.07, sustainSeconds: 6 },
   electric: { damping: 0.02, pickPosition: 0.1, pickNoise: 0.05, sustainSeconds: 8 },
+  // The same string as `electric`: the difference between those two voices is the
+  // amplifier, and this one is going through it either way.
+  recorded: { damping: 0.02, pickPosition: 0.1, pickNoise: 0.05, sustainSeconds: 8 },
 };
 
 /** How much of a fallback note is rendered; longer than anything the app holds. */
@@ -185,6 +215,25 @@ const DEFAULTS: Record<PlayMode, { gap: number; duration: number }> = {
  */
 export const LOOSE_ARPEGGIO_GAP = 0.14;
 
+/**
+ * How a held note behaves once its loop has taken over.
+ *
+ * The recording's own decay is gone from the loop by then — src/synth/loopPoints.ts
+ * flattens it, because a lap that restarts louder than it ended is a tremolo. This
+ * is what goes back in its place: far slower than a real string, so a held fret is
+ * actually held, but unmistakably there, so it is still a struck note and not a
+ * drone. `SUSTAIN` is where it settles, as a share of where it started.
+ */
+const HOLD_SUSTAIN = 0.3;
+const HOLD_DECAY = 4;
+/** How long the other held notes take to step aside when one more joins them. */
+const HOLD_ADJUST = 0.025;
+/**
+ * The longest a note may be held. A looping buffer has no end of its own, so this
+ * is the only thing standing between a lost pointerup and a note that never stops.
+ */
+const MAX_HOLD = 30;
+
 /** The click track: a fifth apart so the downbeat is tellable, and very short. */
 const CLICK_HZ = 1000;
 const CLICK_ACCENT_HZ = 1500;
@@ -206,8 +255,12 @@ const PEAK = 0.55;
  * milliseconds of each other and add much more directly than that. Leaning past 0.5
  * buys headroom exactly where the peaks are, at the cost of a chord sitting a shade
  * below a single note.
+ *
+ * It also keeps the level arriving at the amplifier's shaper nearly constant
+ * across every voicing, which is what makes ONE measured makeup gain valid for
+ * all of them — so exported for src/synth/amp.test.ts to measure against.
  */
-function voicePeak(simultaneous: number): number {
+export function voicePeak(simultaneous: number): number {
   return PEAK / Math.pow(Math.max(1, simultaneous), 0.65);
 }
 
@@ -236,14 +289,27 @@ export interface ProgressionHandle {
   stop(): void;
 }
 
+/** Lets the caller end a note it is holding down. Safe to call more than once. */
+export interface NoteHandle {
+  /**
+   * @param fade Seconds to fade over. The default is a note let go of; pass
+   *   HARD_RELEASE where the finger was taken away rather than lifted — a swipe
+   *   across the neck should leave a click, not a note.
+   */
+  release(fade?: number): void;
+}
+
 export interface AudioPlayer {
   /** Play a list of MIDI notes. Cancels whatever was playing first, unless stacking. */
   play(midiNotes: readonly number[], options?: PlayOptions): void;
   /**
-   * Sound a single note WITHOUT cancelling anything already ringing — so tapping
-   * several fretboard dots lets them stack into a chord by ear.
+   * Sound a single note for as long as it is held, WITHOUT cancelling anything
+   * already ringing — so several fingers on the neck stack into a chord.
+   *
+   * The caller owns the finger and must release the handle. Nothing else ends the
+   * note except a global stop() or MAX_HOLD.
    */
-  playNote(midi: number): void;
+  holdNote(midi: number): NoteHandle;
   /** Play chords in tempo, optionally looping. Replaces any current playback. */
   startProgression(
     chords: readonly (readonly number[])[],
@@ -267,6 +333,7 @@ function audioContextCtor(): Ctor | null {
 }
 
 const NO_OP_HANDLE: ProgressionHandle = { stop: () => {} };
+const NO_OP_NOTE: NoteHandle = { release: () => {} };
 
 /** Which recordings exist. Static data, so it is shared rather than per player. */
 let manifest: Record<string, SampleSet> | null = null;
@@ -317,7 +384,7 @@ export function createAudioPlayer(): AudioPlayer {
   if (!Ctor) {
     return {
       play: () => {},
-      playNote: () => {},
+      holdNote: () => NO_OP_NOTE,
       startProgression: () => NO_OP_HANDLE,
       stop: () => {},
       setTimbre: () => {},
@@ -336,16 +403,40 @@ export function createAudioPlayer(): AudioPlayer {
    * The safety net, kept to hand because the click joins the signal here.
    *
    * A metronome is not the instrument: it must not pick up the guitar's voicing
-   * filters or its loudness trim, or changing to the overdrive would move the click
-   * too. It does still pass the ceiling, because nothing reaches the output raw.
+   * filters, its loudness trim or — now — its amplifier, or changing to the overdrive
+   * would move the click too. Joining here is what buys all three at once, so do not
+   * "tidy" the click onto master. It does still pass the ceiling, because nothing
+   * reaches the output raw.
    */
   let ceiling: WaveShaperNode | null = null;
+  /**
+   * The amplifier, as a pair of level controls rather than a pair of connections.
+   *
+   * Both paths stay wired the whole time and the voice only crossfades between them.
+   * Re-plugging nodes would click if anything were ringing, and setTimbre fires from
+   * a useEffect on mount — before there is an AudioContext to re-plug. Five biquads
+   * and a shaper idling cost nothing worth having a bug over.
+   */
+  let dry: GainNode | null = null;
+  let wet: GainNode | null = null;
   let live: AudioScheduledSourceNode[] = [];
+  /**
+   * The notes with a finger still on them, so each new one can ask the others to
+   * step back. Only the level adjustment lives here — ending a note is the
+   * handle's job, and the handle belongs to whoever is holding it.
+   */
+  const held = new Set<{ retarget(peak: number): void }>();
   /** The current voice — changed by setTimbre, read when each note is built. */
   let timbre: Timbre = 'clean';
 
   /** Decoded audio, once an AudioContext has existed long enough to decode it. */
   const recordings = new Map<string, AudioBuffer>();
+
+  /**
+   * The looping build of each recording, for held notes. Null where a recording
+   * had no sustain worth looping — cached too, so it is not searched for twice.
+   */
+  const sustained = new Map<string, { buffer: AudioBuffer; loop: LoopRegion } | null>();
 
   /** Rendered fallback strings, keyed by voice and pitch. Insertion-ordered, so the
    *  oldest entry is simply the first key when the cache has to make room. */
@@ -373,6 +464,24 @@ export function createAudioPlayer(): AudioPlayer {
       filter.Q.value = resonance?.q ?? 1;
       filter.gain.value = resonance?.gain ?? 0;
     });
+  };
+
+  /** Crossfades the amplifier in or out for the current voice. */
+  const applyAmp = (seconds = 0.02) => {
+    if (!context || !dry || !wet) return;
+    const driven = VOICES[timbre].amp;
+    const at = context.currentTime;
+
+    // Short, but a ramp and not a jump: switching the voice while a chord rings is
+    // an ordinary thing to do, and a step in a gain is a click.
+    for (const [node, target] of [
+      [dry, driven ? 0 : 1],
+      [wet, driven ? 1 : 0],
+    ] as const) {
+      node.gain.cancelScheduledValues(at);
+      node.gain.setValueAtTime(node.gain.value, at);
+      node.gain.linearRampToValueAtTime(target, at + seconds);
+    }
   };
 
   const decodeAll = async (ctx: AudioContext) => {
@@ -412,9 +521,65 @@ export function createAudioPlayer(): AudioPlayer {
       master.gain.value = 0.9;
       const shaped = tone.reduce<AudioNode>((node, filter) => node.connect(filter), master);
 
-      shaped.connect(ceiling);
+      /*
+       * The amplifier, hanging off the sum — which is the entire point. One
+       * nonlinearity that sees all six strings at once is what makes a chord read
+       * as one thick voice instead of six fuzzy notes; src/synth/amp.ts carries the
+       * numbers and amp.test.ts measures that it actually happens.
+       *
+       * It sits AFTER the tone filters because those are the guitar and its pickup,
+       * and the amplifier comes after the guitar — not the speaker before the pickup.
+       *
+       * No DynamicsCompressor here to glue the chord together, however tempting.
+       * That was measured once already (see CEILING_CURVE) and it raised the peak
+       * it was meant to hold down while pumping in time with the strumming.
+       */
+      const stage = (kind: StageKind, settings: AmpStage): BiquadFilterNode => {
+        const filter = context!.createBiquadFilter();
+        filter.type = kind;
+        filter.frequency.value = settings.frequency;
+        // Web Audio does not take a Q the same way for every filter type — a table
+        // value handed over raw is wrong for two of these four, and silently so.
+        filter.Q.value = webAudioQ(kind, settings.q);
+        if (settings.gain !== undefined) filter.gain.value = settings.gain;
+        return filter;
+      };
+
+      const preGain = context.createGain();
+      preGain.gain.value = AMP.preGain;
+
+      const valve = context.createWaveShaper();
+      valve.curve = shaperCurve((x) => ampShape(x));
+      // Without this the aliasing of everything the curve adds folds back down into
+      // the guitar's own range, which is a good deal of what "sounds computed" is.
+      valve.oversample = '4x';
+
+      const makeup = context.createGain();
+      makeup.gain.value = AMP.makeup;
+
+      wet = context.createGain();
+      dry = context.createGain();
+      // Clean is the default voice, so the amplifier starts shut.
+      wet.gain.value = 0;
+      dry.gain.value = 1;
+
+      shaped
+        .connect(stage('lowshelf', AMP.tight))
+        .connect(preGain)
+        .connect(valve)
+        .connect(stage('highpass', AMP.block))
+        .connect(stage('lowpass', AMP.cab[0]))
+        .connect(stage('lowpass', AMP.cab[1]))
+        .connect(stage('peaking', AMP.presence))
+        .connect(stage('lowshelf', AMP.body))
+        .connect(makeup)
+        .connect(wet)
+        .connect(ceiling);
+
+      shaped.connect(dry).connect(ceiling);
 
       applyTone();
+      applyAmp(0);
       // First gesture: the bytes are usually already here, so this only decodes.
       void decodeAll(context);
     }
@@ -432,6 +597,10 @@ export function createAudioPlayer(): AudioPlayer {
       }
     }
     live = [];
+    // Their handles may still be released later and that is harmless, but the
+    // count must not survive the notes: left standing it would make every note
+    // played afterwards quieter, for good.
+    held.clear();
   };
 
   /**
@@ -500,6 +669,106 @@ export function createAudioPlayer(): AudioPlayer {
     return buffer;
   };
 
+  /**
+   * The looping build of this note's buffer, for a finger that is still down.
+   *
+   * A recording runs out after about two seconds, and less than that once it has
+   * been stretched down a few semitones — well short of how long anyone holds a
+   * fret. So the sustain is rebuilt to loop; src/synth/loopPoints.ts does the work
+   * and explains why it takes as much care as it does.
+   *
+   * Built on first use rather than at decode, because most sessions never hold a
+   * note, and cached per file: there are a dozen recordings and one buffer each.
+   */
+  const sustainedFor = (
+    ctx: AudioContext,
+    midi: number,
+  ): { buffer: AudioBuffer; loop: LoopRegion } | null => {
+    const set = manifest?.[VOICES[timbre].recording];
+    const choice = set ? sampleFor(midi, set) : null;
+    const source = choice && recordings.get(choice.file);
+    // Falls back to the plain buffer, which simply runs out — better a note that
+    // ends early than one that does not sound.
+    if (!choice || !source) return null;
+
+    const cached = sustained.get(choice.file);
+    if (cached !== undefined) return cached;
+
+    const samples = source.getChannelData(0);
+    // The pitch of the RECORDING: the loop is cut from this buffer, so it has to
+    // line up with the periods in it, not with the note being asked for.
+    const loop = findLoop(samples, source.sampleRate, midiToFrequency(choice.midi));
+
+    let built: { buffer: AudioBuffer; loop: LoopRegion } | null = null;
+    if (loop) {
+      const flattened = renderSustain(samples, source.sampleRate, loop);
+      const buffer = ctx.createBuffer(1, flattened.length, source.sampleRate);
+      buffer.copyToChannel(flattened, 0);
+      built = { buffer, loop };
+    }
+
+    sustained.set(choice.file, built);
+    return built;
+  };
+
+  /**
+   * One sounding string: a buffer, a level, and nothing else decided yet.
+   *
+   * Whether the note ends on a schedule or when a finger lifts is the caller's
+   * business, which is the only difference between the two ways of playing one.
+   *
+   * `sustain` swaps in the looping build of the buffer — see src/synth/loopPoints.ts.
+   * Only a held note wants it: everything else already knows how long it has, and a
+   * note that outlives its recording is exactly what a scheduled one never does.
+   */
+  const buildVoice = (
+    ctx: AudioContext,
+    midi: number,
+    at: number,
+    peak: number,
+    sustain = false,
+  ): { source: AudioBufferSourceNode; gain: GainNode; loopFrom: number; level: number } => {
+    const recorded = recordingFor(midi);
+    const held = sustain ? sustainedFor(ctx, midi) : null;
+
+    const source = ctx.createBufferSource();
+    source.buffer = held ? held.buffer : (recorded?.buffer ?? modelledFor(ctx, midi));
+    // Playing a recording faster raises its pitch, the way speeding up a record does.
+    if (recorded) source.playbackRate.value = recorded.playbackRate;
+
+    let loopFrom = Infinity;
+    if (held) {
+      source.loop = true;
+      source.loopStart = held.loop.start;
+      source.loopEnd = held.loop.end;
+      // Loop points are positions in the BUFFER, so the rate stretches how long it
+      // takes to reach them. Whoever puts a decay back on this needs to know when.
+      loopFrom = held.loop.start / (recorded?.playbackRate ?? 1);
+    }
+
+    // The decay lives in the buffer — a real string dies away on its own, highs
+    // first. So this gain only sets the level and takes the note away when its time
+    // is up; an envelope with a decay of its own would fight that and choke the note.
+    const gain = ctx.createGain();
+    const level = peak * VOICES[timbre].gain;
+    gain.gain.setValueAtTime(level, at);
+
+    // Straight through. The overdrive was a WaveShaper here once and is now on the
+    // bus in ensureContext, where it can distort the sum rather than each string.
+    source.connect(gain).connect(master!);
+    source.start(at);
+
+    source.addEventListener('ended', () => {
+      live = live.filter((other) => other !== source);
+      // A looping progression builds a few hundred of these per pass; letting go
+      // explicitly is cheaper than leaning on the graph to notice.
+      gain.disconnect();
+    });
+    live.push(source);
+
+    return { source, gain, loopFrom, level };
+  };
+
   const voice = (
     ctx: AudioContext,
     midi: number,
@@ -508,37 +777,16 @@ export function createAudioPlayer(): AudioPlayer {
     peak: number,
     release = SOFT_RELEASE,
   ) => {
-    const recorded = recordingFor(midi);
+    const { source, gain } = buildVoice(ctx, midi, at, peak);
 
-    const source = ctx.createBufferSource();
-    source.buffer = recorded ? recorded.buffer : modelledFor(ctx, midi);
-    // Playing a recording faster raises its pitch, the way speeding up a record does.
-    if (recorded) source.playbackRate.value = recorded.playbackRate;
-
-    // The decay lives in the buffer — a real string dies away on its own, highs
-    // first. So this gain only sets the level and takes the note away when its time
-    // is up; an envelope with a decay of its own would fight that and choke the note.
-    //
-    // How sharply it is taken away is the caller's call, because that is what
+    // How sharply the note is taken away is the caller's call, because that is what
     // separates a note left to ring from one damped with the palm.
-    const gain = ctx.createGain();
     const scaledPeak = peak * VOICES[timbre].gain;
     const fade = Math.min(release, duration / 2);
-    gain.gain.setValueAtTime(scaledPeak, at);
     gain.gain.setValueAtTime(scaledPeak, at + duration - fade);
     gain.gain.linearRampToValueAtTime(0.0001, at + duration);
 
-    // Straight through. The overdrive used to be a WaveShaper here and is now part of
-    // the recording, which is the whole reason it stopped sounding computed.
-    source.connect(gain).connect(master!);
-
-    source.start(at);
     source.stop(at + duration + 0.02);
-
-    source.addEventListener('ended', () => {
-      live = live.filter((other) => other !== source);
-    });
-    live.push(source);
   };
 
   /**
@@ -616,10 +864,91 @@ export function createAudioPlayer(): AudioPlayer {
     }
   };
 
-  const playNote = (midi: number) => {
+  const holdNote = (midi: number): NoteHandle => {
     const ctx = ensureContext();
-    // On its own, and so at full strength.
-    voice(ctx, midi, ctx.currentTime + 0.02, 1, voicePeak(1));
+    const at = ctx.currentTime + 0.02;
+
+    const voiceGain = VOICES[timbre].gain;
+    const { source, gain, loopFrom, level } = buildVoice(ctx, midi, at, voicePeak(held.size + 1), true);
+
+    /**
+     * The slow decay that keeps a held note a guitar.
+     *
+     * The loop holds the string at a steady level for as long as the finger is
+     * down, and a string that never dies away is an organ. So the decay the loop
+     * took out goes back on here — much slower than the recording's own, because
+     * the point of holding a fret is to hear the note, but present, so it still
+     * behaves like something that was struck once.
+     *
+     * Armed for when the loop actually begins: until then the recording is still
+     * playing its own attack and decay, and two decays over each other would
+     * choke it.
+     *
+     * And not armed at all where there is no loop — the fallback string, or a
+     * recording with no sustain to cut one from. That note still has its own
+     * decay and simply runs out, which is the honest thing for it to do.
+     */
+    const looping = Number.isFinite(loopFrom);
+    const decay = (from: number, top: number) => {
+      if (looping) gain.gain.setTargetAtTime(top * HOLD_SUSTAIN, from, HOLD_DECAY);
+    };
+    decay(at + loopFrom, level);
+
+    /** Where this note is now, as a fraction of the level it was given. */
+    let peakNow = level;
+
+    const entry = {
+      retarget: (peak: number) => {
+        const now = ctx.currentTime;
+        const next = peak * voiceGain;
+        // Reading the parameter is the only way to find out how far the decay has
+        // already got: cancelScheduledValues rewinds to the last scheduled event,
+        // not to where the value actually is, so it has to be pinned first.
+        const current = gain.gain.value;
+        const decayed = peakNow > 0 ? current / peakNow : 1;
+
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(current, now);
+        gain.gain.linearRampToValueAtTime(next * decayed, now + HOLD_ADJUST);
+        // Re-armed from the new level, so a note that has been ringing a while
+        // does not get its decay handed back to it.
+        decay(now + HOLD_ADJUST, next);
+        peakNow = next;
+      },
+    };
+
+    // Every finger already down steps back to make room for this one. Without it
+    // six held notes would arrive at the ceiling six times over and come out
+    // crushed — voicePeak is the same rule a strum is held to.
+    held.add(entry);
+    for (const other of held) other.retarget(voicePeak(held.size));
+
+    // A looping buffer never ends on its own, so a pointerup that never arrives
+    // would leave a note sounding for good. Nothing is held this long on purpose.
+    source.stop(at + MAX_HOLD);
+
+    let released = false;
+    return {
+      release: (fade = SOFT_RELEASE) => {
+        if (released) return;
+        released = true;
+
+        held.delete(entry);
+        for (const other of held) other.retarget(voicePeak(held.size));
+
+        const now = ctx.currentTime;
+        try {
+          const current = gain.gain.value;
+          gain.gain.cancelScheduledValues(now);
+          gain.gain.setValueAtTime(current, now);
+          gain.gain.linearRampToValueAtTime(0.0001, now + fade);
+          // Replaces the MAX_HOLD stop above; a second stop() supersedes the first.
+          source.stop(now + fade + 0.02);
+        } catch {
+          // Already stopped by a global stop() — the note is over either way.
+        }
+      },
+    };
   };
 
   const startProgression = (
@@ -743,15 +1072,16 @@ export function createAudioPlayer(): AudioPlayer {
   const setTimbre = (next: Timbre) => {
     timbre = next;
     // Recordings are cached per file and fallback strings per voice, so neither needs
-    // invalidating — but the tone filters are one shared set and have to be pointed
-    // at the new voice.
+    // invalidating — but the tone filters and the amplifier are one shared set each
+    // and have to be pointed at the new voice.
     applyTone();
+    applyAmp();
   };
 
 
   return {
     play,
-    playNote,
+    holdNote,
     startProgression,
     stop,
     setTimbre,
