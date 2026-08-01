@@ -87,10 +87,22 @@ export const AMP = {
    * An amplifier is driven so its SUSTAIN saturates and its peaks get flattened;
    * that flattening is what overdrive is. So this is sized from the RMS, and the
    * peaks now run past the shaper's edge — where the curve is already flat, see
-   * `drive`. Measured on the real recordings: a six-string chord goes from 7 %
-   * nonlinear content to 48 %, and its crest factor from 20 dB to about 7 dB.
+   * `drive`.
+   *
+   * How far past decides how long the dirt LASTS, which turned out to matter as
+   * much as how much of it there is. A chord decays, and with it the drive into
+   * the curve, so at 6 the sound was distorted at the pick and clean a second
+   * later — measured as intermodulation off the chord's own harmonics, 4.1 %
+   * falling to 0.8 %. At 16 it is 10.3 % falling to 4.4 %, and the note holds
+   * 4.2 dB of its opening level instead of 8.5 dB below it. That sustain is the
+   * amplifier, not the guitar.
+   *
+   * What stops it going further is not the bass — the shelf above keeps
+   * intermodulation below the low E at 0.02 % of the signal even here — but that
+   * a chord has to stay readable on a fretboard trainer. At 16, 91.6 % of the
+   * energy still sits on a harmonic of a note actually being played.
    */
-  preGain: 6,
+  preGain: 16,
 
   /**
    * Steepness of the valve's curve — where the saturation comes from, rather
@@ -159,7 +171,7 @@ export const AMP = {
    * An OfflineAudioContext rendering an open E major from the actual mp3s
    * through the actual graph is what set it, and it has to be re-measured after
    * any change to preGain or drive — an amplifier turned up is louder as well as
-   * dirtier, and here that is 13.3 dB of it. The reference below disagreed by
+   * dirtier, and here that is 26.4 dB of it. The reference below disagreed by
    * 2.3 dB even before that, and the reason is worth keeping:
    *
    * The gap is not the reference being sloppy, and it is worth knowing because
@@ -177,7 +189,7 @@ export const AMP = {
    * 24 dB per octave and that the signal stays inside the shaper, and it cannot
    * set this. amp.test.ts asserts only a sane range for it, and says so.
    */
-  makeup: 0.067,
+  makeup: 0.0478,
 };
 
 /**

@@ -276,6 +276,31 @@ describe('renderAmp', () => {
     expect(slope(level) / slope(0)).toBeLessThan(0.75);
   });
 
+  it('still bends once the chord has decayed', () => {
+    /*
+     * The other half of "it sounds distorted", and the less obvious half. A
+     * chord dies away, and the drive into the curve dies with it, so an
+     * amplifier set just barely into saturation is dirty at the pick and clean a
+     * second later — measured on the recordings at a drive of 6, intermodulation
+     * fell from 4.1 % to 0.8 % within a second, and the ear reads that as a
+     * clean guitar with a scratchy attack.
+     *
+     * So the curve has to still be bending well BELOW the level the chord
+     * arrives at. Twelve decibels down is about where a strummed chord sits a
+     * second later; the slope there must still have visibly given way.
+     *
+     * A statement about the curve and its operating point, which is exactly what
+     * this reference can speak to — unlike absolute level, see AMP.makeup.
+     */
+    const driven = ampInput(chord(E_MAJOR), SAMPLE_RATE);
+    let sum = 0;
+    for (const value of driven) sum += value * value;
+    const decayed = Math.sqrt(sum / driven.length) / 4; // -12 dB
+
+    const slope = (x: number) => (ampShape(x + 1e-4) - ampShape(x - 1e-4)) / 2e-4;
+    expect(slope(decayed) / slope(0)).toBeLessThan(0.85);
+  });
+
   it('has finished bending before the shaper runs out of domain', () => {
     /*
      * What makes it safe to drive that hard. A WaveShaper clamps its input to
