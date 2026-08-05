@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { hasChordShapes } from './ChordShape';
 import { Tuning } from './Tuning';
 
 describe('Tuning — Beschreibung', () => {
@@ -21,6 +22,30 @@ describe('Tuning — Beschreibung', () => {
     // Kapo im 3. Bund: aus E-A-D-G-B-E wird G-C-F-Bb-D-G. Ein von Hand gepflegter
     // Name hätte hier weiter die offenen Saiten behauptet.
     expect(Tuning.STANDARD.withCapo(3).description).toBe('Standard + Kapo 3 (G-C-F-Bb-D-G)');
+  });
+
+  it('teilt jede neue Stimmung ein Formen-Set mit einer alten', () => {
+    // Der Grund, dass D Standard und Drop C nichts gekostet haben: shapeSetFor
+    // vergleicht die Saitenabstände, nicht die Töne. Wer hier eine Stimmung
+    // ergänzt, deren Muster neu ist, braucht auch ein neues Set — dieser Test
+    // sagt es ihm.
+    expect(Tuning.D_STANDARD.intervals).toEqual(Tuning.STANDARD.intervals);
+    expect(Tuning.DROP_C.intervals).toEqual(Tuning.DROP_D.intervals);
+
+    expect(Tuning.D_STANDARD.description).toBe('D Standard (D-G-C-F-A-D)');
+    expect(Tuning.DROP_C.description).toBe('Drop C (C-G-C-F-A-D)');
+  });
+
+  it('gibt jeder angebotenen Stimmung Akkordformen', () => {
+    for (const tuning of Tuning.ALL) {
+      expect(hasChordShapes(tuning), tuning.name).toBe(true);
+    }
+  });
+
+  it('findet jede angebotene Stimmung über ihre id wieder', () => {
+    for (const tuning of Tuning.ALL) {
+      expect(Tuning.byId(tuning.id)).toBe(tuning);
+    }
   });
 
   it('hält den Namen kurz genug, um ihn nebenbei anzuzeigen', () => {

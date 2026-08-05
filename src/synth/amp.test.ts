@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { spectrum } from '../test/spectrum';
 import { voicePeak } from '../audio';
 import { midiToFrequency, STANDARD_STRUM_GAP } from '../theory';
-import { AMP, ampInput, ampShape, biquad, renderAmp, webAudioQ } from './amp';
+import { AMP, AMP_IDS, AMPS, ampInput, ampShape, biquad, renderAmp, webAudioQ } from './amp';
 import { pluck, type PluckOptions } from './pluck';
 
 const SAMPLE_RATE = 48000;
@@ -364,4 +364,77 @@ describe('renderAmp', () => {
     // 8 kHz is a rounding error next to the band the guitar lives in.
     expect(band(8000, 20000) / band(80, 8000)).toBeLessThan(0.001);
   });
+});
+
+/**
+ * The properties above are written against the crunch amp because that is the one
+ * that was tuned by measurement. They are not private to it: an entry in AMPS that
+ * emitted DC, clipped on a corner or fizzed above the speaker would be a broken
+ * amplifier whichever make it is named after. So the same assertions run over the
+ * whole table — that is what stops a new archetype from being added by eye.
+ */
+describe('every amplifier in AMPS', () => {
+  const clean = chord(E_MAJOR);
+
+  for (const id of AMP_IDS) {
+    const spec = AMPS[id];
+
+    describe(id, () => {
+      it('emits no DC into silence', () => {
+        expect(ampShape(0, spec.drive, spec.bias)).toBe(0);
+      });
+
+      it('has finished bending before the shaper runs out of domain', () => {
+        const slope = (x: number) =>
+          (ampShape(x, spec.drive, spec.bias) - ampShape(x - 2e-3, spec.drive, spec.bias)) / 2e-3;
+        // A gentler amp bends less far by the edge than the crunch one does, so
+        // this bound is looser than the 0.001 above — what matters is that the
+        // curve is flattening, not that every amp is a brick wall.
+        expect(slope(0.999) / slope(1e-4)).toBeLessThan(0.2);
+      });
+
+      it('leans to one side, which is where the warmth comes from', () => {
+        const up = ampShape(0.5, spec.drive, spec.bias);
+        const down = -ampShape(-0.5, spec.drive, spec.bias);
+        expect(up).not.toBeCloseTo(down, 6);
+      });
+
+      it('keeps its level within reach of the clean voice', () => {
+        /*
+         * The coarse bound from the single-amp test, applied to all four — it
+         * catches a makeup that lost a decimal point, which is the way this table
+         * actually breaks. It cannot check the makeup is RIGHT: that comes from
+         * scripts/measure-makeup.html and the browser, for the reason written out
+         * where the numbers live.
+         */
+        const driven = renderAmp(clean, SAMPLE_RATE, spec);
+        expect(Math.abs(dB(rms(driven) / rms(clean))), id).toBeLessThan(12);
+      });
+
+      it('rolls the fizz off above its own speaker', () => {
+        const driven = renderAmp(clean, SAMPLE_RATE, spec);
+        const frame = driven.subarray(SAMPLE_RATE / 4, SAMPLE_RATE / 4 + N);
+        const magnitude = spectrum(Float64Array.from(frame));
+
+        const band = (from: number, to: number) => {
+          let sum = 0;
+          const first = Math.round((from * N) / SAMPLE_RATE);
+          const last = Math.round((to * N) / SAMPLE_RATE);
+          for (let k = first; k < last; k++) sum += magnitude[k] * magnitude[k];
+          return sum;
+        };
+
+        expect(band(8000, 20000) / band(80, 8000), id).toBeLessThan(0.001);
+      });
+
+      it('blocks the DC its own curve makes', () => {
+        const driven = renderAmp(clean, SAMPLE_RATE, spec);
+        let sum = 0;
+        for (const sample of driven) sum += sample;
+        // The mean of the output, against its own RMS: an unblocked asymmetric
+        // curve would push a step here on every note onset.
+        expect(Math.abs(sum / driven.length) / rms(driven), id).toBeLessThan(0.01);
+      });
+    });
+  }
 });

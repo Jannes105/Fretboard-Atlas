@@ -19,6 +19,7 @@ import {
   customSteps,
   defaultPattern,
   defaultVoicingIndex,
+  voicingPath,
   diatonicChords,
   Fretboard,
   serializePattern,
@@ -73,9 +74,11 @@ export default function App() {
     bpm,
     loop,
     sound,
+    amp,
     beatsPerBar,
     rhythm,
     strum,
+    feel,
     sustain,
     click,
   } = state;
@@ -259,9 +262,11 @@ export default function App() {
   const [chosenVoicings, setChosenVoicings] = useState<number[]>([]);
 
   // A different key, progression, chord size or tuning means different grips, so
-  // any earlier choice is meaningless — fall back to the barre default.
+  // any earlier choice is meaningless. The replacements are chosen as a sequence,
+  // not one by one: the opening grip is still the barre default, and the rest are
+  // the ones that keep the hand where it already is.
   useEffect(() => {
-    setChosenVoicings(stepVoicings.map(defaultVoicingIndex));
+    setChosenVoicings(voicingPath(stepVoicings));
   }, [stepVoicings]);
 
   const voicingIndex = (step: number) =>
@@ -280,6 +285,13 @@ export default function App() {
   useEffect(() => {
     player().setTimbre(sound);
   }, [sound]);
+
+  // Same again for the amplifier. Separate from the voice on purpose: switching
+  // amplifier while `clean` is selected is legal and silent, and the choice is
+  // still there when the overdrive is switched back on.
+  useEffect(() => {
+    player().setAmp(amp);
+  }, [amp]);
 
 
   // A one-off chord has no bar to spread across, so an arpeggio there just walks the
@@ -418,6 +430,7 @@ export default function App() {
     beatsPerBar,
     rhythm,
     style: strum,
+    feel,
     length: sustain,
     click,
     loop,
@@ -442,10 +455,12 @@ export default function App() {
           capo={capo}
           fretCount={fretCount}
           sound={sound}
+          amp={amp}
           onTuningIdChange={(next) => update('tuningId', next)}
           onCapoChange={(next) => update('capo', next)}
           onFretCountChange={(next) => update('fretCount', next)}
           onSoundChange={(next) => update('sound', next)}
+          onAmpChange={(next) => update('amp', next)}
         />
       </header>
 
@@ -718,6 +733,7 @@ export default function App() {
               >
                 <option value={3}>Dreiklänge</option>
                 <option value={4}>Septakkorde</option>
+                <option value={5}>Nonakkorde</option>
               </select>
             </div>
 
@@ -819,6 +835,7 @@ export default function App() {
             beatsPerBar={beatsPerBar}
             rhythm={rhythm}
             strum={strum}
+            feel={feel}
             sustain={sustain}
             click={click}
             onBeatsPerBarChange={(nextBeats) =>
@@ -831,6 +848,7 @@ export default function App() {
             }
             onRhythmChange={(next) => update('rhythm', next)}
             onStrumChange={(next) => update('strum', next)}
+            onFeelChange={(next) => update('feel', next)}
             onSustainChange={(next) => update('sustain', next)}
             onClickChange={(next) => update('click', next)}
           />

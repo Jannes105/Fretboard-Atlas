@@ -28,6 +28,7 @@ const { player, transport, noteHandles } = vi.hoisted(() => {
       ),
       stop: vi.fn(),
       setTimbre: vi.fn(),
+      setAmp: vi.fn(),
       available: true,
     },
   };
@@ -360,6 +361,31 @@ describe('App — Klang', () => {
     expect(window.location.search).toContain('sound=electric');
   });
 
+  it('bietet die Verstärkerwahl erst zum Overdrive an und gibt sie weiter', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    const openSetup = async () =>
+      user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
+    const ampSelect = () =>
+      [...container.querySelectorAll<HTMLSelectElement>('.setup-panel select')].find((select) =>
+        [...select.options].some((option) => option.value === 'modern-high-gain'),
+      );
+
+    // Clean geht gar nicht durch den Verstärker — ein Wahlschalter dafür wäre tot.
+    await openSetup();
+    expect(ampSelect()).toBeUndefined();
+
+    const soundSelect = [...container.querySelectorAll<HTMLSelectElement>('.setup-panel select')].find(
+      (select) => [...select.options].some((option) => option.value === 'electric'),
+    )!;
+    await user.selectOptions(soundSelect, 'electric');
+
+    await user.selectOptions(ampSelect()!, 'modern-high-gain');
+
+    expect(player.setAmp).toHaveBeenCalledWith('modern-high-gain');
+    expect(window.location.search).toContain('amp=modern-high-gain');
+  });
 });
 
 describe('App — Tonlänge', () => {

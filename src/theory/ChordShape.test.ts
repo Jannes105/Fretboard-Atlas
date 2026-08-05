@@ -9,7 +9,7 @@ import {
 } from './ChordShape';
 import { Note } from './Note';
 import { ROOT_CHOICES, Scale } from './Scale';
-import { MAJOR } from './ScaleType';
+import { MAJOR, SCALE_TYPES } from './ScaleType';
 import { Tuning } from './Tuning';
 
 /** The pitch classes a voicing actually sounds in a given tuning, low string first. */
@@ -167,6 +167,48 @@ describe('voicingsFor', () => {
 
     expect(voicings.find((v) => v.baseFret === 0)!.isBarre).toBe(false);
     expect(voicings.every((v) => v.isBarre === v.baseFret > 0)).toBe(true);
+  });
+});
+
+describe('Nonakkorde', () => {
+  it('findet für jeden Neunklang jeder Skala einen Griff', () => {
+    // Fünf verschiedene Töne auf sechs Saiten: ohne die mittlere Suchstufe
+    // (Quinte weg, Spanne aber weiterhin handbreit) fand die Suche hier nichts.
+    for (const type of SCALE_TYPES.filter((t) => t.isHeptatonic)) {
+      for (const rootName of ROOT_CHOICES) {
+        const scale = new Scale(Note.parse(rootName), type);
+        for (const chord of diatonicChords(scale, 5)) {
+          expect(
+            voicingsFor(chord, { maxFret: 15 }).length,
+            `${scale.name()} — ${chord.name()}`,
+          ).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('lässt höchstens die Quinte weg, nie Terz oder Septime', () => {
+    // Was fehlen darf, entscheidet droppableTones. Terz und Septime tragen die
+    // Qualität — ohne sie wäre es ein anderer Akkord, kein unvollständiger.
+    const scale = new Scale(Note.parse('C'), MAJOR);
+
+    for (const chord of diatonicChords(scale, 5)) {
+      const fifth = (chord.root.pitchClass + 7) % 12;
+      const mustSound = chord.notes
+        .map((note) => note.pitchClass)
+        .filter((pitchClass) => pitchClass !== fifth);
+
+      for (const voicing of voicingsFor(chord, { maxFret: 15 })) {
+        const heard = new Set(
+          voicing.frets
+            .map((fret, string) => (fret >= 0 ? Tuning.STANDARD.pitchClassAt(string, fret) : -1))
+            .filter((pitchClass) => pitchClass >= 0),
+        );
+        for (const pitchClass of mustSound) {
+          expect(heard.has(pitchClass), `${chord.name()} — Ton ${pitchClass}`).toBe(true);
+        }
+      }
+    }
   });
 });
 

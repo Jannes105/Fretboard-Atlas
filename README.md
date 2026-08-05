@@ -32,6 +32,7 @@ das DOM:
 | `Fretboard.ts` | Ton pro Saite/Bund, Lagen ("Boxen") |
 | `Chord.ts` | Leitereigene Akkorde durch Terzschichtung |
 | `ChordShape.ts` | Greifbare Akkordformen je Stimmung |
+| `voicingPath.ts` | Ein Griff je Akkord — als Folge, nicht einzeln |
 | `Progression.ts` | Gängige Akkordfolgen |
 | `format.ts` | Namen für die Anzeige: `#`/`b` werden zu ♯/♭ |
 
@@ -58,11 +59,40 @@ Die Griffe sind nicht auf gut Glück abgetippt: ein Test spielt **jede Form jede
 Sets auf jedem Grundton** in ihrer Stimmung nach und vergleicht die klingenden
 Tonhöhen mit dem Akkord.
 
+**Welcher Griff gespielt wird, entscheidet die ganze Folge, nicht der einzelne
+Akkord.** Jeden für sich am bequemsten zu wählen schickt die Hand über den Hals,
+obwohl der nächste Akkord meist einen Griff dort hat, wo sie schon steht.
+`voicingPath.ts` sucht deshalb den kürzesten Weg durch alle Kandidaten:
+gemeinsame Töne zählen als Gewinn, Handweg als Kosten. Über alle Presets in sechs
+Tonarten sank die Handbewegung von 240 auf 128 Bünde.
+
+Das Gewicht der Bequemlichkeit gegen den Weg ist gemessen und nicht geraten — bei
+vollem Gewicht wandert die Hand zehn Bünde weit für eine offene Saite, und der
+12-Takt-Blues in A wurde damit schlechter statt besser.
+
 Eine Lage ("Box") ist übrigens nichts anderes als ein **Fünf-Bund-Fenster**. Die
 berühmte Box 1 der A-Moll-Pentatonik ist exakt "alle Skalentöne zwischen Bund 4
 und 8". Die Fenster liegen dort, wo die Skalenstufen der Reihe nach auf der
 tiefsten Saite landen — für A-Moll-Pentatonik ergibt das die Bünde 5, 8, 10, 12
 und 15, also genau die fünf Positionen, die man lernt.
+
+### Fachliches Hintergrundwissen
+
+`docs/` sammelt Recherche zu Musiktheorie, E-Gitarre, Effektpedalen und
+Verstärkern — was es in Musik und Hardware gibt, mit Quellen, plus eine
+Bewertung, was davon in diese App gehört. Nachschlagen, bevor eine neue Skala,
+ein Akkordtyp oder ein Klangbaustein aus dem Gedächtnis entsteht.
+
+### Der Verstärker ist eine Tabelle, und jeder Eintrag ist gemessen
+
+`src/synth/amp.ts` hält vier Archetypen — American Clean, British Chime, British
+Crunch, Modern High Gain. Der Ausgleichspegel `makeup` jedes einzelnen kommt aus
+`scripts/measure-makeup.html`, das die echten Aufnahmen durch den echten Graphen
+in einem `OfflineAudioContext` schickt. Er lässt sich nicht ausrechnen: Modell
+und Aufnahme treiben die Kennlinie unterschiedlich stark, und beim Anlegen der
+drei neuen Amps lagen Schätzung und Messung bis zu 6,2 dB auseinander. Wer an
+`preGain`, `drive` oder einem Filter dreht, misst neu — sonst ändert der
+Umschalter die Lautstärke statt den Klang.
 
 ## Zustand
 

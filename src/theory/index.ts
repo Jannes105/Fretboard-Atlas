@@ -42,7 +42,8 @@ export {
   type Voicing,
   type VoicingOptions,
 } from './ChordShape';
-export { generateVoicings } from './voicingSearch';
+export { generateVoicings, gripCost } from './voicingSearch';
+export { voicingPath } from './voicingPath';
 export {
   CAGED_ORDER,
   CAGED_SHAPES,
@@ -61,6 +62,9 @@ export {
   isDefaultPattern,
   PATTERN_PRESETS,
   type PatternPreset,
+  type SwingFeel,
+  SWING_RATIO,
+  slotTime,
   type StrumStyle,
   STANDARD_STRUM_GAP,
   arpeggioStringCount,

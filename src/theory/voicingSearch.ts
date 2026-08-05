@@ -111,8 +111,15 @@ function isValid(
   return tuning.pitchClassAt(lowestString, frets[lowestString]) === bassPitchClass;
 }
 
-/** Lower is more comfortable: penalise gaps, stretch and fingers, reward open strings. */
-function gripCost(frets: readonly number[]): number {
+/**
+ * Lower is more comfortable: penalise gaps, stretch and fingers, reward open strings.
+ *
+ * Exported because voicingPath.ts weighs the same comfort against hand movement
+ * when it picks one grip per chord of a progression. Two scales for "how awkward
+ * is this grip" would drift apart, and the ranking here is the one the picker
+ * already shows.
+ */
+export function gripCost(frets: readonly number[]): number {
   const soundingStrings = frets
     .map((fret, string) => (fret >= 0 ? string : -1))
     .filter((string) => string >= 0);
@@ -185,28 +192,57 @@ function runSearch(
 }
 
 /**
- * Playable grips for the chord, most comfortable first. Coverage wins over
- * comfort: if a tight, clean grip cannot be found, the search widens (a longer
- * stretch, and the fifth may be dropped) so a hard grip is offered rather than
- * none. Empty only when even that finds nothing.
+ * The tones this chord may give up, in the order a guitarist gives them up.
+ *
+ * The perfect fifth first, and for most chords last as well: it says nothing about
+ * the chord's quality, which is exactly why it goes. The third and the seventh are
+ * never in this list — those are the guide tones, and a grip without them is a
+ * different chord.
+ *
+ * A ninth chord adds a second step. Five distinct tones on six strings inside a
+ * four-fret window is rarely reachable at all, and the standard shape a player
+ * actually uses for a 9th is root, third, seventh, ninth — the fifth gone, the
+ * root kept because nothing else here is playing a bass line.
+ */
+function droppableTones(chord: Chord): number[] {
+  const fifth = mod(chord.root.pitchClass + 7, 12);
+  const tones = new Set(chord.pitchClasses);
+  // A power chord is root and fifth; dropping the fifth leaves a single note.
+  if (tones.size <= 2 || !tones.has(fifth)) return [];
+  return [fifth];
+}
+
+/**
+ * Playable grips for the chord, most comfortable first.
+ *
+ * Coverage wins over comfort: the search runs a sequence of passes, each one
+ * giving up a little more than the last, and stops at the first that finds
+ * anything. A hard grip beats no grip; an incomplete chord beats a wrong one,
+ * which is why only `droppableTones` may ever go missing.
+ *
+ * The passes were two — strict, then a wider stretch with the fifth dropped — and
+ * a ninth chord cleared neither. The middle pass is what it needs: the fifth
+ * dropped while the stretch stays hand-sized. It cannot change what a triad or a
+ * seventh chord returns, because those already find grips in the strict pass.
  */
 export function generateVoicings(chord: Chord, tuning: Tuning, maxFret: number): Voicing[] {
   if (!chord.quality) return [];
 
   const bassPitchClass = (chord.bass ?? chord.root).pitchClass;
   const allowed = new Set(chord.pitchClasses);
+  const droppable = droppableTones(chord);
+  const withoutDropped = new Set([...allowed].filter((tone) => !droppable.includes(tone)));
 
-  // Strict pass: every tone present, a hand-sized stretch.
-  let grips = runSearch(tuning, maxFret, bassPitchClass, allowed, allowed, 4);
+  const passes: readonly { required: ReadonlySet<number>; span: number }[] = [
+    { required: allowed, span: 4 },
+    { required: withoutDropped, span: 4 },
+    { required: withoutDropped, span: 5 },
+  ];
 
-  if (grips.length === 0) {
-    // Widen, and let the perfect fifth go — the tone a guitarist drops first.
-    const fifth = mod(chord.root.pitchClass + 7, 12);
-    const required =
-      allowed.size > 2 && allowed.has(fifth)
-        ? new Set([...allowed].filter((pitchClass) => pitchClass !== fifth))
-        : allowed;
-    grips = runSearch(tuning, maxFret, bassPitchClass, allowed, required, 5);
+  let grips: Grip[] = [];
+  for (const pass of passes) {
+    grips = runSearch(tuning, maxFret, bassPitchClass, allowed, pass.required, pass.span);
+    if (grips.length > 0) break;
   }
 
   return grips

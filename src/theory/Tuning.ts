@@ -93,7 +93,31 @@ export class Tuning {
    */
   static readonly EB = new Tuning('eb', 'Eb Standard', [39, 44, 49, 54, 58, 63]);
 
-  static readonly ALL: readonly Tuning[] = [Tuning.STANDARD, Tuning.EB, Tuning.DROP_D];
+  /**
+   * Every string down a whole tone. Same argument as Eb — the gaps do not move,
+   * so the standard shapes hold.
+   */
+  static readonly D_STANDARD = new Tuning('d-standard', 'D Standard', [38, 43, 48, 53, 57, 62]);
+
+  /**
+   * D Standard with the low string dropped a further whole tone. Its gaps come out
+   * as [7,5,5,4,5] — the very pattern Drop D has, so it inherits the whole Drop D
+   * shape set including the one-finger power chord, two whole tones lower.
+   *
+   * That is the point worth keeping: neither of these two tunings needed a single
+   * new chord shape. `shapeSetFor` matches on the gaps between the strings and not
+   * on the tuning, so a tuning that shifts everything equally, or shifts the low
+   * string by the same amount Drop D does, is already covered.
+   */
+  static readonly DROP_C = new Tuning('drop-c', 'Drop C', [36, 43, 48, 53, 57, 62]);
+
+  static readonly ALL: readonly Tuning[] = [
+    Tuning.STANDARD,
+    Tuning.EB,
+    Tuning.D_STANDARD,
+    Tuning.DROP_D,
+    Tuning.DROP_C,
+  ];
 
   static byId(id: string): Tuning {
     return Tuning.ALL.find((tuning) => tuning.id === id) ?? Tuning.STANDARD;

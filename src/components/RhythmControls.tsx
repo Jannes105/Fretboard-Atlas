@@ -4,6 +4,7 @@ import {
   PATTERN_PRESETS,
   serializePattern,
   type StrumStyle,
+  type SwingFeel,
 } from '../theory';
 import { RhythmEditor } from './RhythmEditor';
 import './RhythmControls.css';
@@ -12,10 +13,12 @@ interface RhythmControlsProps {
   beatsPerBar: number;
   rhythm: string;
   strum: StrumStyle;
+  feel: SwingFeel;
   sustain: NoteLength;
   onBeatsPerBarChange: (beatsPerBar: number) => void;
   onRhythmChange: (rhythm: string) => void;
   onStrumChange: (strum: StrumStyle) => void;
+  onFeelChange: (feel: SwingFeel) => void;
   onSustainChange: (sustain: NoteLength) => void;
 }
 
@@ -38,6 +41,15 @@ const STRUMS: readonly { value: StrumStyle; label: string }[] = [
 const LENGTHS: readonly { value: NoteLength; label: string }[] = [
   { value: 'ring', label: 'ausklingen' },
   { value: 'stopped', label: 'abgestoppt' },
+];
+
+/**
+ * Where the offbeat sits. Two entries and no slider, for the reason the strum
+ * speeds were cut to two: what a player picks is straight or shuffled.
+ */
+const FEELS: readonly { value: SwingFeel; label: string }[] = [
+  { value: 'straight', label: 'gerade' },
+  { value: 'shuffle', label: 'Shuffle' },
 ];
 
 const METERS: readonly { value: number; label: string }[] = [
@@ -69,10 +81,12 @@ export function RhythmControls({
   beatsPerBar,
   rhythm,
   strum,
+  feel,
   sustain,
   onBeatsPerBarChange,
   onRhythmChange,
   onStrumChange,
+  onFeelChange,
   onSustainChange,
 }: RhythmControlsProps) {
   const [open, setOpen] = useState(false);
@@ -111,9 +125,14 @@ export function RhythmControls({
           <path d="M5 2v10M2.6 9.6 5 12.4l2.4-2.8M11 14V4M8.6 6.4 11 3.6l2.4 2.8" />
         </svg>
         Rhythmus
-        {/* Naming the pattern would be a lie under an arpeggio, which has none. */}
+        {/*
+          Naming the pattern would be a lie under an arpeggio, which has none.
+          A shuffle is named here as well: it changes every note's timing, and a
+          feel you cannot see while the panel is shut is one you forget you set.
+        */}
         <span className="trigger-value">
           {meter} · {strum === 'arpeggio' ? 'Arpeggio' : patternName(rhythm, beatsPerBar)}
+          {strum !== 'arpeggio' && feel === 'shuffle' ? ' · Shuffle' : ''}
         </span>
         <span className="trigger-caret" aria-hidden="true">
           ▾
@@ -151,6 +170,24 @@ export function RhythmControls({
               ))}
             </select>
           </label>
+
+          {/* An arpeggio has no slots to shift, so the control would do nothing. */}
+          {strum === 'arpeggio' ? null : (
+            <label className="field field--inline">
+              <span>Feel</span>
+              <select
+                aria-label="Feel"
+                value={feel}
+                onChange={(event) => onFeelChange(event.target.value as SwingFeel)}
+              >
+                {FEELS.map((entry) => (
+                  <option key={entry.value} value={entry.value}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label className="field field--inline">
             <span>Ton</span>

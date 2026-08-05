@@ -1,0 +1,174 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>makeup messen</title>
+<style>
+  body { font: 14px/1.6 system-ui, sans-serif; margin: 2rem; max-width: 46rem; }
+  table { border-collapse: collapse; margin: 1rem 0; }
+  th, td { border: 1px solid #ccc; padding: 0.3rem 0.7rem; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  code { background: #f2f2f2; padding: 0.1rem 0.3rem; }
+  .out { white-space: pre-wrap; font-family: ui-monospace, monospace; }
+</style>
+
+<h1>makeup messen</h1>
+
+<p>
+  Was <code>AMP.makeup</code> sein muss, damit ein Verstärker so laut ist wie die
+  clean gespielte Gitarre — pro Archetyp. Mit <code>npm run dev</code> starten und
+  <code>/scripts/measure-makeup.html</code> aufrufen.
+</p>
+
+<p>
+  Warum als Seite und nicht als Test: es gibt in Node keinen
+  <code>OfflineAudioContext</code>, und der Referenz-Renderer in
+  <code>amp.ts</code> taugt dafür nicht — er rechnet richtig, aber Modell und
+  Aufnahme treiben die Kennlinie unterschiedlich stark (Crest-Faktor 7,95 dB
+  gegen 13,02 dB), und genau dieser Unterschied ist der Pegel. Also die echten
+  Aufnahmen durch den echten Graphen.
+</p>
+
+<button id="run">messen</button>
+<div id="result" class="out"></div>
+
+<script type="module">
+  import { AMPS, ampShape, webAudioQ } from '/src/synth/amp.ts';
+
+  /** An open E major — the chord the original measurement used. */
+  const E_MAJOR = [40, 47, 52, 56, 59, 64];
+  const SECONDS = 3;
+  const SAMPLE_RATE = 48000;
+
+  /** Copied in spirit from audio.ts: PEAK and the voice-count rolloff. */
+  const PEAK = 0.55;
+  const voicePeak = (n) => PEAK / Math.pow(Math.max(1, n), 0.7);
+
+  function shaperCurve(shape) {
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < curve.length; i++) {
+      curve[i] = shape((i / (curve.length - 1)) * 2 - 1);
+    }
+    return curve;
+  }
+
+  async function loadSamples() {
+    const manifest = await (await fetch('/samples/manifest.json')).json();
+    const set = manifest.electric;
+    const ctx = new OfflineAudioContext(1, 1, SAMPLE_RATE);
+    const buffers = new Map();
+    for (const entry of set) {
+      const bytes = await (await fetch(`/samples/${entry.file}`)).arrayBuffer();
+      buffers.set(entry.file, await ctx.decodeAudioData(bytes));
+    }
+    return { set, buffers };
+  }
+
+  function sampleFor(midi, set) {
+    let best = set[0];
+    for (const entry of set) {
+      if (Math.abs(entry.midi - midi) < Math.abs(best.midi - midi)) best = entry;
+    }
+    return { file: best.file, playbackRate: Math.pow(2, (midi - best.midi) / 12) };
+  }
+
+  /**
+   * The chord, played into `destination`. Strummed, because that is what the amp
+   * has to survive — a single note never reaches the interesting part of the curve.
+   */
+  function playChord(ctx, { set, buffers }, destination) {
+    const peak = voicePeak(E_MAJOR.length);
+    E_MAJOR.forEach((midi, i) => {
+      const choice = sampleFor(midi, set);
+      const source = ctx.createBufferSource();
+      source.buffer = buffers.get(choice.file);
+      source.playbackRate.value = choice.playbackRate;
+      const gain = ctx.createGain();
+      gain.gain.value = peak;
+      source.connect(gain).connect(destination);
+      source.start(i * 0.01);
+    });
+  }
+
+  /** The amplifier chain, node for node as audio.ts builds it. */
+  function buildAmp(ctx, spec) {
+    const stage = (kind, settings) => {
+      const filter = ctx.createBiquadFilter();
+      filter.type = kind;
+      filter.frequency.value = settings.frequency;
+      filter.Q.value = webAudioQ(kind, settings.q);
+      if (settings.gain !== undefined) filter.gain.value = settings.gain;
+      return filter;
+    };
+
+    const input = ctx.createGain();
+    const preGain = ctx.createGain();
+    preGain.gain.value = spec.preGain;
+
+    const valve = ctx.createWaveShaper();
+    valve.curve = shaperCurve((x) => ampShape(x, spec.drive, spec.bias));
+    valve.oversample = '4x';
+
+    // Deliberately WITHOUT spec.makeup — that is the number being solved for.
+    input
+      .connect(stage('lowshelf', spec.tight))
+      .connect(preGain)
+      .connect(valve)
+      .connect(stage('highpass', spec.block))
+      .connect(stage('lowpass', spec.cab[0]))
+      .connect(stage('lowpass', spec.cab[1]))
+      .connect(stage('peaking', spec.presence))
+      .connect(stage('lowshelf', spec.body))
+      .connect(ctx.destination);
+
+    return input;
+  }
+
+  function rms(channel) {
+    let sum = 0;
+    for (let i = 0; i < channel.length; i++) sum += channel[i] * channel[i];
+    return Math.sqrt(sum / channel.length);
+  }
+
+  async function render(samples, build) {
+    const ctx = new OfflineAudioContext(1, SAMPLE_RATE * SECONDS, SAMPLE_RATE);
+    playChord(ctx, samples, build(ctx));
+    return rms((await ctx.startRendering()).getChannelData(0));
+  }
+
+  document.getElementById('run').addEventListener('click', async () => {
+    const out = document.getElementById('result');
+    out.textContent = 'lade Aufnahmen …';
+    const samples = await loadSamples();
+
+    // The clean voice: one gentle resonance, no amplifier. This is the reference
+    // every amp is levelled against, and it is why the numbers are absolute.
+    const cleanRms = await render(samples, (ctx) => {
+      const input = ctx.createGain();
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'peaking';
+      tone.frequency.value = 2600;
+      tone.Q.value = 0.8;
+      tone.gain.value = 2;
+      input.connect(tone).connect(ctx.destination);
+      return input;
+    });
+
+    const rows = [];
+    for (const [id, spec] of Object.entries(AMPS)) {
+      const raw = await render(samples, (ctx) => buildAmp(ctx, spec));
+      const makeup = cleanRms / raw;
+      rows.push({ id, raw, makeup, current: spec.makeup });
+    }
+
+    out.textContent =
+      `clean RMS: ${cleanRms.toFixed(6)}\n\n` +
+      rows
+        .map(
+          (r) =>
+            `${r.id.padEnd(18)} roh ${r.raw.toFixed(4)}` +
+            `   makeup: ${r.makeup.toFixed(4)}` +
+            `   (in der Tabelle: ${r.current})` +
+            `   Abweichung ${(20 * Math.log10(r.current / r.makeup)).toFixed(2)} dB`,
+        )
+        .join('\n');
+  });
+</script>

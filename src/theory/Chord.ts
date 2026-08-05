@@ -28,6 +28,16 @@ export interface ChordQuality {
 /** Letter steps for a chord built by stacking thirds: root, third, fifth, seventh. */
 const TERTIAN = [0, 2, 4, 6] as const;
 
+/**
+ * The same, one third further: the ninth is eight letters up, not one.
+ *
+ * Eight rather than one because the letter distance is what spells the note, and a
+ * ninth is a second an octave up — Note.transpose folds it back into an octave
+ * itself. Writing 1 would spell it the same but would say the wrong thing about
+ * the interval, and this table is read by people as much as by code.
+ */
+const TERTIAN_NINTH = [0, 2, 4, 6, 8] as const;
+
 const QUALITIES: readonly ChordQuality[] = [
   // Triads
   { id: 'major', symbol: '', semitones: [0, 4, 7], diatonicSteps: TERTIAN, uppercase: true, romanSuffix: '' },
@@ -64,6 +74,34 @@ const QUALITIES: readonly ChordQuality[] = [
     uppercase: true,
     romanSuffix: '+maj7',
   },
+
+  /*
+   * Ninths — a seventh chord with one more third on top.
+   *
+   * The list is not a taste selection. Stacking five thirds on each of the seven
+   * degrees of every heptatonic scale the app offers produces exactly these
+   * signatures, and Chord.test.ts checks that by enumerating them: a scale whose
+   * ninth chords are not all nameable would otherwise show "?" on a card and offer
+   * no grips. Some of them (m7b9, m7b5b9) are chords nobody reaches for by name —
+   * they are here because the third degree of an ordinary major key IS one.
+   */
+  { id: 'major9', symbol: 'maj9', semitones: [0, 4, 7, 11, 14], diatonicSteps: TERTIAN_NINTH, uppercase: true, romanSuffix: 'maj9' },
+  { id: 'dominant9', symbol: '9', semitones: [0, 4, 7, 10, 14], diatonicSteps: TERTIAN_NINTH, uppercase: true, romanSuffix: '9' },
+  { id: 'minor9', symbol: 'm9', semitones: [0, 3, 7, 10, 14], diatonicSteps: TERTIAN_NINTH, uppercase: false, romanSuffix: '9' },
+  { id: 'minor7b9', symbol: 'm7b9', semitones: [0, 3, 7, 10, 13], diatonicSteps: TERTIAN_NINTH, uppercase: false, romanSuffix: '7b9' },
+  { id: 'minor9b5', symbol: 'm9b5', semitones: [0, 3, 6, 10, 14], diatonicSteps: TERTIAN_NINTH, uppercase: false, romanSuffix: 'ø9' },
+  { id: 'minor7b5b9', symbol: 'm7b5b9', semitones: [0, 3, 6, 10, 13], diatonicSteps: TERTIAN_NINTH, uppercase: false, romanSuffix: 'ø7b9' },
+  { id: 'dominant7b9', symbol: '7b9', semitones: [0, 4, 7, 10, 13], diatonicSteps: TERTIAN_NINTH, uppercase: true, romanSuffix: '7b9' },
+  { id: 'minorMajor9', symbol: 'mMaj9', semitones: [0, 3, 7, 11, 14], diatonicSteps: TERTIAN_NINTH, uppercase: false, romanSuffix: 'maj9' },
+  { id: 'augmentedMajor9', symbol: 'maj9#5', semitones: [0, 4, 8, 11, 14], diatonicSteps: TERTIAN_NINTH, uppercase: true, romanSuffix: '+maj9' },
+  { id: 'diminished7b9', symbol: 'dim7b9', semitones: [0, 3, 6, 9, 13], diatonicSteps: TERTIAN_NINTH, uppercase: false, romanSuffix: '°7b9' },
+  /*
+   * The VI of harmonic minor, and the reason the enumeration test exists: in A it
+   * is F A C E G#, and the G# is an augmented ninth above the F. Nobody writes
+   * this chord down on purpose — it is what the scale produces, and without it the
+   * sixth card of every harmonic minor key would read "?".
+   */
+  { id: 'major7s9', symbol: 'maj7#9', semitones: [0, 4, 7, 11, 15], diatonicSteps: TERTIAN_NINTH, uppercase: true, romanSuffix: 'maj7#9' },
 
   // Non-tertian: no third, or a suspended one, so each carries its own letter steps.
   { id: 'power', symbol: '5', semitones: [0, 7], diatonicSteps: [0, 4], uppercase: true, romanSuffix: '5' },
@@ -110,21 +148,55 @@ const SUFFIX_ALIASES: Record<string, string> = {
   m6: 'minor6',
 };
 
+/**
+ * A set of semitones as one comparable string: folded into an octave, deduplicated,
+ * and sorted.
+ *
+ * Sorting is the point. The signature used to be compared index by index against
+ * each quality in turn, which quietly assumed the notes arrive in ascending order
+ * from the root. `fromScaleDegree` and `fromQuality` do supply that, but the
+ * constructor is public, and a chord handed its notes in another order failed to
+ * match anything at all — leaving `quality: null`, a name of "C?" and no grips,
+ * with nothing thrown and nothing logged.
+ */
+function signatureKey(semitones: readonly number[]): string {
+  return [...new Set(semitones.map((semitone) => mod(semitone, 12)))]
+    .sort((a, b) => a - b)
+    .join(',');
+}
+
+/**
+ * Every quality by its signature. Built once — a lookup rather than a scan of the
+ * table, which matters as the table grows.
+ *
+ * Two qualities sharing a signature would make one of them unreachable, and which
+ * one would depend on declaration order. Chord.test.ts asserts the keys are
+ * distinct, so a new entry that collides with an old one fails loudly instead of
+ * silently shadowing it.
+ */
+const BY_SIGNATURE = new Map<string, ChordQuality>(
+  QUALITIES.map((quality) => [signatureKey(quality.semitones), quality]),
+);
+
+/** Exported for the collision test — the map's own keys, in declaration order. */
+export function qualitySignatures(): string[] {
+  return QUALITIES.map((quality) => signatureKey(quality.semitones));
+}
+
 /** Finds the quality whose semitone signature matches, or null for exotic stacks. */
 function identifyQuality(root: Note, notes: readonly Note[]): ChordQuality | null {
   const signature = notes.map((note) => mod(note.pitchClass - root.pitchClass, 12));
-
-  return (
-    QUALITIES.find(
-      (quality) =>
-        quality.semitones.length === signature.length &&
-        quality.semitones.every((semitone, i) => semitone === signature[i]),
-    ) ?? null
-  );
+  return BY_SIGNATURE.get(signatureKey(signature)) ?? null;
 }
 
-/** How many notes a chord is built from: a triad or a seventh chord. */
-export type ChordSize = 3 | 4;
+/**
+ * How many notes a chord is built from: a triad, a seventh chord, or a ninth.
+ *
+ * `fromScaleDegree` was already general — it takes every second scale note and
+ * wraps, so a fifth tone falls out on its own. Only this type and the quality
+ * table stood in the way.
+ */
+export type ChordSize = 3 | 4 | 5;
 
 export class Chord {
   readonly root: Note;

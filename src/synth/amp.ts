@@ -54,12 +54,28 @@ export function webAudioQ(kind: StageKind, q: number): number {
 }
 
 /**
- * Every number the amplifier is made of.
+ * Every number one amplifier is made of.
  *
  * The order they are applied in is the order of a real rig: tighten the bass,
  * drive the valve, block the DC it makes, then the speaker.
+ *
+ * The field comments below explain what each number DOES and what goes wrong when
+ * it is set carelessly; they were written for the crunch amp, which is the one
+ * that was tuned by measurement, and they hold for every entry in AMPS.
  */
-export const AMP = {
+export interface AmpSpec {
+  readonly tight: AmpStage;
+  readonly preGain: number;
+  readonly drive: number;
+  readonly bias: number;
+  readonly block: AmpStage;
+  readonly cab: readonly [AmpStage, AmpStage];
+  readonly presence: AmpStage;
+  readonly body: AmpStage;
+  readonly makeup: number;
+}
+
+const BRITISH_CRUNCH = {
   /**
    * The tight-bass filter every high-gain amplifier has in front of its gain
    * stage, and the single biggest reason chords used to turn to mush: without
@@ -190,7 +206,114 @@ export const AMP = {
    * set this. amp.test.ts asserts only a sane range for it, and says so.
    */
   makeup: 0.0478,
-};
+} satisfies AmpSpec;
+
+/**
+ * The four amplifiers, as the four axes that actually tell them apart: how hard
+ * the valve is driven, how much weight is taken out before it, where the speaker
+ * stops, and how much presence is given back. docs/verstaerker.md §6 has the
+ * reasoning and the sources.
+ *
+ * `british-crunch` is the amp this app has always had, unchanged down to the last
+ * decimal — so switching to it is switching to nothing, and the one entry whose
+ * numbers were tuned against measurements keeps them.
+ *
+ * EVERY `makeup` HERE IS MEASURED, NOT ESTIMATED, and the note on the field above
+ * says why it cannot be otherwise: model and recording drive the curve differently
+ * enough that the arithmetic reference is the right tool for shape and the wrong
+ * one for level. scripts/measure-makeup.html renders each of these through the
+ * real graph in an OfflineAudioContext with the real recordings and prints what
+ * belongs here. Re-run it after touching preGain, drive, bias or any filter — an
+ * amplifier turned up is louder as well as dirtier, and a table that changes the
+ * volume when you audition it teaches the wrong thing.
+ *
+ * That the measurement can be trusted is not an assumption either: run against the
+ * crunch amp, whose makeup was measured independently long before that page
+ * existed, it returns 0.0477 for the 0.0478 recorded here — 0.02 dB apart. The
+ * three new numbers came out of the same rig. Estimating them first and measuring
+ * afterwards showed what the guessing was worth: 6.2 dB out on the clean amp,
+ * 4.4 on the chime, 2.1 on the high gain.
+ */
+export const AMPS = {
+  /**
+   * A blackface Fender: a lot of headroom, a speaker that stays bright, and only
+   * as much bass tightening as a 6V6 needs — which is very little. It is the one
+   * that has to still be clean under a full chord.
+   */
+  'american-clean': {
+    tight: { frequency: 180, q: 0.707, gain: -3 },
+    preGain: 3,
+    drive: 3.5,
+    bias: 0.02,
+    block: { frequency: 80, q: 0.707 },
+    cab: [
+      { frequency: 5000, q: 0.5412 },
+      { frequency: 5000, q: 1.30656 },
+    ],
+    presence: { frequency: 3000, q: 1.0, gain: 2 },
+    body: { frequency: 160, q: 0.707, gain: 2.5 },
+    makeup: 0.1298,
+  },
+
+  /**
+   * An AC30: cathode-biased EL84s and no negative feedback at all, which is the
+   * source of both its chime and its early, soft breakup. The higher bias is that
+   * missing feedback — nothing is straightening the curve out, so more of the
+   * even-harmonic warmth survives.
+   */
+  'british-chime': {
+    tight: { frequency: 180, q: 0.707, gain: -5 },
+    preGain: 7,
+    drive: 5,
+    bias: 0.03,
+    block: { frequency: 90, q: 0.707 },
+    cab: [
+      { frequency: 4500, q: 0.5412 },
+      { frequency: 4500, q: 1.30656 },
+    ],
+    presence: { frequency: 2600, q: 1.2, gain: 5.5 },
+    body: { frequency: 170, q: 0.707, gain: 2 },
+    makeup: 0.0684,
+  },
+
+  'british-crunch': BRITISH_CRUNCH,
+
+  /**
+   * A rectifier: the bass shelf does the work here. Twenty-six into the curve
+   * would be mush without taking eleven decibels out below 190 Hz first — that
+   * shelf is not a tone control at this gain, it is what keeps the low string from
+   * swinging the valve on its own.
+   */
+  'modern-high-gain': {
+    tight: { frequency: 190, q: 0.707, gain: -11 },
+    preGain: 26,
+    drive: 7,
+    bias: 0.015,
+    block: { frequency: 90, q: 0.707 },
+    cab: [
+      { frequency: 3800, q: 0.5412 },
+      { frequency: 3800, q: 1.30656 },
+    ],
+    presence: { frequency: 2900, q: 1.2, gain: 5 },
+    body: { frequency: 150, q: 0.707, gain: 4 },
+    makeup: 0.0423,
+  },
+} as const satisfies Record<string, AmpSpec>;
+
+export type AmpId = keyof typeof AMPS;
+
+export const AMP_IDS = Object.keys(AMPS) as readonly AmpId[];
+
+/** What plays when no amplifier is named — the sound the app has always made. */
+export const DEFAULT_AMP: AmpId = 'british-crunch';
+
+/**
+ * The default amplifier's numbers.
+ *
+ * Kept as a name of its own because most of this file and its tests are about one
+ * amplifier at a time, and `AMPS[DEFAULT_AMP]` at every call site would say less.
+ */
+export const AMP: AmpSpec = AMPS[DEFAULT_AMP];
 
 /**
  * The valve's transfer curve. Zero in gives exactly zero out, and the larger
@@ -295,23 +418,31 @@ export function biquad(
 }
 
 /** Everything before the valve — what the shaper's clamped domain actually sees. */
-export function ampInput(input: Float64Array, sampleRate: number): Float64Array {
-  const tightened = biquad('lowshelf', input, sampleRate, AMP.tight);
+export function ampInput(
+  input: Float64Array,
+  sampleRate: number,
+  spec: AmpSpec = AMP,
+): Float64Array {
+  const tightened = biquad('lowshelf', input, sampleRate, spec.tight);
   const out = new Float64Array(tightened.length);
-  for (let i = 0; i < tightened.length; i++) out[i] = tightened[i] * AMP.preGain;
+  for (let i = 0; i < tightened.length; i++) out[i] = tightened[i] * spec.preGain;
   return out;
 }
 
 /** Everything after the valve: the DC block, the speaker, and the level trim. */
-export function ampOutput(input: Float64Array, sampleRate: number): Float64Array {
-  let signal = biquad('highpass', input, sampleRate, AMP.block);
-  signal = biquad('lowpass', signal, sampleRate, AMP.cab[0]);
-  signal = biquad('lowpass', signal, sampleRate, AMP.cab[1]);
-  signal = biquad('peaking', signal, sampleRate, AMP.presence);
-  signal = biquad('lowshelf', signal, sampleRate, AMP.body);
+export function ampOutput(
+  input: Float64Array,
+  sampleRate: number,
+  spec: AmpSpec = AMP,
+): Float64Array {
+  let signal = biquad('highpass', input, sampleRate, spec.block);
+  signal = biquad('lowpass', signal, sampleRate, spec.cab[0]);
+  signal = biquad('lowpass', signal, sampleRate, spec.cab[1]);
+  signal = biquad('peaking', signal, sampleRate, spec.presence);
+  signal = biquad('lowshelf', signal, sampleRate, spec.body);
 
   const out = new Float64Array(signal.length);
-  for (let i = 0; i < signal.length; i++) out[i] = signal[i] * AMP.makeup;
+  for (let i = 0; i < signal.length; i++) out[i] = signal[i] * spec.makeup;
   return out;
 }
 
@@ -324,14 +455,18 @@ export function ampOutput(input: Float64Array, sampleRate: number): Float64Array
  * produces. That makes this reference slightly HARSHER than the browser, never
  * gentler, so a level measured here is a safe one.
  */
-export function renderAmp(input: Float64Array, sampleRate: number): Float64Array {
-  const driven = ampInput(input, sampleRate);
+export function renderAmp(
+  input: Float64Array,
+  sampleRate: number,
+  spec: AmpSpec = AMP,
+): Float64Array {
+  const driven = ampInput(input, sampleRate, spec);
   const shaped = new Float64Array(driven.length);
   // The clamp is the WaveShaper's own behaviour, not a safety measure: outside
   // [-1, 1] it repeats the end of the curve. Modelling it is what makes the
   // "under 2 % of samples reach the edge" test meaningful.
   for (let i = 0; i < driven.length; i++) {
-    shaped[i] = ampShape(Math.max(-1, Math.min(1, driven[i])));
+    shaped[i] = ampShape(Math.max(-1, Math.min(1, driven[i])), spec.drive, spec.bias);
   }
-  return ampOutput(shaped, sampleRate);
+  return ampOutput(shaped, sampleRate, spec);
 }

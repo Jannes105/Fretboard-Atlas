@@ -30,9 +30,15 @@ describe('readState', () => {
 
   it('fällt bei Unsinn auf die Defaults zurück, statt zu werfen', () => {
     // Eine URL ist vom User editierbar — sie wird zwangsläufig irgendwann kaputt sein.
-    const state = readState('?root=H&scale=klingonisch&tuning=open-g&capo=99&frets=7&chords=5');
+    // chords=6 statt =5: Neunklänge sind seit den Fünfklängen gültig, Elfklänge nicht.
+    const state = readState('?root=H&scale=klingonisch&tuning=open-g&capo=99&frets=7&chords=6');
 
     expect(state).toEqual(DEFAULT_STATE);
+  });
+
+  it('liest die Akkordgröße bis zum Nonakkord', () => {
+    expect(readState('?chords=4').chordSize).toBe(4);
+    expect(readState('?chords=5').chordSize).toBe(5);
   });
 
   it('liest Tempo und Loop', () => {

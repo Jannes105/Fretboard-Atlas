@@ -12,7 +12,61 @@ import {
   strumOffsets,
   noteSeconds,
   serializePattern,
+  slotTime,
+  SLOTS_PER_BEAT,
+  SWING_RATIO,
 } from './rhythm';
+
+describe('slotTime — wann ein Slot klingt', () => {
+  const secondsPerBeat = 0.5; // 120 BPM
+  const slotSeconds = secondsPerBeat / SLOTS_PER_BEAT;
+
+  it('ist gerade exakt die alte Multiplikation', () => {
+    // Der Regressionstest für den Umbau: vorher stand hier `s * slotSeconds`,
+    // und ohne Swing muss genau das wieder herauskommen — sonst hätte der
+    // Einbau von Swing das gerade Spiel mitverschoben.
+    for (let s = 0; s <= 8; s++) {
+      expect(slotTime(s, secondsPerBeat, 'straight')).toBeCloseTo(s * slotSeconds, 12);
+    }
+  });
+
+  it('lässt die Schläge liegen und schiebt nur das Offbeat', () => {
+    // Jeder gerade Slot ist ein Schlag und darf sich nicht bewegen — daran hängt,
+    // dass das Metronom weiter mit der Gitarre zusammenfällt.
+    for (const s of [0, 2, 4, 6]) {
+      expect(slotTime(s, secondsPerBeat, 'shuffle')).toBeCloseTo(
+        slotTime(s, secondsPerBeat, 'straight'),
+        12,
+      );
+    }
+
+    expect(slotTime(1, secondsPerBeat, 'shuffle')).toBeCloseTo(
+      SWING_RATIO.shuffle * secondsPerBeat,
+      12,
+    );
+  });
+
+  it('macht aus zwei gleichen Achteln eine lange und eine kurze', () => {
+    const long = slotTime(1, secondsPerBeat, 'shuffle') - slotTime(0, secondsPerBeat, 'shuffle');
+    const short = slotTime(2, secondsPerBeat, 'shuffle') - slotTime(1, secondsPerBeat, 'shuffle');
+
+    expect(long).toBeGreaterThan(short);
+    // 2:1 — das Verhältnis, das den Shuffle ausmacht.
+    expect(long / short).toBeCloseTo(2, 6);
+    // Und der Schlag bleibt vollständig: zusammen sind sie eine Zählzeit.
+    expect(long + short).toBeCloseTo(secondsPerBeat, 12);
+  });
+
+  it('gibt einen Slot hinter dem Takt den nächsten Taktanfang', () => {
+    // Darauf verlässt sich audio.ts, um dem letzten Slot eine echte Lücke zu geben.
+    for (const feel of ['straight', 'shuffle'] as const) {
+      expect(slotTime(4 * SLOTS_PER_BEAT, secondsPerBeat, feel)).toBeCloseTo(
+        4 * secondsPerBeat,
+        12,
+      );
+    }
+  });
+});
 
 describe('rhythm — Muster ⇄ String', () => {
   it('serialisiert und liest ein Muster verlustfrei', () => {

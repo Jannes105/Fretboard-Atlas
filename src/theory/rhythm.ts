@@ -42,6 +42,59 @@ export function isDefaultPattern(text: string, beatsPerBar: number): boolean {
 }
 
 /**
+ * Whether the offbeat sits halfway through its beat, or two thirds of the way.
+ *
+ * Two named feels rather than a ratio slider, for the same reason the three strum
+ * speeds became two: what a player chooses is straight or shuffled, and the
+ * decimals in between are a setting nobody is looking for. It also keeps the URL
+ * free of a float.
+ */
+export type SwingFeel = 'straight' | 'shuffle';
+
+/**
+ * Where the offbeat lands, as a share of the beat.
+ *
+ * Two thirds is a 2:1 shuffle. Real ones run from about 1.7:1 to 2.2:1 and get
+ * straighter as the tempo rises (docs/musiktheorie.md §5) — this sits in the
+ * middle of that band and does not chase the tempo, because a feel that changes
+ * when you nudge the BPM is a feel you cannot learn against.
+ */
+export const SWING_RATIO: Record<SwingFeel, number> = {
+  straight: 0.5,
+  shuffle: 2 / 3,
+};
+
+/**
+ * When slot `s` sounds, in seconds from the start of the bar.
+ *
+ * This is the ONLY place slots become time, which is what makes swing a ratio
+ * rather than a second grid: the pattern keeps its slots, its length and its
+ * serialisation, and only the clock moves. A straight feel reproduces the plain
+ * `s * slotSeconds` it replaced, exactly.
+ *
+ * Beats stay put and the offbeat moves; anything between the two is carried along
+ * linearly, so a grid finer than eighths inherits the same feel instead of
+ * needing a rule of its own.
+ *
+ * `s` may run one past the last slot of the bar — that gives the next bar's
+ * downbeat, which is how the last slot's gap is measured.
+ */
+export function slotTime(
+  s: number,
+  secondsPerBeat: number,
+  feel: SwingFeel = 'straight',
+): number {
+  const swing = SWING_RATIO[feel];
+  const beat = Math.floor(s / SLOTS_PER_BEAT);
+  const within = (s % SLOTS_PER_BEAT) / SLOTS_PER_BEAT;
+
+  const shifted =
+    within < 0.5 ? within * (swing / 0.5) : swing + (within - 0.5) * ((1 - swing) / 0.5);
+
+  return (beat + shifted) * secondsPerBeat;
+}
+
+/**
  * How the hand crosses the strings.
  *
  * `standard` brushes them, near enough to together that the chord arrives as one

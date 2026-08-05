@@ -1,4 +1,5 @@
 import type { Timbre } from './audio';
+import { type AmpId, AMP_IDS, DEFAULT_AMP } from './synth/amp';
 import type { LabelMode } from './components/FretboardView';
 import {
   ROOT_CHOICES,
@@ -7,9 +8,11 @@ import {
   isDefaultPattern,
   serializePattern,
   defaultPattern,
+  SLOTS_PER_BEAT,
   type ClickMode,
   type NoteLength,
   type StrumStyle,
+  type SwingFeel,
   Tuning,
   CAGED_ORDER,
   type CagedForm,
@@ -46,12 +49,16 @@ export interface AppState {
   loop: boolean;
   /** The instrument's voice. */
   sound: Timbre;
+  /** Which amplifier the overdrive voice runs through. Idle under `clean`. */
+  amp: AmpId;
   /** Beats per bar — the time signature's feel (4 = 4/4, 3 = 3/4, 6 = 6/8, 2 = 2/4). */
   beatsPerBar: number;
   /** Strum pattern for one bar as a d/u/- string; length follows beatsPerBar. */
   rhythm: string;
   /** Brushed together, or walked across the whole bar. */
   strum: StrumStyle;
+  /** Straight eighths, or a shuffle — the difference between a blues and a march. */
+  feel: SwingFeel;
   /** Whether notes ring on or are cut off after each strum. */
   sustain: NoteLength;
   /** Count-in only, a click throughout, or neither. */
@@ -80,19 +87,24 @@ export const DEFAULT_STATE: AppState = {
   bpm: 90,
   loop: true,
   sound: 'clean',
+  amp: DEFAULT_AMP,
   beatsPerBar: 4,
   rhythm: serializePattern(defaultPattern(4)),
   strum: 'standard',
+  feel: 'straight',
   sustain: 'ring',
   click: 'off',
 };
 
 const FRET_COUNTS = [12, 15, 24];
+/** Exported because SetupPanel builds its chooser from it — one list, not two. */
+export const CHORD_SIZES: readonly ChordSize[] = [3, 4, 5];
 // Read by name and not by index, so adding or retiring a voice leaves every
 // existing link pointing at the voice it always did — a `sound` that names a
 // retired voice simply falls back to DEFAULT_STATE.sound below.
 const SOUNDS: readonly Timbre[] = ['clean', 'electric'];
 const STRUMS: readonly StrumStyle[] = ['standard', 'arpeggio'];
+const FEELS: readonly SwingFeel[] = ['straight', 'shuffle'];
 const SUSTAINS: readonly NoteLength[] = ['ring', 'stopped'];
 const CLICKS: readonly ClickMode[] = ['off', 'countIn', 'metronome'];
 const BEATS_PER_BAR = [2, 3, 4, 6];
@@ -201,7 +213,7 @@ export function readState(search: string): AppState {
   // signature is dropped rather than kept as garbage.
   const rawRhythm = params.get('rhythm');
   const rhythm =
-    rawRhythm !== null && rawRhythm.length === beatsPerBar * 2
+    rawRhythm !== null && rawRhythm.length === beatsPerBar * SLOTS_PER_BEAT
       ? rawRhythm
       : serializePattern(defaultPattern(beatsPerBar));
 
@@ -216,9 +228,11 @@ export function readState(search: string): AppState {
     capo: pickInt(params.get('capo'), (v) => v >= 0 && v <= MAX_CAPO, DEFAULT_STATE.capo),
     fretCount: pickInt(params.get('frets'), (v) => FRET_COUNTS.includes(v), DEFAULT_STATE.fretCount),
     labelMode: pickFrom(params.get('labels'), ['note', 'degree'] as const, DEFAULT_STATE.labelMode),
-    chordSize: pickInt(params.get('chords'), (v) => v === 3 || v === 4, DEFAULT_STATE.chordSize) as
-      | 3
-      | 4,
+    chordSize: pickInt(
+      params.get('chords'),
+      (v) => CHORD_SIZES.includes(v as ChordSize),
+      DEFAULT_STATE.chordSize,
+    ) as ChordSize,
     progressionId: params.get('prog') ?? DEFAULT_STATE.progressionId,
     // The scale decides how many boxes exist, so only the lower bound is checked here.
     boxNumber: pickInt(params.get('box'), (v) => v >= 0, DEFAULT_STATE.boxNumber),
@@ -227,7 +241,9 @@ export function readState(search: string): AppState {
     bpm: pickInt(params.get('bpm'), (v) => v >= MIN_BPM && v <= MAX_BPM, DEFAULT_STATE.bpm),
     loop: params.get('loop') === null ? DEFAULT_STATE.loop : params.get('loop') !== '0',
     sound: pickFrom(params.get('sound'), SOUNDS, DEFAULT_STATE.sound),
+    amp: pickFrom(params.get('amp'), AMP_IDS, DEFAULT_STATE.amp),
     strum: pickFrom(params.get('strum'), STRUMS, DEFAULT_STATE.strum),
+    feel: pickFrom(params.get('feel'), FEELS, DEFAULT_STATE.feel),
     sustain: pickFrom(params.get('sustain'), SUSTAINS, DEFAULT_STATE.sustain),
     click: pickFrom(params.get('click'), CLICKS, DEFAULT_STATE.click),
     beatsPerBar,
@@ -258,7 +274,9 @@ export function writeState(state: AppState): string {
   add('bpm', state.bpm, DEFAULT_STATE.bpm);
   if (state.loop !== DEFAULT_STATE.loop) params.set('loop', state.loop ? '1' : '0');
   add('sound', state.sound, DEFAULT_STATE.sound);
+  add('amp', state.amp, DEFAULT_STATE.amp);
   add('strum', state.strum, DEFAULT_STATE.strum);
+  add('feel', state.feel, DEFAULT_STATE.feel);
   add('sustain', state.sustain, DEFAULT_STATE.sustain);
   add('click', state.click, DEFAULT_STATE.click);
   add('sig', state.beatsPerBar, DEFAULT_STATE.beatsPerBar);

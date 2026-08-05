@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { Chord, diatonicChords } from './Chord';
+import { Chord, diatonicChords, qualitySignatures } from './Chord';
 import { Note } from './Note';
-import { Scale } from './Scale';
-import { HARMONIC_MINOR, MAJOR, MAJOR_PENTATONIC, NATURAL_MINOR } from './ScaleType';
+import { ROOT_CHOICES, Scale } from './Scale';
+import {
+  HARMONIC_MINOR,
+  MAJOR,
+  MAJOR_PENTATONIC,
+  NATURAL_MINOR,
+  SCALE_TYPES,
+} from './ScaleType';
 
 const cMajor = new Scale(Note.parse('C'), MAJOR);
 const aMinor = new Scale(Note.parse('A'), NATURAL_MINOR);
@@ -14,6 +20,61 @@ function symbols(chords: Chord[]): string[] {
 function romans(chords: Chord[]): string[] {
   return chords.map((chord, i) => chord.romanNumeral(i));
 }
+
+describe('Akkorderkennung', () => {
+  it('gibt keine zwei Qualitäten mit derselben Signatur', () => {
+    // Die Absicherung für jede neue Qualität in der Tabelle: zwei gleiche
+    // Signaturen machen eine davon unerreichbar, und welche, entschiede die
+    // Reihenfolge der Deklaration.
+    const signatures = qualitySignatures();
+    expect(new Set(signatures).size).toBe(signatures.length);
+  });
+
+  it('erkennt einen Akkord unabhängig von der Reihenfolge seiner Töne', () => {
+    const root = Note.parse('C');
+    const inOrder = [root, Note.parse('E'), Note.parse('G'), Note.parse('B')];
+
+    // Der Konstruktor ist öffentlich, und vorher hing die Erkennung daran, dass
+    // die Töne aufsteigend ankamen — sonst blieb quality still null.
+    const shuffled = new Chord(root, [inOrder[2], inOrder[0], inOrder[3], inOrder[1]]);
+
+    expect(shuffled.quality?.id).toBe('major7');
+    expect(shuffled.name()).toBe('Cmaj7');
+  });
+
+  it('kennt jeden Neunklang jeder angebotenen Skala', () => {
+    // Die Qualitätentabelle wurde nicht nach Geschmack gefüllt, sondern gegen
+    // diesen Test: jede 7-stufige Skala auf jedem Grundton, fünf Töne gestapelt.
+    // Ein unbekannter Stapel hieße "?" auf der Akkordkarte und keine Griffe.
+    const unnamed: string[] = [];
+
+    for (const type of SCALE_TYPES.filter((t) => t.isHeptatonic)) {
+      for (const rootName of ROOT_CHOICES) {
+        const scale = new Scale(Note.parse(rootName), type);
+        diatonicChords(scale, 5).forEach((chord, degree) => {
+          if (!chord.quality) {
+            unnamed.push(
+              `${scale.name()} Stufe ${degree + 1}: ${chord.notes.map((n) => n.name()).join(' ')}`,
+            );
+          }
+        });
+      }
+    }
+
+    expect(unnamed).toEqual([]);
+  });
+
+  it('bleibt bei einem Stapel ohne bekannte Qualität still null', () => {
+    // C-Db-D: nichts, was die Tabelle kennt. Das darf nicht werfen — die
+    // Akkordkarten zeigen dann einfach kein Symbol.
+    const exotic = new Chord(Note.parse('C'), [
+      Note.parse('C'),
+      Note.parse('Db'),
+      Note.parse('D'),
+    ]);
+    expect(exotic.quality).toBeNull();
+  });
+});
 
 describe('Diatonische Dreiklänge', () => {
   it('C-Dur: C Dm Em F G Am Bdim', () => {

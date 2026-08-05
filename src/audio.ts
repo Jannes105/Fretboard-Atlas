@@ -1,4 +1,13 @@
-import { AMP, type AmpStage, ampShape, type StageKind, webAudioQ } from './synth/amp';
+import {
+  AMP,
+  type AmpId,
+  AMPS,
+  type AmpStage,
+  ampShape,
+  DEFAULT_AMP,
+  type StageKind,
+  webAudioQ,
+} from './synth/amp';
 import { findLoop, type LoopRegion, renderSustain } from './synth/loopPoints';
 import { pluck, type PluckOptions } from './synth/pluck';
 import { sampleFor, type SampleSet } from './synth/sampleSet';
@@ -10,6 +19,8 @@ import {
   dropHighest,
   holdDecaySeconds,
   midiToFrequency,
+  slotTime,
+  type SwingFeel,
   STANDARD_STRUM_GAP,
   type StrumSlot,
   strumOffsets,
@@ -301,6 +312,8 @@ export interface ProgressionOptions {
   loop?: boolean;
   /** Brushed together, or walked across the whole bar. */
   style?: StrumStyle;
+  /** Straight eighths, or a shuffle. Ignored by an arpeggio, which has no slots. */
+  feel?: SwingFeel;
   /** Left to ring on, or cut off after each strum. */
   length?: NoteLength;
   /** Count-in only, a click throughout, or neither. */
@@ -344,6 +357,11 @@ export interface AudioPlayer {
   stop(): void;
   /** Switch the voice. Takes effect on the next note; no AudioContext is created. */
   setTimbre(timbre: Timbre): void;
+  /**
+   * Switch the amplifier the `electric` voice runs through. Silent under `clean`,
+   * which never reaches it. No AudioContext is created.
+   */
+  setAmp(amp: AmpId): void;
   /** Whether this browser can make sound at all. */
   readonly available: boolean;
 }
@@ -413,6 +431,7 @@ export function createAudioPlayer(): AudioPlayer {
       startProgression: () => NO_OP_HANDLE,
       stop: () => {},
       setTimbre: () => {},
+      setAmp: () => {},
       available: false,
     };
   }
@@ -453,6 +472,25 @@ export function createAudioPlayer(): AudioPlayer {
   const held = new Set<{ retarget(peak: number): void }>();
   /** The current voice — changed by setTimbre, read when each note is built. */
   let timbre: Timbre = 'clean';
+  /** Which amplifier the `electric` voice runs through. */
+  let ampId: AmpId = DEFAULT_AMP;
+
+  /**
+   * The amplifier's nodes, kept so a different amplifier can be written into them.
+   *
+   * Null until the first AudioContext exists — setAmp fires from a useEffect on
+   * mount, long before a user gesture has allowed one.
+   */
+  let ampStages: {
+    tight: BiquadFilterNode;
+    preGain: GainNode;
+    valve: WaveShaperNode;
+    block: BiquadFilterNode;
+    cab: [BiquadFilterNode, BiquadFilterNode];
+    presence: BiquadFilterNode;
+    body: BiquadFilterNode;
+    makeup: GainNode;
+  } | null = null;
 
   /** Decoded audio, once an AudioContext has existed long enough to decode it. */
   const recordings = new Map<string, AudioBuffer>();
@@ -489,6 +527,37 @@ export function createAudioPlayer(): AudioPlayer {
       filter.Q.value = resonance?.q ?? 1;
       filter.gain.value = resonance?.gain ?? 0;
     });
+  };
+
+  /**
+   * Writes the current amplifier's numbers into the nodes that are already wired.
+   *
+   * Plain assignments and no ramp, unlike applyAmp below, and the difference is
+   * deliberate: a gain crossfade is about not clicking, whereas these are the
+   * amplifier's identity. A filter corner sliding from 4200 to 3800 Hz over 20 ms
+   * is a sweep — an effect nobody asked for. Switching amplifier mid-chord is a
+   * step, exactly as reaching over and pressing the channel switch would be.
+   */
+  const applyAmpSpec = () => {
+    if (!ampStages) return;
+    const spec = AMPS[ampId];
+
+    const point = (filter: BiquadFilterNode, settings: AmpStage) => {
+      filter.frequency.value = settings.frequency;
+      filter.Q.value = webAudioQ(filter.type as StageKind, settings.q);
+      if (settings.gain !== undefined) filter.gain.value = settings.gain;
+    };
+
+    point(ampStages.tight, spec.tight);
+    point(ampStages.block, spec.block);
+    point(ampStages.cab[0], spec.cab[0]);
+    point(ampStages.cab[1], spec.cab[1]);
+    point(ampStages.presence, spec.presence);
+    point(ampStages.body, spec.body);
+
+    ampStages.preGain.gain.value = spec.preGain;
+    ampStages.makeup.gain.value = spec.makeup;
+    ampStages.valve.curve = shaperCurve((x) => ampShape(x, spec.drive, spec.bias));
   };
 
   /**
@@ -584,29 +653,44 @@ export function createAudioPlayer(): AudioPlayer {
       };
 
       const preGain = context.createGain();
-      preGain.gain.value = AMP.preGain;
 
       const valve = context.createWaveShaper();
-      valve.curve = shaperCurve((x) => ampShape(x));
       // Without this the aliasing of everything the curve adds folds back down into
       // the guitar's own range, which is a good deal of what "sounds computed" is.
       valve.oversample = '4x';
 
       const makeup = context.createGain();
-      makeup.gain.value = AMP.makeup;
 
       wet = context.createGain();
       dry = context.createGain();
 
+      /*
+       * Held on to rather than left anonymous, so switching amplifier re-points the
+       * same nodes instead of rewiring the graph — the same reason applyTone can
+       * change the voice while a chord is ringing. AMPS entries all have the same
+       * shape, so every stage always has somewhere to point.
+       */
+      ampStages = {
+        tight: stage('lowshelf', AMP.tight),
+        preGain,
+        valve,
+        block: stage('highpass', AMP.block),
+        cab: [stage('lowpass', AMP.cab[0]), stage('lowpass', AMP.cab[1])],
+        presence: stage('peaking', AMP.presence),
+        body: stage('lowshelf', AMP.body),
+        makeup,
+      };
+      applyAmpSpec();
+
       shaped
-        .connect(stage('lowshelf', AMP.tight))
+        .connect(ampStages.tight)
         .connect(preGain)
         .connect(valve)
-        .connect(stage('highpass', AMP.block))
-        .connect(stage('lowpass', AMP.cab[0]))
-        .connect(stage('lowpass', AMP.cab[1]))
-        .connect(stage('peaking', AMP.presence))
-        .connect(stage('lowshelf', AMP.body))
+        .connect(ampStages.block)
+        .connect(ampStages.cab[0])
+        .connect(ampStages.cab[1])
+        .connect(ampStages.presence)
+        .connect(ampStages.body)
         .connect(makeup)
         .connect(wet)
         .connect(ceiling);
@@ -1065,6 +1149,7 @@ export function createAudioPlayer(): AudioPlayer {
       chordBars,
       loop = false,
       style = 'standard',
+      feel = 'straight',
       length = 'ring',
       click = 'off',
       onChord,
@@ -1072,7 +1157,8 @@ export function createAudioPlayer(): AudioPlayer {
     const barsOf = (index: number) => Math.max(1, chordBars?.[index] ?? 1);
 
     const secondsPerBeat = secondsPerBar / beatsPerBar;
-    const slotSeconds = secondsPerBeat / 2; // eighth-note grid: two slots per beat
+    /** When a slot sounds, and — one slot further on — when the next one does. */
+    const slotAt = (s: number) => slotTime(s, secondsPerBeat, feel);
 
     const ctx = ensureContext();
     runCancelled = false;
@@ -1086,15 +1172,26 @@ export function createAudioPlayer(): AudioPlayer {
     // progression, which is why it lives here rather than inside one strum.
     const arpeggioStrings = style === 'arpeggio' ? arpeggioStringCount(voiced) : 0;
 
-    // How long a note has before its successor arrives: one slot of the strum grid,
-    // or one step of the arpeggio. That gap is what "stopped" is measured against.
-    const untilNext =
-      style === 'arpeggio' && arpeggioStrings > 0 ? secondsPerBar / arpeggioStrings : slotSeconds;
-    const { seconds: ring, release } = noteSeconds(style, length, secondsPerBar, untilNext);
+    /** One step of an arpeggio — a constant, since the bar is divided evenly. */
+    const arpeggioStep = arpeggioStrings > 0 ? secondsPerBar / arpeggioStrings : 0;
 
-    // One strum: the strings brushed low-to-high (down) or high-to-low (up).
-    const strum = (chord: readonly number[], at: number, slot: StrumSlot, peak: number) => {
+    /**
+     * One strum: the strings brushed low-to-high (down) or high-to-low (up).
+     *
+     * `untilNext` is how long this note has before its successor arrives, and it is
+     * passed in rather than computed once outside because under a shuffle the slots
+     * are NOT evenly spaced — the long eighth and the short one want different
+     * lengths, and "stopped" is measured against exactly that gap.
+     */
+    const strum = (
+      chord: readonly number[],
+      at: number,
+      slot: StrumSlot,
+      peak: number,
+      untilNext: number,
+    ) => {
       if (slot === null) return;
+      const { seconds: ring, release } = noteSeconds(style, length, secondsPerBar, untilNext);
       const played = style === 'arpeggio' ? dropHighest(chord, arpeggioStrings) : chord;
       const order = slot === 'up' ? [...played].reverse() : played;
       const offsets = strumOffsets(order.length, style, secondsPerBar);
@@ -1110,10 +1207,14 @@ export function createAudioPlayer(): AudioPlayer {
      */
     const scheduleBar = (chord: readonly number[], barAt: number, peak: number) => {
       if (style === 'arpeggio') {
-        strum(chord, barAt, 'down', peak);
+        strum(chord, barAt, 'down', peak, arpeggioStep);
         return;
       }
-      pattern.forEach((slot, s) => strum(chord, barAt + s * slotSeconds, slot, peak));
+      // One slot past the end is the next bar's downbeat, so the last slot gets a
+      // real gap like every other one.
+      pattern.forEach((slot, s) =>
+        strum(chord, barAt + slotAt(s), slot, peak, slotAt(s + 1) - slotAt(s)),
+      );
     };
 
     // Total span, so the loop knows where to rejoin — chords may differ in length.
@@ -1176,6 +1277,10 @@ export function createAudioPlayer(): AudioPlayer {
     applyAmp();
   };
 
+  const setAmp = (next: AmpId) => {
+    ampId = next;
+    applyAmpSpec();
+  };
 
   return {
     play,
@@ -1183,6 +1288,7 @@ export function createAudioPlayer(): AudioPlayer {
     startProgression,
     stop,
     setTimbre,
+    setAmp,
     available: true,
   };
 }
