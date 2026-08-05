@@ -6,6 +6,7 @@ import { KeyFinder } from './components/KeyFinder';
 import { NoteText } from './components/NoteText';
 import { ProgressionPanel } from './components/ProgressionPanel';
 import { SetupPanel } from './components/SetupPanel';
+import { SoundPanel } from './components/SoundPanel';
 import { useAppState } from './hooks/useAppState';
 import { type ThemeChoice, useTheme } from './hooks/useTheme';
 import { useTransport } from './hooks/useTransport';
@@ -75,6 +76,10 @@ export default function App() {
     loop,
     sound,
     amp,
+    pickup,
+    tone,
+    reverb,
+    delay,
     beatsPerBar,
     rhythm,
     strum,
@@ -293,6 +298,32 @@ export default function App() {
     player().setAmp(amp);
   }, [amp]);
 
+  // The rest of the signal chain, one effect per concern for the same reason: each
+  // of these is legal and silent when the thing it points at is not in use, and
+  // the choice is still there when it comes back.
+  useEffect(() => {
+    player().setPickup(pickup);
+  }, [pickup]);
+
+  useEffect(() => {
+    player().setTone(tone);
+  }, [tone]);
+
+  useEffect(() => {
+    player().setReverb(reverb);
+  }, [reverb]);
+
+  useEffect(() => {
+    player().setDelay(delay);
+  }, [delay]);
+
+  // The delay divides the tempo, so it has to be told about it from here rather
+  // than from useTransport: a single chord clicked on the neck never goes through
+  // the transport, and it should still echo in time.
+  useEffect(() => {
+    player().setTempo(bpm);
+  }, [bpm]);
+
 
   // A one-off chord has no bar to spread across, so an arpeggio there just walks the
   // strings at a leisurely pace.
@@ -448,20 +479,34 @@ export default function App() {
           <p className="subtitle">Tonarten und Skalen auf dem Hals sichtbar machen.</p>
         </div>
 
-        <SetupPanel
-          tuning={tuning}
-          tuningId={tuningId}
-          isCustomTuning={isCustomTuning}
-          capo={capo}
-          fretCount={fretCount}
-          sound={sound}
-          amp={amp}
-          onTuningIdChange={(next) => update('tuningId', next)}
-          onCapoChange={(next) => update('capo', next)}
-          onFretCountChange={(next) => update('fretCount', next)}
-          onSoundChange={(next) => update('sound', next)}
-          onAmpChange={(next) => update('amp', next)}
-        />
+        <div className="setup-group">
+          <SetupPanel
+            tuning={tuning}
+            tuningId={tuningId}
+            isCustomTuning={isCustomTuning}
+            capo={capo}
+            fretCount={fretCount}
+            sound={sound}
+            onTuningIdChange={(next) => update('tuningId', next)}
+            onCapoChange={(next) => update('capo', next)}
+            onFretCountChange={(next) => update('fretCount', next)}
+            onSoundChange={(next) => update('sound', next)}
+          />
+
+          <SoundPanel
+            sound={sound}
+            amp={amp}
+            pickup={pickup}
+            tone={tone}
+            reverb={reverb}
+            delay={delay}
+            onAmpChange={(next) => update('amp', next)}
+            onPickupChange={(next) => update('pickup', next)}
+            onToneChange={(next) => update('tone', next)}
+            onReverbChange={(next) => update('reverb', next)}
+            onDelayChange={(next) => update('delay', next)}
+          />
+        </div>
       </header>
 
       <section className="scale-strip">

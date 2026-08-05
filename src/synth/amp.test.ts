@@ -2,7 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { spectrum } from '../test/spectrum';
 import { voicePeak } from '../audio';
 import { midiToFrequency, STANDARD_STRUM_GAP } from '../theory';
-import { AMP, AMP_IDS, AMPS, ampInput, ampShape, biquad, renderAmp, webAudioQ } from './amp';
+import {
+  AMP,
+  AMP_IDS,
+  AMPS,
+  ampInput,
+  ampShape,
+  biquad,
+  makeBiquad,
+  renderAmp,
+  webAudioQ,
+} from './amp';
 import { pluck, type PluckOptions } from './pluck';
 
 const SAMPLE_RATE = 48000;
@@ -164,7 +174,14 @@ describe('ampShape', () => {
 });
 
 describe('biquad', () => {
-  /** Steady-state amplitude of a sine at `frequency` after one stage. */
+  /**
+   * Steady-state amplitude of a sine at `frequency` after one stage.
+   *
+   * By RMS rather than by peak, and the difference bites above a few kHz: at
+   * 16 kHz a sine has three samples per cycle, so the largest SAMPLE can sit a
+   * decibel below the largest VALUE. Measuring a shelf's far band that way reads
+   * the sample rate, not the filter.
+   */
   function response(kind: Parameters<typeof biquad>[0], stage: Parameters<typeof biquad>[3], frequency: number) {
     const length = SAMPLE_RATE;
     const input = Float64Array.from(
@@ -172,7 +189,8 @@ describe('biquad', () => {
       (_, n) => Math.sin((2 * Math.PI * frequency * n) / SAMPLE_RATE),
     );
     // Skip the first half second so the filter has settled.
-    return peak(biquad(kind, input, SAMPLE_RATE, stage).subarray(length / 2));
+    const settled = biquad(kind, input, SAMPLE_RATE, stage).subarray(length / 2);
+    return rms(settled) * Math.SQRT2;
   }
 
   /** The cabinet pair, optionally moved to another corner frequency. */
@@ -218,6 +236,50 @@ describe('biquad', () => {
     // ...while everything the chord is built from passes untouched.
     expect(dB(response('lowshelf', AMP.tight, 1000))).toBeCloseTo(0, 1);
   });
+
+  it('puts both shelves at exactly half their gain on the corner', () => {
+    /*
+     * |H(f0)| = A = 10^(dB/40) for an RBJ shelf, either kind — half the dB, on
+     * the nose. It is the cleanest exact statement about a shelf there is, and it
+     * is here because the highshelf branch of coefficients() was derived by
+     * flipping the sign of the cosine terms in the hand-verified lowshelf one.
+     * That derivation is either right or badly wrong, and this says which.
+     */
+    const stage = { frequency: 1000, q: 0.707, gain: 8 };
+    expect(dB(response('lowshelf', stage, stage.frequency))).toBeCloseTo(4, 1);
+    expect(dB(response('highshelf', stage, stage.frequency))).toBeCloseTo(4, 1);
+  });
+
+  it('points the two shelves in opposite directions', () => {
+    // The other half of the same derivation: same numbers, mirrored about the
+    // corner. A sign error that survived the test above would land here.
+    const stage = { frequency: 1000, q: 0.707, gain: 8 };
+    expect(dB(response('lowshelf', stage, 60))).toBeCloseTo(8, 1);
+    expect(dB(response('lowshelf', stage, 16000))).toBeCloseTo(0, 1);
+    expect(dB(response('highshelf', stage, 60))).toBeCloseTo(0, 1);
+    expect(dB(response('highshelf', stage, 16000))).toBeCloseTo(8, 1);
+  });
+});
+
+describe('makeBiquad', () => {
+  it('is the same filter as biquad, sample for sample', () => {
+    /*
+     * biquad() is written in terms of makeBiquad(), so this is not really testing
+     * two implementations — it is making sure it stays that way. The running form
+     * exists because src/synth/delay.ts has to filter inside a feedback loop, and
+     * a second copy of the amplifier's filter arithmetic living over there is
+     * exactly the kind of drift that put the wrong exponent in
+     * scripts/measure-makeup.html.
+     */
+    const stage = { frequency: 900, q: 0.9, gain: -4 };
+    const input = Float64Array.from({ length: 2048 }, (_, n) => Math.sin(n * 0.07) * 0.5);
+
+    const step = makeBiquad('peaking', SAMPLE_RATE, stage);
+    const running = Float64Array.from(input, (x) => step(x));
+    const whole = biquad('peaking', input, SAMPLE_RATE, stage);
+
+    for (let i = 0; i < input.length; i++) expect(running[i]).toBe(whole[i]);
+  });
 });
 
 describe('webAudioQ', () => {
@@ -235,6 +297,9 @@ describe('webAudioQ', () => {
   it('hands a peaking or shelving stage its Q unchanged', () => {
     expect(webAudioQ('peaking', 1.1)).toBe(1.1);
     expect(webAudioQ('lowshelf', 0.707)).toBe(0.707);
+    // Both shelves have their slope fixed at S = 1 by the spec, so there is
+    // nothing for either of them to convert.
+    expect(webAudioQ('highshelf', 0.707)).toBe(0.707);
   });
 });
 

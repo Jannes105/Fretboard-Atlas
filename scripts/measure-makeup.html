@@ -32,15 +32,23 @@
 
 <script type="module">
   import { AMPS, ampShape, webAudioQ } from '/src/synth/amp.ts';
+  import { PICKUPS } from '/src/synth/pickup.ts';
+  import { NEUTRAL_TONE, STACK_KINDS, stackStages } from '/src/synth/toneStack.ts';
+  /*
+   * Imported, not copied. It used to be re-declared here "in spirit" with an
+   * exponent of 0.7 where audio.ts has 0.65 — which meant this rig drove the valve
+   * 0.82 dB softer than the app does, at six voices. That is not a rounding error
+   * in a level trim: the valve compresses, so the same 0.82 dB is worth more at
+   * preGain 26 than at 3, and every makeup in the table inherited a different
+   * slice of it. audio.ts exports voicePeak for exactly this reason (amp.test.ts
+   * measures against it too); there is no excuse for a second copy.
+   */
+  import { voicePeak } from '/src/audio.ts';
 
   /** An open E major — the chord the original measurement used. */
   const E_MAJOR = [40, 47, 52, 56, 59, 64];
   const SECONDS = 3;
   const SAMPLE_RATE = 48000;
-
-  /** Copied in spirit from audio.ts: PEAK and the voice-count rolloff. */
-  const PEAK = 0.55;
-  const voicePeak = (n) => PEAK / Math.pow(Math.max(1, n), 0.7);
 
   function shaperCurve(shape) {
     const curve = new Float32Array(1024);
@@ -88,16 +96,40 @@
     });
   }
 
+  const stageIn = (ctx) => (kind, settings) => {
+    const filter = ctx.createBiquadFilter();
+    filter.type = kind;
+    filter.frequency.value = settings.frequency;
+    filter.Q.value = webAudioQ(kind, settings.q);
+    if (settings.gain !== undefined) filter.gain.value = settings.gain;
+    return filter;
+  };
+
+  /**
+   * The pickup, at whatever position is being measured.
+   *
+   * On BOTH sides of the comparison, because in audio.ts it is on both — it sits
+   * in front of the fork, and the clean voice goes through it too. At the default
+   * position it is two filters at 0 dB, so it changes neither side; that it comes
+   * out that way in a real graph rather than only in the arithmetic is worth
+   * having measured.
+   */
+  function withPickup(ctx, input, pickup) {
+    const stage = stageIn(ctx);
+    const spec = PICKUPS[pickup];
+    return input.connect(stage('peaking', spec.resonance)).connect(stage('lowshelf', spec.level));
+  }
+
+  /** The tone stack, on the sum. Flat here — it is not part of the amplifier. */
+  function withToneStack(ctx, input) {
+    const stage = stageIn(ctx);
+    const stages = stackStages(NEUTRAL_TONE);
+    return STACK_KINDS.reduce((node, kind, i) => node.connect(stage(kind, stages[i])), input);
+  }
+
   /** The amplifier chain, node for node as audio.ts builds it. */
   function buildAmp(ctx, spec) {
-    const stage = (kind, settings) => {
-      const filter = ctx.createBiquadFilter();
-      filter.type = kind;
-      filter.frequency.value = settings.frequency;
-      filter.Q.value = webAudioQ(kind, settings.q);
-      if (settings.gain !== undefined) filter.gain.value = settings.gain;
-      return filter;
-    };
+    const stage = stageIn(ctx);
 
     const input = ctx.createGain();
     const preGain = ctx.createGain();
@@ -108,7 +140,7 @@
     valve.oversample = '4x';
 
     // Deliberately WITHOUT spec.makeup — that is the number being solved for.
-    input
+    const out = input
       .connect(stage('lowshelf', spec.tight))
       .connect(preGain)
       .connect(valve)
@@ -116,8 +148,9 @@
       .connect(stage('lowpass', spec.cab[0]))
       .connect(stage('lowpass', spec.cab[1]))
       .connect(stage('peaking', spec.presence))
-      .connect(stage('lowshelf', spec.body))
-      .connect(ctx.destination);
+      .connect(stage('lowshelf', spec.body));
+
+    withToneStack(ctx, out).connect(ctx.destination);
 
     return input;
   }
@@ -134,30 +167,42 @@
     return rms((await ctx.startRendering()).getChannelData(0));
   }
 
+  /** The clean voice: the pickup and the tone stack, no amplifier. */
+  const buildClean = (pickup) => (ctx) => {
+    const input = ctx.createGain();
+    withToneStack(ctx, withPickup(ctx, input, pickup)).connect(ctx.destination);
+    return input;
+  };
+
   document.getElementById('run').addEventListener('click', async () => {
     const out = document.getElementById('result');
     out.textContent = 'lade Aufnahmen …';
     const samples = await loadSamples();
 
-    // The clean voice: one gentle resonance, no amplifier. This is the reference
-    // every amp is levelled against, and it is why the numbers are absolute.
-    const cleanRms = await render(samples, (ctx) => {
-      const input = ctx.createGain();
-      const tone = ctx.createBiquadFilter();
-      tone.type = 'peaking';
-      tone.frequency.value = 2600;
-      tone.Q.value = 0.8;
-      tone.gain.value = 2;
-      input.connect(tone).connect(ctx.destination);
-      return input;
-    });
+    // The reference every amp is levelled against, and why the numbers are absolute.
+    const cleanRms = await render(samples, buildClean('recorded'));
 
     const rows = [];
     for (const [id, spec] of Object.entries(AMPS)) {
-      const raw = await render(samples, (ctx) => buildAmp(ctx, spec));
+      const raw = await render(samples, (ctx) => buildAmpWithPickup(ctx, spec));
       const makeup = cleanRms / raw;
       rows.push({ id, raw, makeup, current: spec.makeup });
     }
+
+    /*
+     * What the other two pickup positions do to the level, once the amplifier has
+     * had its say. Printed rather than acted on: a bridge pickup really is quieter
+     * and undoing that would delete the feature. It is here so the spread is a
+     * recorded number instead of an assumption — if a position ever costs more
+     * than about 1.5 dB after the amp, its shelf in src/synth/pickup.ts is too
+     * aggressive.
+     */
+    const positions = [];
+    for (const pickup of ['recorded', 'neck', 'bridge']) {
+      const level = await render(samples, (ctx) => buildAmpWithPickup(ctx, AMPS['british-crunch'], pickup));
+      positions.push({ pickup, level });
+    }
+    const reference = positions[0].level;
 
     out.textContent =
       `clean RMS: ${cleanRms.toFixed(6)}\n\n` +
@@ -169,6 +214,20 @@
             `   (in der Tabelle: ${r.current})` +
             `   Abweichung ${(20 * Math.log10(r.current / r.makeup)).toFixed(2)} dB`,
         )
+        .join('\n') +
+      '\n\nTonabnehmer durch british-crunch, gegen „wie aufgenommen":\n' +
+      positions
+        .map(
+          (p) =>
+            `${p.pickup.padEnd(18)} ${(20 * Math.log10(p.level / reference)).toFixed(2)} dB`,
+        )
         .join('\n');
   });
+
+  /** The chain as audio.ts has it: pickup, then amplifier, then tone stack. */
+  function buildAmpWithPickup(ctx, spec, pickup = 'recorded') {
+    const input = ctx.createGain();
+    withPickup(ctx, input, pickup).connect(buildAmp(ctx, spec));
+    return input;
+  }
 </script>

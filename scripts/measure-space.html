@@ -1,0 +1,309 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Hall und Delay messen</title>
+<style>
+  body { font: 14px/1.6 system-ui, sans-serif; margin: 2rem; max-width: 46rem; }
+  code { background: #f2f2f2; padding: 0.1rem 0.3rem; }
+  .out { white-space: pre-wrap; font-family: ui-monospace, monospace; }
+  .bad { color: #b00; font-weight: bold; }
+</style>
+
+<h1>Hall und Delay messen</h1>
+
+<p>
+  Was <code>src/synth/reverb.ts</code> und <code>src/synth/delay.ts</code> im echten
+  Graphen tun. Mit <code>npm run dev</code> starten und
+  <code>/scripts/measure-space.html</code> aufrufen.
+</p>
+
+<p>
+  Warum als Seite und nicht als Test: Vitest läuft in Node, und dort gibt es weder
+  <code>ConvolverNode</code> noch <code>DelayNode</code>. Die Zahlen, die diese
+  beiden Bausteine <em>beschreiben</em>, prüfen ihre Testdateien in reiner
+  Arithmetik; was sich nur hier prüfen lässt, sind die drei Aussagen über den
+  <em>Graphen</em>: dass „aus" wirklich aus ist, dass die Echos dort landen, wo das
+  Tempo sie hinschickt, und dass der Sendepegel dank
+  <code>normalize = false</code> tatsächlich der Hallanteil ist.
+</p>
+
+<button id="run">messen</button>
+<div id="result" class="out"></div>
+
+<script type="module">
+  import { voicePeak } from '/src/audio.ts';
+  import {
+    DELAY_DAMPING,
+    DELAY_FEEDBACK,
+    DELAY_MIX,
+    delaySeconds,
+    MAX_DELAY_SECONDS,
+  } from '/src/synth/delay.ts';
+  import { CHANNEL_SEEDS, impulseResponse, REVERBS, seeded } from '/src/synth/reverb.ts';
+  import { webAudioQ } from '/src/synth/amp.ts';
+
+  const E_MAJOR = [40, 47, 52, 56, 59, 64];
+  const SAMPLE_RATE = 48000;
+  const BPM = 120;
+
+  const dB = (ratio) => 20 * Math.log10(ratio);
+
+  function rms(channel, from = 0, to = channel.length) {
+    let sum = 0;
+    for (let i = from; i < to; i++) sum += channel[i] * channel[i];
+    return Math.sqrt(sum / Math.max(1, to - from));
+  }
+
+  async function loadSamples() {
+    const manifest = await (await fetch('/samples/manifest.json')).json();
+    const set = manifest.electric;
+    const ctx = new OfflineAudioContext(1, 1, SAMPLE_RATE);
+    const buffers = new Map();
+    for (const entry of set) {
+      const bytes = await (await fetch(`/samples/${entry.file}`)).arrayBuffer();
+      buffers.set(entry.file, await ctx.decodeAudioData(bytes));
+    }
+    return { set, buffers };
+  }
+
+  function sampleFor(midi, set) {
+    let best = set[0];
+    for (const entry of set) {
+      if (Math.abs(entry.midi - midi) < Math.abs(best.midi - midi)) best = entry;
+    }
+    return { file: best.file, playbackRate: Math.pow(2, (midi - best.midi) / 12) };
+  }
+
+  /** One strummed chord at the app's own level, then silence for the tail. */
+  function playChord(ctx, { set, buffers }, destination) {
+    const peak = voicePeak(E_MAJOR.length);
+    E_MAJOR.forEach((midi, i) => {
+      const choice = sampleFor(midi, set);
+      const source = ctx.createBufferSource();
+      source.buffer = buffers.get(choice.file);
+      source.playbackRate.value = choice.playbackRate;
+      const gain = ctx.createGain();
+      gain.gain.value = peak;
+      source.connect(gain).connect(destination);
+      source.start(i * 0.01);
+    });
+  }
+
+  /** A single click, for measuring where the echoes fall. */
+  function playImpulse(ctx, destination) {
+    const buffer = ctx.createBuffer(1, 8, SAMPLE_RATE);
+    buffer.getChannelData(0)[0] = 1;
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(destination);
+    source.start(0);
+  }
+
+  /**
+   * A synthetic strummed chord, played at rate 1.
+   *
+   * For the transparency test only, and the reason is a measurement: rendering the
+   * REAL recordings twice through the same graph does not give the same samples
+   * twice. They are resampled — playbackRate is never 1, because a dozen
+   * recordings have to cover four octaves — and Chrome's resampler is reproducible
+   * only to about 3e-8. That is 130 dB down and utterly inaudible, but it is also
+   * far larger than the thing being looked for, so with the recordings the test
+   * would be measuring the resampler and not the sends. Rate 1 removes it, and
+   * bare-against-bare then agrees bit for bit.
+   */
+  function playSynthetic(ctx, destination) {
+    const seconds = 2;
+    const length = Math.round(seconds * SAMPLE_RATE);
+    const buffer = ctx.createBuffer(1, length, SAMPLE_RATE);
+    const data = buffer.getChannelData(0);
+    const level = voicePeak(E_MAJOR.length);
+    E_MAJOR.forEach((midi, i) => {
+      const frequency = 440 * Math.pow(2, (midi - 69) / 12);
+      const onset = Math.round(i * 0.01 * SAMPLE_RATE);
+      for (let n = onset; n < length; n++) {
+        const t = (n - onset) / SAMPLE_RATE;
+        // Three partials and an exponential decay: enough to reach every filter
+        // in the chain, and nothing that needs resampling to produce.
+        data[n] +=
+          level *
+          Math.exp(-t * 1.6) *
+          (Math.sin(2 * Math.PI * frequency * t) +
+            0.5 * Math.sin(4 * Math.PI * frequency * t) +
+            0.25 * Math.sin(6 * Math.PI * frequency * t));
+      }
+    });
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(destination);
+    source.start(0);
+  }
+
+  const roomBuffer = (ctx, id) => {
+    const channels = CHANNEL_SEEDS.map((seed) =>
+      impulseResponse(REVERBS[id], ctx.sampleRate, seeded(seed)),
+    );
+    const buffer = ctx.createBuffer(channels.length, channels[0].length, ctx.sampleRate);
+    channels.forEach((channel, i) => buffer.copyToChannel(Float32Array.from(channel), i));
+    return buffer;
+  };
+
+  /**
+   * The post-amp section of audio.ts, on its own: a bus, the two sends, and the
+   * feedback loop. Built the same way and in the same order.
+   */
+  function buildSpace(ctx, { reverb = 'off', delay = 'off', bpm = BPM } = {}) {
+    const bus = ctx.createGain();
+    bus.connect(ctx.destination);
+
+    const send = ctx.createGain();
+    send.gain.value = delay === 'off' ? 0 : DELAY_MIX;
+    const line = ctx.createDelay(MAX_DELAY_SECONDS);
+    line.delayTime.value = delay === 'off' ? 0.5 : delaySeconds(bpm, delay);
+    const damp = ctx.createBiquadFilter();
+    damp.type = 'lowpass';
+    damp.frequency.value = DELAY_DAMPING.frequency;
+    damp.Q.value = webAudioQ('lowpass', DELAY_DAMPING.q);
+    const feedback = ctx.createGain();
+    feedback.gain.value = DELAY_FEEDBACK;
+
+    bus.connect(send).connect(line).connect(damp).connect(ctx.destination);
+    damp.connect(feedback).connect(line);
+
+    const reverbSend = ctx.createGain();
+    reverbSend.gain.value = reverb === 'off' ? 0 : REVERBS[reverb].mix;
+    const convolver = ctx.createConvolver();
+    convolver.normalize = false;
+    convolver.buffer = reverb === 'off' ? null : roomBuffer(ctx, reverb);
+    bus.connect(reverbSend).connect(convolver).connect(ctx.destination);
+    damp.connect(reverbSend);
+
+    return bus;
+  }
+
+  /** Just the bus, with none of the new nodes at all — the control. */
+  function buildBare(ctx) {
+    const bus = ctx.createGain();
+    bus.connect(ctx.destination);
+    return bus;
+  }
+
+  async function render(seconds, build, play) {
+    const ctx = new OfflineAudioContext(1, Math.round(SAMPLE_RATE * seconds), SAMPLE_RATE);
+    play(ctx, build(ctx));
+    return (await ctx.startRendering()).getChannelData(0);
+  }
+
+  document.getElementById('run').addEventListener('click', async () => {
+    const out = document.getElementById('result');
+    out.textContent = 'lade Aufnahmen …';
+    const samples = await loadSamples();
+    const chord = (ctx, node) => playChord(ctx, samples, node);
+    const lines = [];
+    let failures = 0;
+
+    const check = (ok, text) => {
+      if (!ok) failures++;
+      lines.push(`${ok ? '  ok  ' : '  NEIN '} ${text}`);
+    };
+
+    /*
+     * 1. Aus ist aus.
+     *
+     * The claim the whole design rests on: a send at gain 0 emits zeros, and
+     * adding zero is exact — so with both effects off the output has to be the
+     * SAME SAMPLES the graph produced before any of this existed. Not "close":
+     * identical. Nothing else can show this, which is why it is first.
+     */
+    const withOff = await render(2, (ctx) => buildSpace(ctx), playSynthetic);
+    const bare = await render(2, buildBare, playSynthetic);
+    let worst = 0;
+    for (let i = 0; i < bare.length; i++) worst = Math.max(worst, Math.abs(withOff[i] - bare[i]));
+    check(worst === 0, `aus ist aus — groesste Abweichung ${worst} (muss exakt 0 sein)`);
+
+    // Und die Gegenprobe, dass die Null oben etwas wert ist: derselbe Graph zweimal
+    // gerendert muss sich ebenfalls exakt gleichen, sonst misst der Test das
+    // Rendern und nicht die Sends.
+    const bareAgain = await render(2, buildBare, playSynthetic);
+    let control = 0;
+    for (let i = 0; i < bare.length; i++) control = Math.max(control, Math.abs(bare[i] - bareAgain[i]));
+    check(control === 0, `derselbe Graph zweimal ergibt dieselben Samples (${control})`);
+
+    /*
+     * 2. Die Echos liegen, wo das Tempo sie hinschickt.
+     *
+     * effektpedale.md §6: Viertel = 60000/BPM ms, punktierte Achtel = 45000/BPM ms.
+     * Web Audio legt in jede Rueckkopplung einen Renderblock von 128 Samples, also
+     * laeuft jede Runde 2,7 ms nach — das ist der erlaubte Fehler hier und keine
+     * Abweichung der Rechnung.
+     */
+    for (const division of ['quarter', 'dotted8']) {
+      const wet = await render(2, (ctx) => buildSpace(ctx, { delay: division }), playImpulse);
+      const expected = delaySeconds(BPM, division);
+      const window = Math.round(0.02 * SAMPLE_RATE);
+      const centre = Math.round(expected * SAMPLE_RATE);
+      let best = centre;
+      for (let n = centre - window; n < centre + window; n++) {
+        if (Math.abs(wet[n]) > Math.abs(wet[best])) best = n;
+      }
+      const measured = best / SAMPLE_RATE;
+      const offBy = (measured - expected) * 1000;
+      check(
+        Math.abs(offBy) < 5,
+        `${division.padEnd(8)} erwartet ${(expected * 1000).toFixed(1)} ms, ` +
+          `gemessen ${(measured * 1000).toFixed(1)} ms (${offBy.toFixed(2)} ms daneben)`,
+      );
+    }
+
+    /*
+     * 3. Der Hallanteil ist der Sendepegel — und zwar fuer beide Raeume gleich.
+     *
+     * Die Zusicherung, die die Energienormierung in impulseResponse zusammen mit
+     * convolver.normalize = false gibt: die Halle ist doppelt so lang wie der Raum
+     * und darf deshalb trotzdem nicht lauter sein.
+     *
+     * Gemessen als GESAMTENERGIE des nassen Anteils, nicht als Pegel in einem
+     * spaeten Fenster — das war der erste Versuch und er war falsch. Bei 2,2 s ist
+     * der 0,9-s-Raum zweieinhalb Abklingzeiten alt und die 1,8-s-Halle erst eine;
+     * die 7,3 dB, die dabei herauskamen, sind der Unterschied der Nachhallzeiten
+     * und sagen ueber den Pegel nichts. Was eine Impulsantwort mit Energie 1
+     * verspricht, ist die Energie ueber das ganze Stueck.
+     */
+    const dryTotal = rms(await render(6, buildBare, chord));
+    const wetLevels = [];
+    for (const id of ['room', 'hall']) {
+      const wet = await render(6, (ctx) => buildSpace(ctx, { reverb: id }), chord);
+      wetLevels.push({ id, relative: dB(rms(wet) / dryTotal) });
+    }
+    for (const w of wetLevels) {
+      lines.push(`  ${w.id.padEnd(6)} mit Hall insgesamt ${w.relative.toFixed(2)} dB lauter als trocken`);
+    }
+    check(
+      Math.abs(wetLevels[0].relative - wetLevels[1].relative) < 1,
+      `Raum und Halle kosten denselben Pegel ` +
+        `(${Math.abs(wetLevels[0].relative - wetLevels[1].relative).toFixed(2)} dB auseinander)`,
+    );
+
+    /*
+     * 4. Die Fahne haelt so lange durch, wie die Tabelle sagt.
+     *
+     * Gegen den Anfang der Fahne gemessen, nicht gegen den Akkord — RT60 ist eine
+     * Eigenschaft des Raums, nicht des Signals, das ihn anregt.
+     */
+    for (const id of ['room', 'hall']) {
+      const room = REVERBS[id];
+      const wet = await render(6, (ctx) => buildSpace(ctx, { reverb: id }), chord);
+      const at = (seconds) => {
+        const start = Math.round((2 + seconds) * SAMPLE_RATE);
+        return rms(wet, start, start + Math.round(0.05 * SAMPLE_RATE));
+      };
+      const fall = dB(at(room.rt60) / at(0));
+      check(fall < -30, `${id.padEnd(6)} faellt in ${room.rt60} s um ${fall.toFixed(1)} dB`);
+    }
+
+    out.innerHTML =
+      lines.join('\n') +
+      '\n\n' +
+      (failures === 0
+        ? 'Alles wie vorgesehen.'
+        : `<span class="bad">${failures} Punkt(e) stimmen nicht.</span>`);
+  });
+</script>

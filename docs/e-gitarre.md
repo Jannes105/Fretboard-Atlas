@@ -51,6 +51,19 @@ Das ist als kurzes Delay + Summe modellierbar (Größenordnung: die
 Pickup-Abstände liegen bei 8–10 cm, die Auslöschungen ergeben sich aus der
 Saitenwellenlänge, nicht aus einer Laufzeit im Kabel).
 
+*In der App:* **implementiert** in `src/synth/pickup.ts` — Hals bei 2800 Hz
+(Q 1,2) und Steg bei 6300 Hz (Q 1,0), das sind die geometrischen Mitten der
+Bänder in der Tabelle oben; dazu ein Low-Shelf bei 320 Hz für den
+Pegelunterschied aus der Positionstabelle. Die Q-Werte kommen aus §2, nicht aus
+dem Pickup-Typ.
+
+Die Vorgabe ist eine **dritte** Stellung, „wie aufgenommen", flach auf beiden
+Filtern: die Aufnahmen sind durch einen Pickup entstanden, und den kann man nicht
+herausrechnen. Der Pickup sitzt vor dem Verstärker, weil er die Gitarre ist —
+gemessen fährt der Halspickup die Kennlinie 3,5 dB kräftiger an als der Steg,
+wovon nach dem Verstärker noch 0,3 dB übrig sind. Die Zwischenstellungen sind
+nicht implementiert.
+
 ### Typen
 
 - **Single Coil** — hell, dynamisch, brummempfindlich (50/60 Hz Netzbrumm).

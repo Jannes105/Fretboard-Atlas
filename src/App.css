@@ -375,8 +375,17 @@ body {
  * one tap away inside the panel, and it is not something you check twice a
  * session. The phone rule below arrived at the same answer for its own reason.
  */
-.setup-trigger .trigger-value {
+.setup-trigger .trigger-value,
+.sound-trigger .trigger-value {
   display: none;
+}
+
+/* Two triggers share the header now, so they need to sit beside each other
+   rather than each claiming the end of the row. */
+.setup-group {
+  display: flex;
+  flex: none;
+  gap: 0.4rem;
 }
 
 /* Everything else it needs comes from .trigger. */
@@ -386,6 +395,52 @@ body {
   gap: 0.75rem;
   width: max-content;
   min-width: 13rem;
+}
+
+/*
+ * The sound drawer. Wider than the instrument one because three sliders sitting
+ * side by side need the room, and because its longest label ("Punktierte Achtel")
+ * is longer than anything next door.
+ */
+.sound-panel {
+  min-width: 15rem;
+}
+
+/*
+ * Bass, Mitten, Höhen in one row. Side by side rather than stacked because the
+ * three of them are read as a shape — a scoop or a smile — and that only works
+ * if they are next to each other.
+ */
+.tone-stack {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+
+.tone-knob {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.tone-knob output {
+  font-weight: var(--weight-bold);
+  color: var(--text);
+  /* Tabular, so nudging a control does not shuffle the two beside it. */
+  font-variant-numeric: tabular-nums;
+}
+
+.tone-knob input[type='range'] {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 /* The six per-string note pickers of a custom tuning, low string first. */
@@ -877,6 +932,7 @@ button:focus-visible {
  * looked wrong — but they were the last two values outside the scale.
  */
 .tempo input[type='range'],
+.tone-knob input[type='range'],
 .toggle input {
   font-size: var(--text-sm);
 }

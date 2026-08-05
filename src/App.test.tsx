@@ -29,6 +29,11 @@ const { player, transport, noteHandles } = vi.hoisted(() => {
       stop: vi.fn(),
       setTimbre: vi.fn(),
       setAmp: vi.fn(),
+      setPickup: vi.fn(),
+      setTone: vi.fn(),
+      setReverb: vi.fn(),
+      setDelay: vi.fn(),
+      setTempo: vi.fn(),
       available: true,
     },
   };
@@ -365,26 +370,89 @@ describe('App — Klang', () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    const openSetup = async () =>
-      user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
+    const openSound = async () =>
+      user.click(container.querySelector<HTMLButtonElement>('.sound-trigger')!);
     const ampSelect = () =>
-      [...container.querySelectorAll<HTMLSelectElement>('.setup-panel select')].find((select) =>
+      [...container.querySelectorAll<HTMLSelectElement>('.sound-panel select')].find((select) =>
         [...select.options].some((option) => option.value === 'modern-high-gain'),
       );
 
     // Clean geht gar nicht durch den Verstärker — ein Wahlschalter dafür wäre tot.
-    await openSetup();
+    await openSound();
     expect(ampSelect()).toBeUndefined();
 
+    // Die Stimme selbst bleibt im Instrument-Fach, weil sie entscheidet, ob es
+    // überhaupt einen Verstärker gibt.
+    await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
     const soundSelect = [...container.querySelectorAll<HTMLSelectElement>('.setup-panel select')].find(
       (select) => [...select.options].some((option) => option.value === 'electric'),
     )!;
     await user.selectOptions(soundSelect, 'electric');
 
+    await openSound();
     await user.selectOptions(ampSelect()!, 'modern-high-gain');
 
     expect(player.setAmp).toHaveBeenCalledWith('modern-high-gain');
     expect(window.location.search).toContain('amp=modern-high-gain');
+  });
+
+  it('gibt Tonabnehmer, Hall und Delay an den Player weiter', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    // Beim Start stehen alle drei auf ihrer Vorgabe — und die Vorgabe ist
+    // durchsichtig, siehe src/synth/pickup.ts und reverb.ts.
+    expect(player.setPickup).toHaveBeenCalledWith('recorded');
+    expect(player.setReverb).toHaveBeenCalledWith('off');
+    expect(player.setDelay).toHaveBeenCalledWith('off');
+
+    await user.click(container.querySelector<HTMLButtonElement>('.sound-trigger')!);
+    const selectFor = (value: string) =>
+      [...container.querySelectorAll<HTMLSelectElement>('.sound-panel select')].find((select) =>
+        [...select.options].some((option) => option.value === value),
+      )!;
+
+    await user.selectOptions(selectFor('bridge'), 'bridge');
+    expect(player.setPickup).toHaveBeenCalledWith('bridge');
+    expect(window.location.search).toContain('pickup=bridge');
+
+    await user.selectOptions(selectFor('hall'), 'hall');
+    expect(player.setReverb).toHaveBeenCalledWith('hall');
+    expect(window.location.search).toContain('reverb=hall');
+
+    await user.selectOptions(selectFor('dotted8'), 'dotted8');
+    expect(player.setDelay).toHaveBeenCalledWith('dotted8');
+    expect(window.location.search).toContain('delay=dotted8');
+  });
+
+  it('gibt die drei Klangregler weiter und lässt sie flach beginnen', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    expect(player.setTone).toHaveBeenCalledWith({ bass: 0, mid: 0, treble: 0 });
+
+    await user.click(container.querySelector<HTMLButtonElement>('.sound-trigger')!);
+    const bass = container.querySelector<HTMLInputElement>('.tone-stack input[type="range"]')!;
+
+    // fireEvent statt userEvent: ein Slider auf einen bestimmten Wert zu ziehen
+    // ist eine Mausgeste, die jsdom nicht hat — der Wert selbst ist der Punkt.
+    fireEvent.change(bass, { target: { value: '-4' } });
+
+    expect(player.setTone).toHaveBeenCalledWith({ bass: -4, mid: 0, treble: 0 });
+    expect(window.location.search).toContain('bass=-4');
+  });
+
+  it('bindet das Delay an das Tempo, damit auch ein einzelner Akkord im Takt hallt', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    expect(player.setTempo).toHaveBeenCalledWith(90);
+
+    const tempo = container.querySelector<HTMLInputElement>('.tempo input[type="range"]')!;
+    fireEvent.change(tempo, { target: { value: '140' } });
+
+    await user.click(container.querySelector<HTMLButtonElement>('.sound-trigger')!);
+    expect(player.setTempo).toHaveBeenCalledWith(140);
   });
 });
 

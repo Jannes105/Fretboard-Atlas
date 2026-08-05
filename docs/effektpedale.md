@@ -185,6 +185,21 @@ Parameter: Pre-Delay (0–100 ms), Decay/RT60 (0,3–10 s), Damping (Höhenverlu
 generierten Impulsantwort (Rauschen mit exponentiell fallender Hüllkurve) — das
 braucht keine externe Datei.
 
+*In der App:* **beide implementiert**, `src/synth/delay.ts` und
+`src/synth/reverb.ts`, hinter dem Verstärker als Sends. Delay mit Feedback 0,35
+und Tiefpass 3000 Hz in der Schleife — die Sättigung aus der Tabelle oben fehlt
+absichtlich, weil eine Nichtlinearität in einer Rückkopplung gegen die Regel am
+Ende dieses Dokuments verstößt. Hall als Raum (RT60 0,9 s) und Halle (1,8 s), mit
+wandernder Dämpfung und einer auf Energie 1 normierten Impulsantwort; der
+`ConvolverNode` steht deshalb auf `normalize = false`, sonst wäre der Sendepegel
+nicht der Hallanteil.
+
+Zwei Zahlen aus der Messung in `scripts/measure-space.html`: die Echos liegen
+0,06 ms neben dem Sollwert, und Raum und Halle kosten trotz doppelter Länge
+denselben Pegel auf 0,29 dB. Wichtiger noch — mit beiden auf „aus" ist die
+Ausgabe **sample-identisch** mit der ohne diese Knoten, weil ein Send auf 0
+echte Nullen liefert.
+
 ## 7. Was davon in Web Audio direkt geht
 
 | Effekt | Web-Audio-Bausteine | Aufwand |

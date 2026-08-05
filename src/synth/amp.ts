@@ -37,7 +37,7 @@ export interface AmpStage {
   readonly gain?: number;
 }
 
-export type StageKind = 'lowpass' | 'highpass' | 'peaking' | 'lowshelf';
+export type StageKind = 'lowpass' | 'highpass' | 'peaking' | 'lowshelf' | 'highshelf';
 
 /**
  * A textbook Q as the Web Audio API wants it for this filter type. Measured
@@ -46,8 +46,8 @@ export type StageKind = 'lowpass' | 'highpass' | 'peaking' | 'lowshelf';
  * - `lowpass` / `highpass` — Q is in DECIBELS. `Q.value = 1` is a pole Q of
  *   1.122, not 1. This is the one that silently ruins a filter table.
  * - `peaking` — Q is a real Q, passed through.
- * - `lowshelf` — Q is IGNORED entirely; the spec fixes the slope at S = 1.
- *   Returned unchanged so the caller need not special-case it.
+ * - `lowshelf` / `highshelf` — Q is IGNORED entirely; the spec fixes the slope at
+ *   S = 1. Returned unchanged so the caller need not special-case it.
  */
 export function webAudioQ(kind: StageKind, q: number): number {
   return kind === 'lowpass' || kind === 'highpass' ? 20 * Math.log10(q) : q;
@@ -204,8 +204,11 @@ const BRITISH_CRUNCH = {
    * level: it can show that the curve intermodulates, that the cabinet slopes at
    * 24 dB per octave and that the signal stays inside the shaper, and it cannot
    * set this. amp.test.ts asserts only a sane range for it, and says so.
+   *
+   * Was 0.0478 until two things moved it — see the note on AMPS below, which is
+   * where that story belongs because both of them moved all four numbers.
    */
-  makeup: 0.0478,
+  makeup: 0.0498,
 } satisfies AmpSpec;
 
 /**
@@ -214,9 +217,10 @@ const BRITISH_CRUNCH = {
  * stops, and how much presence is given back. docs/verstaerker.md §6 has the
  * reasoning and the sources.
  *
- * `british-crunch` is the amp this app has always had, unchanged down to the last
- * decimal — so switching to it is switching to nothing, and the one entry whose
- * numbers were tuned against measurements keeps them.
+ * `british-crunch` is the amp this app has always had. Every number that shapes it
+ * is unchanged down to the last decimal — so switching to it is still switching to
+ * nothing in tone. Only its `makeup` moved, and only because the rig that had set
+ * it was measuring at the wrong level; see the note below.
  *
  * EVERY `makeup` HERE IS MEASURED, NOT ESTIMATED, and the note on the field above
  * says why it cannot be otherwise: model and recording drive the curve differently
@@ -227,12 +231,37 @@ const BRITISH_CRUNCH = {
  * amplifier turned up is louder as well as dirtier, and a table that changes the
  * volume when you audition it teaches the wrong thing.
  *
- * That the measurement can be trusted is not an assumption either: run against the
- * crunch amp, whose makeup was measured independently long before that page
- * existed, it returns 0.0477 for the 0.0478 recorded here — 0.02 dB apart. The
- * three new numbers came out of the same rig. Estimating them first and measuring
- * afterwards showed what the guessing was worth: 6.2 dB out on the clean amp,
- * 4.4 on the chime, 2.1 on the high gain.
+ * Estimating them first and measuring afterwards showed what the guessing was
+ * worth: 6.2 dB out on the clean amp, 4.4 on the chime, 2.1 on the high gain.
+ *
+ * ALL FOUR MOVED ONCE MORE, AND THE REASON IS THE ONE WARNING WORTH READING HERE.
+ * The page used to re-declare audio.ts's `voicePeak` "in spirit", with an exponent
+ * of 0.7 against the 0.65 the app actually uses. At six voices that is 0.82 dB, so
+ * the rig had been auditioning every amplifier at a level the app never plays at.
+ * A level trim measured at the wrong level is simply wrong, and not by a constant:
+ * the valve compresses, so the error grew with the drive — 0.20 dB on the clean
+ * amp, 0.43 on the chime, 0.57 on the crunch, 0.66 on the high gain. The page now
+ * imports voicePeak instead of restating it, which is the only fix that cannot
+ * drift again.
+ *
+ * This also retires a claim that used to stand here: that the rig was validated by
+ * returning 0.0477 for the crunch amp's independently measured 0.0478. It was not.
+ * Both of those numbers came from the same wrong level, and two errors agreeing is
+ * not a measurement agreeing. What validates the rig now is that it is built from
+ * the app's own exports rather than from copies of them.
+ *
+ * The second move was smaller and is worth separating from the first: the clean
+ * voice, which is the REFERENCE all four are ratios against, lost the +2 dB it
+ * used to carry at 2600 Hz. That lift was a pickup's, and it now lives in
+ * src/synth/pickup.ts where it can be chosen instead of being wired in — so the
+ * default guitar is the recording, unshaped. It made the reference 0.22 dB
+ * quieter and every makeup the same 0.22 dB with it.
+ *
+ * What did NOT move is the useful part of that measurement: the raw output of all
+ * four amplifiers came back identical to the last digit with the pickup and the
+ * tone stack in the graph. Both blocks really are wires at their defaults, in a
+ * browser and not only in the arithmetic — which is the whole reason those two
+ * features cost no re-measurement of their own.
  */
 export const AMPS = {
   /**
@@ -252,7 +281,7 @@ export const AMPS = {
     ],
     presence: { frequency: 3000, q: 1.0, gain: 2 },
     body: { frequency: 160, q: 0.707, gain: 2.5 },
-    makeup: 0.1298,
+    makeup: 0.1296,
   },
 
   /**
@@ -273,7 +302,7 @@ export const AMPS = {
     ],
     presence: { frequency: 2600, q: 1.2, gain: 5.5 },
     body: { frequency: 170, q: 0.707, gain: 2 },
-    makeup: 0.0684,
+    makeup: 0.0701,
   },
 
   'british-crunch': BRITISH_CRUNCH,
@@ -296,7 +325,7 @@ export const AMPS = {
     ],
     presence: { frequency: 2900, q: 1.2, gain: 5 },
     body: { frequency: 150, q: 0.707, gain: 4 },
-    makeup: 0.0423,
+    makeup: 0.0445,
   },
 } as const satisfies Record<string, AmpSpec>;
 
@@ -343,17 +372,24 @@ function coefficients(
 
   let b0: number, b1: number, b2: number, a0: number, a1: number, a2: number;
 
-  if (kind === 'lowshelf') {
+  if (kind === 'lowshelf' || kind === 'highshelf') {
     // The spec fixes the shelf slope at S = 1 and ignores Q, which works out to
     // exactly this alpha. Verified against getFrequencyResponse.
     const alpha = (sin / 2) * Math.SQRT2;
     const shelf = 2 * Math.sqrt(A) * alpha;
-    b0 = A * (A + 1 - (A - 1) * cos + shelf);
-    b1 = 2 * A * (A - 1 - (A + 1) * cos);
-    b2 = A * (A + 1 - (A - 1) * cos - shelf);
-    a0 = A + 1 + (A - 1) * cos + shelf;
-    a1 = -2 * (A - 1 + (A + 1) * cos);
-    a2 = A + 1 + (A - 1) * cos - shelf;
+    // The two shelves are the same six expressions with the sign of the cosine
+    // term flipped — which is the algebra of reflecting the response about
+    // Nyquist, and the reason this is one branch and not two. `lowshelf` was
+    // checked against getFrequencyResponse by hand; `highshelf` inherits that
+    // check through the sign, and amp.test.ts pins it down independently with
+    // the property that a shelf is at exactly half its dB gain on the corner.
+    const lean = kind === 'lowshelf' ? 1 : -1;
+    b0 = A * (A + 1 - lean * (A - 1) * cos + shelf);
+    b1 = 2 * lean * A * (A - 1 - lean * (A + 1) * cos);
+    b2 = A * (A + 1 - lean * (A - 1) * cos - shelf);
+    a0 = A + 1 + lean * (A - 1) * cos + shelf;
+    a1 = -2 * lean * (A - 1 + lean * (A + 1) * cos);
+    a2 = A + 1 + lean * (A - 1) * cos - shelf;
   } else {
     const alpha = sin / (2 * stage.q);
     if (kind === 'lowpass') {
@@ -384,36 +420,49 @@ function coefficients(
 }
 
 /**
- * One biquad, direct form I.
+ * One biquad, direct form I, as a running function of one sample at a time.
  *
  * The Web Audio spec prescribes the RBJ cookbook coefficients for
  * BiquadFilterNode, so this is not a model of that node — it is the same
  * arithmetic, and a measurement here holds for the browser.
+ *
+ * Sample by sample rather than array in, array out, because a feedback loop
+ * cannot be written the other way: the delay in src/synth/delay.ts has to filter
+ * a sample it is about to compute from. `biquad` below is the array form, and it
+ * is this function, so the two cannot drift.
  */
-export function biquad(
+export function makeBiquad(
   kind: StageKind,
-  input: Float64Array,
   sampleRate: number,
   stage: AmpStage,
-): Float64Array {
+): (x: number) => number {
   const [b0, b1, b2, a1, a2] = coefficients(kind, sampleRate, stage);
-  const out = new Float64Array(input.length);
 
   let x1 = 0;
   let x2 = 0;
   let y1 = 0;
   let y2 = 0;
 
-  for (let i = 0; i < input.length; i++) {
-    const x0 = input[i];
+  return (x0) => {
     const y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-    out[i] = y0;
     x2 = x1;
     x1 = x0;
     y2 = y1;
     y1 = y0;
-  }
+    return y0;
+  };
+}
 
+/** One biquad over a whole signal. */
+export function biquad(
+  kind: StageKind,
+  input: Float64Array,
+  sampleRate: number,
+  stage: AmpStage,
+): Float64Array {
+  const step = makeBiquad(kind, sampleRate, stage);
+  const out = new Float64Array(input.length);
+  for (let i = 0; i < input.length; i++) out[i] = step(input[i]);
   return out;
 }
 

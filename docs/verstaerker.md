@@ -69,10 +69,19 @@ Bei kleiner Lautstärke lässt er die Höhen vorbei, bei voll aufgedrehtem Poti 
 er keine Wirkung mehr. Deshalb klingt ein Fender bei Volume 2 spitz und bei
 Volume 8 rund — nicht weil die Röhren "warm werden".
 
-*In der App:* Der Tone Stack ist der nächstliegende große Baustein. Drei
-Biquads (Low-Shelf, Peaking, High-Shelf) approximieren die Kurve gut genug für
-eine Trainer-App; wer es exakt will, braucht die Übertragungsfunktion 3. Ordnung
-aus dem CCRMA/DAFx-Paper und eine bilineare Transformation.
+*In der App:* **implementiert** in `src/synth/toneStack.ts` — drei Biquads
+(Low-Shelf 160 Hz, Peaking 500 Hz, High-Shelf 2400 Hz), je −6…+6 dB. Die
+Eckfrequenzen sind die 5F6-A-Zahlen oben: 500 Hz ist der Mitten-Scoop, 2400 Hz
+die Mitte der Wanderung von 2313 bis 2548 Hz. Wer es exakt will, braucht die
+Übertragungsfunktion 3. Ordnung aus dem CCRMA/DAFx-Paper und eine bilineare
+Transformation.
+
+**Zwei Abweichungen, die man kennen muss.** Erstens sitzt der Stack in der App
+*hinter* dem Verstärker statt in der Vorstufe — er entscheidet also nicht mit,
+was verzerrt wird (siehe §1, Punkt 2). Das ist kein Versehen: `AMP.makeup` ist ein
+gemessenes Verhältnis zwischen cleanem und verzerrtem Weg, und ein Stack im
+Verstärker würde es bei jeder Reglerbewegung verschieben. Zweitens sind drei
+getrennte Biquads **orthogonal**, das echte FMV-Netzwerk ist es nicht.
 
 ## 3. Vorstufe
 

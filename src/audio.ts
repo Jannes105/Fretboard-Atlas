@@ -8,9 +8,33 @@ import {
   type StageKind,
   webAudioQ,
 } from './synth/amp';
+import {
+  DEFAULT_DELAY,
+  DELAY_DAMPING,
+  DELAY_FEEDBACK,
+  type DelayId,
+  DELAY_MIX,
+  delaySeconds,
+  MAX_DELAY_SECONDS,
+} from './synth/delay';
 import { findLoop, type LoopRegion, renderSustain } from './synth/loopPoints';
+import { DEFAULT_PICKUP, type PickupId, PICKUPS } from './synth/pickup';
 import { pluck, type PluckOptions } from './synth/pluck';
+import {
+  CHANNEL_SEEDS,
+  DEFAULT_REVERB,
+  impulseResponse,
+  type ReverbId,
+  REVERBS,
+  seeded,
+} from './synth/reverb';
 import { sampleFor, type SampleSet } from './synth/sampleSet';
+import {
+  NEUTRAL_TONE,
+  STACK_KINDS,
+  stackStages,
+  type ToneGains,
+} from './synth/toneStack';
 import {
   arpeggioStringCount,
   type ClickMode,
@@ -80,25 +104,20 @@ export type PlayMode = 'sequence' | 'strum';
  */
 export type Timbre = 'clean' | 'electric';
 
-/** One resonance: where, how narrow, how much. */
-interface Resonance {
-  frequency: number;
-  q: number;
-  gain: number;
-}
-
 /**
  * How each voice is put together.
  *
- * The tone shaping is deliberately light, and for `electric` there is none at all —
- * it gets its voicing from the amplifier it is about to go through.
+ * There is no tone shaping here any more. It used to hold one gentle resonance for
+ * `clean` and nothing at all for `electric`, and both of those jobs now belong
+ * somewhere better: the resonance was a pickup's, and it lives in
+ * src/synth/pickup.ts where it can be chosen; the voicing `electric` gets instead
+ * comes from the amplifier it is about to go through.
  */
 const VOICES: Record<
   Timbre,
   {
     /** Which recorded set feeds it, keyed as in public/samples/manifest.json. */
     readonly recording: 'electric';
-    readonly tone: readonly Resonance[];
     /** Loudness trim, measured — not set by ear. */
     readonly gain: number;
     /** Whether the sum goes through the amplifier in src/synth/amp.ts. */
@@ -107,7 +126,6 @@ const VOICES: Record<
 > = {
   clean: {
     recording: 'electric',
-    tone: [{ frequency: 2600, q: 0.8, gain: 2 }],
     gain: 1,
     amp: false,
   },
@@ -115,16 +133,12 @@ const VOICES: Record<
     // The CLEAN recording — feeding a pre-distorted one into a second amplifier is
     // just mud, and the whole point is that the distortion happens after the sum.
     recording: 'electric',
-    tone: [],
     // Full level: the amplifier's own trim, AMP.makeup, is what balances this voice
     // against the others, and it was measured against exactly this input.
     gain: 1,
     amp: true,
   },
 };
-
-/** Filters kept in the sum for tone shaping. Unused ones sit flat and pass through. */
-const TONE_FILTERS = 2;
 
 /**
  * Fallback string settings, used only until the recordings finish loading or if they
@@ -362,6 +376,22 @@ export interface AudioPlayer {
    * which never reaches it. No AudioContext is created.
    */
   setAmp(amp: AmpId): void;
+  /** Switch the pickup. Applies to both voices — it is the guitar, not the amp. */
+  setPickup(pickup: PickupId): void;
+  /** Bass, Mitten, Höhen, in decibels. Zero is a wire. */
+  setTone(gains: ToneGains): void;
+  /** Which room, or none. */
+  setReverb(reverb: ReverbId): void;
+  /** Which note the echo falls on, or none. */
+  setDelay(delay: DelayId): void;
+  /**
+   * The tempo the delay divides.
+   *
+   * Told to the player directly rather than derived inside startProgression: a
+   * single chord clicked on the neck never passes through the transport, and it
+   * should still echo in time with everything else.
+   */
+  setTempo(bpm: number): void;
   /** Whether this browser can make sound at all. */
   readonly available: boolean;
 }
@@ -432,6 +462,11 @@ export function createAudioPlayer(): AudioPlayer {
       stop: () => {},
       setTimbre: () => {},
       setAmp: () => {},
+      setPickup: () => {},
+      setTone: () => {},
+      setReverb: () => {},
+      setDelay: () => {},
+      setTempo: () => {},
       available: false,
     };
   }
@@ -441,16 +476,24 @@ export function createAudioPlayer(): AudioPlayer {
   let context: AudioContext | null = null;
   /** Everything goes through here, so nothing can hit the output raw. */
   let master: GainNode | null = null;
-  /** Tone shaping, in the sum rather than per note — see VOICES. */
-  let tone: BiquadFilterNode[] | null = null;
+  /**
+   * The pickup, in the sum rather than per note — one guitar, not six.
+   *
+   * A resonant peak and a shelf for the output difference, which is what
+   * src/synth/pickup.ts explains a pickup is worth modelling as. Before the
+   * amplifier on purpose: it is the guitar, and the amplifier comes after it.
+   */
+  let pickupStages: { resonance: BiquadFilterNode; level: BiquadFilterNode } | null = null;
   /**
    * The safety net, kept to hand because the click joins the signal here.
    *
-   * A metronome is not the instrument: it must not pick up the guitar's voicing
-   * filters, its loudness trim or — now — its amplifier, or changing to the overdrive
-   * would move the click too. Joining here is what buys all three at once, so do not
-   * "tidy" the click onto master. It does still pass the ceiling, because nothing
-   * reaches the output raw.
+   * A metronome is not the instrument: it must not pick up the guitar's pickup, its
+   * loudness trim, its amplifier, its tone controls or its effects, or changing any
+   * one of them would move the click too. Joining here is what buys all of that at
+   * once, so do not "tidy" the click onto `master` — or onto `bus`, which is the
+   * newer and much more tempting mistake, since `bus` genuinely is "the sound".
+   * A click with reverb on it is unusable as a click. It does still pass the
+   * ceiling, because nothing reaches the output raw.
    */
   let ceiling: WaveShaperNode | null = null;
   /**
@@ -463,6 +506,26 @@ export function createAudioPlayer(): AudioPlayer {
    */
   let dry: GainNode | null = null;
   let wet: GainNode | null = null;
+  /**
+   * Where the two paths meet: the instrument, finished.
+   *
+   * There was no such point before — `dry` and `wet` each ran straight to the
+   * ceiling — and everything after the amplifier needs one. The tone stack chains
+   * out of it and the two effect sends tap the end of that chain, so a repeat and
+   * a reverb tail carry the same tone the dry signal does.
+   */
+  let bus: GainNode | null = null;
+  /** Bass, Mitten, Höhen. A wire at NEUTRAL_TONE — see src/synth/toneStack.ts. */
+  let stack: BiquadFilterNode[] | null = null;
+  /** The last node of the tone stack: what the effect sends listen to. */
+  let voiceOut: AudioNode | null = null;
+  let delayStages: {
+    send: GainNode;
+    line: DelayNode;
+    damp: BiquadFilterNode;
+    feedback: GainNode;
+  } | null = null;
+  let reverbStages: { send: GainNode; convolver: ConvolverNode } | null = null;
   let live: AudioScheduledSourceNode[] = [];
   /**
    * The notes with a finger still on them, so each new one can ask the others to
@@ -474,6 +537,28 @@ export function createAudioPlayer(): AudioPlayer {
   let timbre: Timbre = 'clean';
   /** Which amplifier the `electric` voice runs through. */
   let ampId: AmpId = DEFAULT_AMP;
+  /** Which pickup, which room, which echo, and where the three controls sit. */
+  let pickupId: PickupId = DEFAULT_PICKUP;
+  let reverbId: ReverbId = DEFAULT_REVERB;
+  let delayId: DelayId = DEFAULT_DELAY;
+  let toneGains: ToneGains = NEUTRAL_TONE;
+  /**
+   * The tempo the delay divides, in BPM.
+   *
+   * Seeded with the same 90 that DEFAULT_STATE uses, spelled out rather than
+   * imported: urlState.ts imports Timbre from this file, and the cycle would be a
+   * worse thing to own than one duplicated number that only matters until App's
+   * first effect fires.
+   */
+  let bpm = 90;
+
+  /**
+   * The two rooms, rendered once and kept.
+   *
+   * Built lazily on the first selection rather than with the context: a hall is
+   * 1.8 s of stereo noise to generate, and most sessions never turn the reverb on.
+   */
+  const rooms = new Map<ReverbId, AudioBuffer>();
 
   /**
    * The amplifier's nodes, kept so a different amplifier can be written into them.
@@ -515,18 +600,122 @@ export function createAudioPlayer(): AudioPlayer {
   let runCancelled = true;
   let runOnStep: ((index: number | null) => void) | undefined = undefined;
 
-  /** Points the tone filters at the current voice. */
-  const applyTone = () => {
-    if (!tone) return;
-    const wanted = VOICES[timbre].tone;
-    tone.forEach((filter, i) => {
-      const resonance = wanted[i];
-      // A peaking filter at 0 dB is transparent, so unused slots simply pass through
-      // rather than needing the graph rewired every time the voice changes.
-      filter.frequency.value = resonance?.frequency ?? 1000;
-      filter.Q.value = resonance?.q ?? 1;
-      filter.gain.value = resonance?.gain ?? 0;
-    });
+  /**
+   * Writes one stage's numbers into one filter.
+   *
+   * Shared by every block in the graph, and the reason is webAudioQ: a Q taken
+   * from a filter table is wrong for two of the five types the app uses, and
+   * silently so. One helper means there is one place that can get it right.
+   */
+  const point = (filter: BiquadFilterNode, settings: AmpStage) => {
+    filter.frequency.value = settings.frequency;
+    filter.Q.value = webAudioQ(filter.type as StageKind, settings.q);
+    if (settings.gain !== undefined) filter.gain.value = settings.gain;
+  };
+
+  /** Points the pickup filters at the chosen position. */
+  const applyPickup = () => {
+    if (!pickupStages) return;
+    const spec = PICKUPS[pickupId];
+    point(pickupStages.resonance, spec.resonance);
+    point(pickupStages.level, spec.level);
+  };
+
+  /**
+   * Writes the three tone controls into the three filters.
+   *
+   * At NEUTRAL_TONE every one of them has A = 1, which makes an RBJ numerator its
+   * own denominator — so the default really is a wire, and the amplifier's four
+   * measured makeup values are still measured against the signal they see.
+   * toneStack.test.ts holds that to 1e-12.
+   */
+  const applyToneStack = () => {
+    if (!stack) return;
+    const stages = stackStages(toneGains);
+    stack.forEach((filter, i) => point(filter, stages[i]));
+  };
+
+  /**
+   * Sets the reverb send, building the room the first time it is asked for.
+   *
+   * The buffer is swapped rather than a second convolver being wired up alongside.
+   * That is the one place this file departs from "wire it once and only write
+   * parameters", and it is a considered departure: a ConvolverNode runs its FFTs
+   * whether or not anyone is listening, so two of them idling would cost real
+   * processor time on a phone for a feature that is off by default.
+   *
+   * Swapping a buffer is an assignment, like valve.curve in applyAmpSpec — but
+   * unlike that one it RESTARTS the convolution, cutting off whatever tail was
+   * ringing. So the send is ducked first and the swap waits for the duck to have
+   * actually happened. That wait is a setTimeout and not a scheduled AudioParam
+   * event, because `convolver.buffer = x` runs on this thread the instant it is
+   * written: a ramp scheduled on the audio clock would still be sliding down while
+   * the buffer underneath it had already changed, which is exactly the click the
+   * duck exists to prevent.
+   */
+  const rampSend = (send: GainNode, to: number, at: number, seconds: number) => {
+    send.gain.cancelScheduledValues(at);
+    send.gain.setValueAtTime(send.gain.value, at);
+    send.gain.linearRampToValueAtTime(to, at + seconds);
+  };
+
+  const applyReverb = (seconds = 0.02) => {
+    if (!context || !reverbStages) return;
+    const send = reverbStages.send;
+
+    if (reverbId === 'off') {
+      rampSend(send, 0, context.currentTime, seconds);
+      return;
+    }
+
+    let buffer = rooms.get(reverbId);
+    if (!buffer) {
+      const room = REVERBS[reverbId];
+      const channels = CHANNEL_SEEDS.map((seed) =>
+        impulseResponse(room, context!.sampleRate, seeded(seed)),
+      );
+      buffer = context.createBuffer(channels.length, channels[0].length, context.sampleRate);
+      channels.forEach((channel, i) => buffer!.copyToChannel(Float32Array.from(channel), i));
+      rooms.set(reverbId, buffer);
+    }
+
+    const wanted = REVERBS[reverbId].mix;
+    if (reverbStages.convolver.buffer === buffer) {
+      rampSend(send, wanted, context.currentTime, seconds);
+      return;
+    }
+
+    rampSend(send, 0, context.currentTime, seconds);
+    const room = reverbId;
+    const swapped = buffer;
+    window.setTimeout(() => {
+      // The choice may have moved on again while the duck was running; the last
+      // call wins, and it will have scheduled its own swap.
+      if (!context || !reverbStages || reverbId !== room) return;
+      reverbStages.convolver.buffer = swapped;
+      rampSend(reverbStages.send, wanted, context.currentTime, seconds);
+    }, seconds * 1000);
+  };
+
+  /** Sets the delay send and, when it is on, the time the tempo asks for. */
+  const applyDelay = (seconds = 0.02) => {
+    if (!context || !delayStages) return;
+    const at = context.currentTime;
+
+    const send = delayStages.send;
+    send.gain.cancelScheduledValues(at);
+    send.gain.setValueAtTime(send.gain.value, at);
+    send.gain.linearRampToValueAtTime(delayId === 'off' ? 0 : DELAY_MIX, at + seconds);
+
+    if (delayId === 'off') return;
+    /*
+     * A glide and not a step, which is the opposite of what applyAmpSpec does with
+     * its filter corners — and for a reason that is also the opposite. An amplifier
+     * is switched, so its numbers should land at once. A tempo is DRAGGED, and a
+     * step in a delay line's read pointer is a click where a slide is the tape
+     * bend every delay pedal makes when you turn its time knob.
+     */
+    delayStages.line.delayTime.setTargetAtTime(delaySeconds(bpm, delayId), at, 0.05);
   };
 
   /**
@@ -541,12 +730,6 @@ export function createAudioPlayer(): AudioPlayer {
   const applyAmpSpec = () => {
     if (!ampStages) return;
     const spec = AMPS[ampId];
-
-    const point = (filter: BiquadFilterNode, settings: AmpStage) => {
-      filter.frequency.value = settings.frequency;
-      filter.Q.value = webAudioQ(filter.type as StageKind, settings.q);
-      if (settings.gain !== undefined) filter.gain.value = settings.gain;
-    };
 
     point(ampStages.tight, spec.tight);
     point(ampStages.block, spec.block);
@@ -610,14 +793,6 @@ export function createAudioPlayer(): AudioPlayer {
     if (!context) {
       context = new Ctor();
 
-      // Tone shaping belongs to the instrument, not to any one note, so it sits in
-      // the sum: two filters in total rather than two per pluck.
-      tone = Array.from({ length: TONE_FILTERS }, () => {
-        const filter = context!.createBiquadFilter();
-        filter.type = 'peaking';
-        return filter;
-      });
-
       // The safety net, and the last thing anything passes through.
       ceiling = context.createWaveShaper();
       ceiling.curve = CEILING_CURVE;
@@ -626,7 +801,18 @@ export function createAudioPlayer(): AudioPlayer {
 
       master = context.createGain();
       master.gain.value = 0.9;
-      const shaped = tone.reduce<AudioNode>((node, filter) => node.connect(filter), master);
+
+      /*
+       * The pickup belongs to the instrument, not to any one note, so it sits in
+       * the sum: two filters in total rather than two per pluck.
+       */
+      pickupStages = {
+        resonance: context.createBiquadFilter(),
+        level: context.createBiquadFilter(),
+      };
+      pickupStages.resonance.type = 'peaking';
+      pickupStages.level.type = 'lowshelf';
+      const shaped = master.connect(pickupStages.resonance).connect(pickupStages.level);
 
       /*
        * The amplifier, hanging off the sum — which is the entire point. One
@@ -634,8 +820,10 @@ export function createAudioPlayer(): AudioPlayer {
        * as one thick voice instead of six fuzzy notes; src/synth/amp.ts carries the
        * numbers and amp.test.ts measures that it actually happens.
        *
-       * It sits AFTER the tone filters because those are the guitar and its pickup,
-       * and the amplifier comes after the guitar — not the speaker before the pickup.
+       * It sits AFTER the pickup filters because those are the guitar, and the
+       * amplifier comes after the guitar — not the speaker before the pickup. That
+       * ordering is what lets the neck pickup drive the valve a shade harder than
+       * the bridge one does; pickup.test.ts measures it.
        *
        * No DynamicsCompressor here to glue the chord together, however tempting.
        * That was measured once already (see CEILING_CURVE) and it raised the peak
@@ -666,8 +854,8 @@ export function createAudioPlayer(): AudioPlayer {
 
       /*
        * Held on to rather than left anonymous, so switching amplifier re-points the
-       * same nodes instead of rewiring the graph — the same reason applyTone can
-       * change the voice while a chord is ringing. AMPS entries all have the same
+       * same nodes instead of rewiring the graph — the same reason applyPickup can
+       * change the guitar while a chord is ringing. AMPS entries all have the same
        * shape, so every stage always has somewhere to point.
        */
       ampStages = {
@@ -682,6 +870,13 @@ export function createAudioPlayer(): AudioPlayer {
       };
       applyAmpSpec();
 
+      /*
+       * Where the two paths meet. It stays at unity forever and exists only so that
+       * there is somewhere to say "the instrument, finished" — which is what
+       * everything below needs, and what the graph did not have before.
+       */
+      bus = context.createGain();
+
       shaped
         .connect(ampStages.tight)
         .connect(preGain)
@@ -693,11 +888,78 @@ export function createAudioPlayer(): AudioPlayer {
         .connect(ampStages.body)
         .connect(makeup)
         .connect(wet)
+        .connect(bus);
+
+      shaped.connect(dry).connect(bus);
+
+      /*
+       * The tone controls, on the sum rather than inside the amplifier.
+       *
+       * A real tone stack hangs in the middle of the preamp, where it decides what
+       * the valve distorts next as well as what you hear. Ours only does the second
+       * half, and src/synth/toneStack.ts argues the trade at length — the short
+       * version is that a stack inside the amplifier would move the ratio between
+       * the clean and driven paths, and that ratio is exactly what each amp's one
+       * measured makeup number is.
+       */
+      const stackAt = stackStages(toneGains);
+      stack = STACK_KINDS.map((kind, i) => stage(kind, stackAt[i]));
+      voiceOut = stack.reduce<AudioNode>((node, filter) => node.connect(filter), bus);
+
+      voiceOut.connect(ceiling);
+
+      /*
+       * Delay and reverb as SENDS, not as wet/dry crossfades — and that choice is
+       * what makes "off" mean off. A crossfade would leave the dry level a function
+       * of the mix, so transparency would rest on two floats summing to exactly one.
+       * A send at gain 0 emits literal zeros, and adding zero is exact in IEEE 754.
+       * That is the property the four measured makeup values rest on, and it is
+       * worth an extra node.
+       *
+       * They hang off the END of the tone stack so a repeat and a tail carry the
+       * same tone the dry signal does, and docs/effektpedale.md §1 puts them after
+       * the amplifier for the reason it gives there: in front of one, the preamp
+       * would distort the reverb tail and the result is mud.
+       */
+      delayStages = {
+        send: context.createGain(),
+        line: context.createDelay(MAX_DELAY_SECONDS),
+        damp: stage('lowpass', DELAY_DAMPING),
+        feedback: context.createGain(),
+      };
+      delayStages.send.gain.value = 0;
+      delayStages.line.delayTime.value = delaySeconds(bpm, 'quarter');
+      delayStages.feedback.gain.value = DELAY_FEEDBACK;
+
+      voiceOut
+        .connect(delayStages.send)
+        .connect(delayStages.line)
+        .connect(delayStages.damp)
         .connect(ceiling);
+      /*
+       * The loop. Legal because a DelayNode sits in it — Web Audio allows a cycle
+       * only through one, and adds a 128-sample render quantum to it, so each lap
+       * runs 2.7 ms late at 48 kHz. That is below the ear and above zero: the
+       * reference renderer in delay.ts deliberately does not model it, which is
+       * worth knowing before someone measures three milliseconds and calls it a bug.
+       */
+      delayStages.damp.connect(delayStages.feedback).connect(delayStages.line);
 
-      shaped.connect(dry).connect(ceiling);
+      reverbStages = { send: context.createGain(), convolver: context.createConvolver() };
+      reverbStages.send.gain.value = 0;
+      /*
+       * The impulse responses carry unit energy of their own (see reverb.ts), which
+       * is what makes the send gain mean the wet level and what stops a hall being
+       * louder than a room just because it is longer. A ConvolverNode normalises by
+       * default and would throw all of that away.
+       */
+      reverbStages.convolver.normalize = false;
+      voiceOut.connect(reverbStages.send).connect(reverbStages.convolver).connect(ceiling);
+      // The repeats are in the room too, which is the order effektpedale.md §1 puts
+      // them in — and it costs one connection rather than a second dry path.
+      delayStages.damp.connect(reverbStages.send);
 
-      applyTone();
+      applyPickup();
       // Straight assignment, not a crossfade: the voice may already be the overdrive
       // when the first note arrives, and there is nothing ringing yet to ease it in
       // for.
@@ -756,6 +1018,11 @@ export function createAudioPlayer(): AudioPlayer {
   /**
    * Silences everything. Crucially this also kills a looping progression — its
    * timers would otherwise keep scheduling new chords after the sound stopped.
+   *
+   * With a room selected this no longer means instant silence: the tail runs on
+   * for up to a couple of seconds after the last string is stopped. That is
+   * correct rather than a leak — a room does not stop when you mute the strings —
+   * but it is new, and it is why nothing here reaches for the reverb send.
    */
   const stop = () => {
     cancelRun();
@@ -1271,15 +1538,41 @@ export function createAudioPlayer(): AudioPlayer {
   const setTimbre = (next: Timbre) => {
     timbre = next;
     // Recordings are cached per file and fallback strings per voice, so neither needs
-    // invalidating — but the tone filters and the amplifier are one shared set each
-    // and have to be pointed at the new voice.
-    applyTone();
+    // invalidating — only the amplifier's blend, which is one shared pair of gains.
+    // The pickup does NOT move with the voice: it is the guitar, and the guitar is
+    // the same instrument whichever amplifier it is plugged into.
     applyAmp();
   };
 
   const setAmp = (next: AmpId) => {
     ampId = next;
     applyAmpSpec();
+  };
+
+  const setPickup = (next: PickupId) => {
+    pickupId = next;
+    applyPickup();
+  };
+
+  const setTone = (next: ToneGains) => {
+    toneGains = next;
+    applyToneStack();
+  };
+
+  const setReverb = (next: ReverbId) => {
+    reverbId = next;
+    applyReverb();
+  };
+
+  const setDelay = (next: DelayId) => {
+    delayId = next;
+    applyDelay();
+  };
+
+  const setTempo = (next: number) => {
+    bpm = next;
+    // Only the delay cares, and only while it is on — applyDelay checks both.
+    applyDelay();
   };
 
   return {
@@ -1289,6 +1582,11 @@ export function createAudioPlayer(): AudioPlayer {
     stop,
     setTimbre,
     setAmp,
+    setPickup,
+    setTone,
+    setReverb,
+    setDelay,
+    setTempo,
     available: true,
   };
 }

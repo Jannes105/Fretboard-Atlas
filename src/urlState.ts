@@ -1,5 +1,9 @@
 import type { Timbre } from './audio';
 import { type AmpId, AMP_IDS, DEFAULT_AMP } from './synth/amp';
+import { DEFAULT_DELAY, DELAY_IDS, type DelayId } from './synth/delay';
+import { DEFAULT_PICKUP, PICKUP_IDS, type PickupId } from './synth/pickup';
+import { DEFAULT_REVERB, REVERB_IDS, type ReverbId } from './synth/reverb';
+import { TONE_MAX_DB, type ToneGains } from './synth/toneStack';
 import type { LabelMode } from './components/FretboardView';
 import {
   ROOT_CHOICES,
@@ -51,6 +55,14 @@ export interface AppState {
   sound: Timbre;
   /** Which amplifier the overdrive voice runs through. Idle under `clean`. */
   amp: AmpId;
+  /** Which pickup position. Applies to both voices — it is the guitar. */
+  pickup: PickupId;
+  /** Bass, Mitten, Höhen, in whole decibels either side of flat. */
+  tone: ToneGains;
+  /** Which room, or none. */
+  reverb: ReverbId;
+  /** Which note the echo falls on, or none. */
+  delay: DelayId;
   /** Beats per bar — the time signature's feel (4 = 4/4, 3 = 3/4, 6 = 6/8, 2 = 2/4). */
   beatsPerBar: number;
   /** Strum pattern for one bar as a d/u/- string; length follows beatsPerBar. */
@@ -88,6 +100,10 @@ export const DEFAULT_STATE: AppState = {
   loop: true,
   sound: 'clean',
   amp: DEFAULT_AMP,
+  pickup: DEFAULT_PICKUP,
+  tone: { bass: 0, mid: 0, treble: 0 },
+  reverb: DEFAULT_REVERB,
+  delay: DEFAULT_DELAY,
   beatsPerBar: 4,
   rhythm: serializePattern(defaultPattern(4)),
   strum: 'standard',
@@ -184,6 +200,19 @@ function pickFrom<T extends string>(raw: string | null, allowed: readonly T[], f
   return raw !== null && (allowed as readonly string[]).includes(raw) ? (raw as T) : fallback;
 }
 
+/**
+ * One tone control, in whole decibels.
+ *
+ * The app's first continuous-looking value, and it deliberately is not one: the
+ * unit a tone control is described in IS the decibel, so a whole number of them is
+ * the honest resolution rather than a compromise for the URL's sake. That means
+ * pickInt already covers it, negatives and all, and there is no new parser to get
+ * subtly wrong.
+ */
+function pickTone(raw: string | null): number {
+  return pickInt(raw, (v) => Math.abs(v) <= TONE_MAX_DB, 0);
+}
+
 /** A CAGED form letter, or null — an unknown letter simply means no overlay. */
 function readCagedForm(raw: string | null): CagedForm | null {
   return raw !== null && (CAGED_ORDER as readonly string[]).includes(raw)
@@ -242,6 +271,14 @@ export function readState(search: string): AppState {
     loop: params.get('loop') === null ? DEFAULT_STATE.loop : params.get('loop') !== '0',
     sound: pickFrom(params.get('sound'), SOUNDS, DEFAULT_STATE.sound),
     amp: pickFrom(params.get('amp'), AMP_IDS, DEFAULT_STATE.amp),
+    pickup: pickFrom(params.get('pickup'), PICKUP_IDS, DEFAULT_STATE.pickup),
+    tone: {
+      bass: pickTone(params.get('bass')),
+      mid: pickTone(params.get('mid')),
+      treble: pickTone(params.get('treble')),
+    },
+    reverb: pickFrom(params.get('reverb'), REVERB_IDS, DEFAULT_STATE.reverb),
+    delay: pickFrom(params.get('delay'), DELAY_IDS, DEFAULT_STATE.delay),
     strum: pickFrom(params.get('strum'), STRUMS, DEFAULT_STATE.strum),
     feel: pickFrom(params.get('feel'), FEELS, DEFAULT_STATE.feel),
     sustain: pickFrom(params.get('sustain'), SUSTAINS, DEFAULT_STATE.sustain),
@@ -275,6 +312,12 @@ export function writeState(state: AppState): string {
   if (state.loop !== DEFAULT_STATE.loop) params.set('loop', state.loop ? '1' : '0');
   add('sound', state.sound, DEFAULT_STATE.sound);
   add('amp', state.amp, DEFAULT_STATE.amp);
+  add('pickup', state.pickup, DEFAULT_STATE.pickup);
+  add('bass', state.tone.bass, DEFAULT_STATE.tone.bass);
+  add('mid', state.tone.mid, DEFAULT_STATE.tone.mid);
+  add('treble', state.tone.treble, DEFAULT_STATE.tone.treble);
+  add('reverb', state.reverb, DEFAULT_STATE.reverb);
+  add('delay', state.delay, DEFAULT_STATE.delay);
   add('strum', state.strum, DEFAULT_STATE.strum);
   add('feel', state.feel, DEFAULT_STATE.feel);
   add('sustain', state.sustain, DEFAULT_STATE.sustain);

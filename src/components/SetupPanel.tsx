@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Timbre } from '../audio';
-import type { AmpId } from '../synth/amp';
 import { pitchClassName, Tuning, withAccidentals } from '../theory';
 import { customTuningId, MAX_CAPO } from '../urlState';
 
@@ -9,17 +8,6 @@ const NOTE_OPTIONS: string[] = Array.from({ length: 12 }, (_, pitchClass) =>
   pitchClassName(pitchClass),
 );
 
-/**
- * The four amplifiers, named for what a player would recognise rather than for the
- * makes they are modelled on. src/synth/amp.ts carries the numbers.
- */
-const AMP_LABELS: readonly { value: AmpId; label: string }[] = [
-  { value: 'american-clean', label: 'American Clean' },
-  { value: 'british-chime', label: 'British Chime' },
-  { value: 'british-crunch', label: 'British Crunch' },
-  { value: 'modern-high-gain', label: 'Modern High Gain' },
-];
-
 interface SetupPanelProps {
   tuning: Tuning;
   tuningId: string;
@@ -27,12 +15,10 @@ interface SetupPanelProps {
   capo: number;
   fretCount: number;
   sound: Timbre;
-  amp: AmpId;
   onTuningIdChange: (tuningId: string) => void;
   onCapoChange: (capo: number) => void;
   onFretCountChange: (fretCount: number) => void;
   onSoundChange: (sound: Timbre) => void;
-  onAmpChange: (amp: AmpId) => void;
 }
 
 /**
@@ -53,12 +39,10 @@ export function SetupPanel({
   capo,
   fretCount,
   sound,
-  amp,
   onTuningIdChange,
   onCapoChange,
   onFretCountChange,
   onSoundChange,
-  onAmpChange,
 }: SetupPanelProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -191,6 +175,10 @@ export function SetupPanel({
             </select>
           </label>
 
+          {/* Clean or driven stays here because it decides whether there IS an
+              amplifier at all; everything downstream of that answer — which
+              amplifier, its tone controls, the pickup, the room — lives in the
+              „Klang" drawer next door. */}
           <label className="field">
             <span>Klang</span>
             <select value={sound} onChange={(e) => onSoundChange(e.target.value as Timbre)}>
@@ -198,21 +186,6 @@ export function SetupPanel({
               <option value="electric">Overdrive</option>
             </select>
           </label>
-
-          {/* Clean never reaches the amplifier, so choosing one there would be a
-              control that does nothing. */}
-          {sound === 'electric' ? (
-            <label className="field">
-              <span>Verstärker</span>
-              <select value={amp} onChange={(e) => onAmpChange(e.target.value as AmpId)}>
-                {AMP_LABELS.map((entry) => (
-                  <option key={entry.value} value={entry.value}>
-                    {entry.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
         </div>
       ) : null}
     </div>

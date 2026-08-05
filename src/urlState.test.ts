@@ -161,6 +161,60 @@ describe('Klang in der URL', () => {
     expect(writeState({ ...DEFAULT_STATE, sound: 'clean' })).toBe('');
     expect(writeState({ ...DEFAULT_STATE, sound: 'electric' })).toBe('?sound=electric');
   });
+
+  it('liest und schreibt den Verstärker, lässt den Default aber weg', () => {
+    // Stand bisher nur indirekt über App.test.tsx unter Beobachtung.
+    expect(readState('?amp=modern-high-gain').amp).toBe('modern-high-gain');
+    expect(readState('?amp=tweed').amp).toBe(DEFAULT_STATE.amp);
+    expect(writeState({ ...DEFAULT_STATE, amp: 'american-clean' })).toBe('?amp=american-clean');
+    expect(writeState({ ...DEFAULT_STATE })).toBe('');
+  });
+
+  it('liest und schreibt den Tonabnehmer, lässt „wie aufgenommen" aber weg', () => {
+    expect(readState('?pickup=bridge').pickup).toBe('bridge');
+    expect(readState('?pickup=piezo').pickup).toBe('recorded');
+    expect(readState('').pickup).toBe('recorded');
+    expect(writeState({ ...DEFAULT_STATE, pickup: 'neck' })).toBe('?pickup=neck');
+  });
+
+  it('liest und schreibt Hall und Delay, lässt „aus" aber weg', () => {
+    expect(readState('?reverb=hall').reverb).toBe('hall');
+    expect(readState('?delay=dotted8').delay).toBe('dotted8');
+    // Unbekanntes fällt auf aus zurück, statt die Seite zu einem Halligen zu machen.
+    expect(readState('?reverb=kathedrale').reverb).toBe('off');
+    expect(readState('?delay=eimer').delay).toBe('off');
+    expect(writeState({ ...DEFAULT_STATE, reverb: 'room' })).toBe('?reverb=room');
+    expect(writeState({ ...DEFAULT_STATE, delay: 'quarter' })).toBe('?delay=quarter');
+  });
+
+  it('liest die drei Klangregler als ganze Dezibel, mit Vorzeichen', () => {
+    expect(readState('?bass=3&mid=-2&treble=6').tone).toEqual({ bass: 3, mid: -2, treble: 6 });
+    // Außerhalb des Regelwegs, keine ganze Zahl, kein Wert: alles fällt auf flach.
+    expect(readState('?bass=99').tone.bass).toBe(0);
+    expect(readState('?mid=1.5').tone.mid).toBe(0);
+    expect(readState('?treble=laut').tone.treble).toBe(0);
+    expect(readState('').tone).toEqual({ bass: 0, mid: 0, treble: 0 });
+  });
+
+  it('schreibt nur die Regler in den Link, die nicht flach stehen', () => {
+    expect(writeState({ ...DEFAULT_STATE, tone: { bass: 0, mid: 0, treble: 0 } })).toBe('');
+    expect(writeState({ ...DEFAULT_STATE, tone: { bass: -4, mid: 0, treble: 2 } })).toBe(
+      '?bass=-4&treble=2',
+    );
+  });
+
+  it('übersteht eine Rundreise mit allem, was der Klangteil kann', () => {
+    const state = {
+      ...DEFAULT_STATE,
+      sound: 'electric' as const,
+      amp: 'british-chime' as const,
+      pickup: 'bridge' as const,
+      tone: { bass: -6, mid: 5, treble: -1 },
+      reverb: 'hall' as const,
+      delay: 'dotted8' as const,
+    };
+    expect(readState(writeState(state))).toEqual(state);
+  });
 });
 
 describe('Spielweise in der URL', () => {

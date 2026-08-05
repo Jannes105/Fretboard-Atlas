@@ -94,6 +94,36 @@ drei neuen Amps lagen Schätzung und Messung bis zu 6,2 dB auseinander. Wer an
 `preGain`, `drive` oder einem Filter dreht, misst neu — sonst ändert der
 Umschalter die Lautstärke statt den Klang.
 
+Wie ernst das gemeint ist, zeigt ein Fehler, den es lange gab: die Messseite
+hatte eine Pegelkonstante aus `audio.ts` nachgebaut statt sie zu importieren,
+mit 0,7 im Exponenten statt 0,65. Damit hat sie jeden Verstärker bei einem Pegel
+angehört, den die App nie spielt — und weil die Kennlinie komprimiert, war der
+Fehler beim High-Gain-Amp dreimal so groß wie beim cleanen. **Eine
+Messvorrichtung darf nichts nachbauen, was sie importieren kann.**
+
+### Davor die Gitarre, danach der Raum
+
+Vor dem Verstärker sitzt der Tonabnehmer (`src/synth/pickup.ts`), dahinter die
+Klangregelung (`toneStack.ts`) und die beiden Effekte (`delay.ts`, `reverb.ts`).
+Die Reihenfolge ist die eines echten Rigs, und die Stelle jedes Bausteins ist
+jeweils eine Entscheidung mit einem Grund — beide Dateien sagen ihn im Kopf.
+
+Was sie eint: **ihre Vorgaben sind arithmetisch nicht vorhanden.** Der Pickup
+steht auf „wie aufgenommen" und ist damit ein Draht, die Regler stehen auf 0 dB
+und sind es auch, und Hall und Delay hängen an Sends mit Verstärkung 0 — und
+`x + 0` ist in IEEE 754 exakt. Im Browser nachgemessen liefern alle vier
+Verstärker mit diesen Bausteinen im Graphen denselben Rohpegel wie ohne sie, auf
+die letzte Stelle; `scripts/measure-space.html` zeigt dasselbe für Hall und Delay
+sample-genau.
+
+**Eine Sache hat sich trotzdem verschoben, und sie gehört genannt.** Die cleane
+Stimme trug bisher fest verdrahtet +2 dB bei 2600 Hz. Das war eine
+Pickup-Resonanz, sie steht jetzt zur Wahl statt im Code, und die Vorgabe ist
+damit die Aufnahme ohne Zutat. Weil die cleane Stimme die **Referenz** ist,
+gegen die jeder Verstärker ausgeglichen wird, sind alle vier `makeup`-Werte um
+dieselben 0,22 dB mitgewandert. Der verzerrte Weg ist unverändert; der cleane ist
+eine Spur schlichter als vorher.
+
 ## Zustand
 
 Alles steht in der URL (`?root=Eb&scale=minor-pentatonic&tuning=drop-d&capo=3`).
