@@ -15,9 +15,27 @@ interface ChordDiagramProps {
 const STRING_GAP = 17;
 const FRET_GAP = 19;
 const ROWS = 5;
-const LEFT = 20;
 const TOP = 26;
-const WIDTH = LEFT * 2 + STRING_GAP * 5;
+
+/** How far left of the first string the fret number is right-aligned. */
+const LABEL_OFFSET = 11;
+/**
+ * Room reserved for the fret number itself, left of that.
+ *
+ * Two digits at the 13px `.base-fret` sets measure 14.5 drawing units — measured,
+ * not guessed. The margin used to be 20 units in total, which left the label
+ * starting at x = -5.4: a shape at the tenth fret lost its leading digit off the
+ * edge of the viewBox and read as a barre at fret "0". Everything below the tenth
+ * fret fitted, which is why it went unnoticed.
+ */
+const LABEL_WIDTH = 16;
+
+/** The margin is the label's, so the left edge of the text lands exactly on 0. */
+const LEFT = LABEL_OFFSET + LABEL_WIDTH;
+/** The right side only has to clear the board's own overhang. */
+const RIGHT = 10;
+
+const WIDTH = LEFT + STRING_GAP * 5 + RIGHT;
 const HEIGHT = TOP + FRET_GAP * ROWS + 12;
 
 /**
@@ -86,7 +104,7 @@ export function ChordDiagram({ chord, voicing, caption }: ChordDiagramProps) {
         {isOpen ? (
           <line className="nut" x1={LEFT - 7} y1={TOP} x2={stringX(5) + 7} y2={TOP} />
         ) : (
-          <text className="base-fret" x={LEFT - 11} y={dotY(1)} textAnchor="end">
+          <text className="base-fret" x={LEFT - LABEL_OFFSET} y={dotY(1)} textAnchor="end">
             {voicing.baseFret}
           </text>
         )}
