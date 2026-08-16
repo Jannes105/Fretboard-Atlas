@@ -49,8 +49,16 @@ vi.mock('./audio', async (importOriginal) => ({
 import App from './App';
 
 beforeEach(() => {
-  // Each test starts from a clean URL, or App would inherit the previous state.
-  window.history.replaceState(null, '', '/');
+  /*
+   * Each test starts from a clean URL, or App would inherit the previous state.
+   *
+   * WITH a key on it, though: the app itself opens on "alle Töne", where there is
+   * no root and so no degrees, no positions, no diatonic chords and no
+   * progression. Almost everything below is about those, so they say which key
+   * they are in rather than leaning on whatever the default happens to be. The
+   * opening state has its own tests, and they set their own URL.
+   */
+  window.history.replaceState(null, '', '/?scale=major');
   vi.clearAllMocks();
   // clearAllMocks resets the spies but not the array they pushed into.
   noteHandles.length = 0;
@@ -63,9 +71,89 @@ function pickedLabels(container: HTMLElement): string[] {
 }
 
 describe('App — Grundzustand', () => {
-  it('rendert den Namen der Default-Tonart', () => {
+  it('rendert den Namen der gewählten Tonart', () => {
     const { container } = render(<App />);
     expect(container.querySelector('.scale-title h2')?.textContent).toBe('A-Dur (Ionisch)');
+  });
+});
+
+describe('App — Alle Töne', () => {
+  /** The opening state: no key in the URL at all. */
+  const openApp = () => {
+    window.history.replaceState(null, '', '/');
+    return render(<App />);
+  };
+
+  it('öffnet ohne Tonart, mit jedem Ton auf dem Hals', () => {
+    const { container } = openApp();
+
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('Alle Töne');
+
+    // Sechs Saiten über fünfzehn Bünde plus die leeren Saiten — lückenlos.
+    const board = new Fretboard(undefined, 15);
+    expect(container.querySelectorAll('.note-dot')).toHaveLength(board.allPositions().length);
+  });
+
+  it('nennt die schwarzen Tasten mit beiden Schreibweisen', () => {
+    const { container } = openApp();
+
+    const stacked = [...container.querySelectorAll('.note-label--stacked')];
+    expect(stacked.length).toBeGreaterThan(0);
+    // Fünf von zwölf Tonklassen haben zwei Namen, die Stammtöne genau einen.
+    expect(stacked.length).toBeLessThan(container.querySelectorAll('.note-label').length);
+    // Der erste ist der 2. Bund der tiefen E-Saite — F♯ und G♭ sind derselbe Bund.
+    expect(stacked[0].textContent).toBe('F♯G♭');
+  });
+
+  it('verschweigt alles, was einen Grundton braucht', () => {
+    const { container } = openApp();
+
+    // Ohne Tonika gibt es keine Stufen, keine Lagen, keine Stufenakkorde — und
+    // damit auch keine Akkordfolge und keinen Transport.
+    expect(container.querySelector('.degree-chips')).toBeNull();
+    expect(container.querySelector('.neck-bar')).toBeNull();
+    expect(container.querySelector('[aria-label="Lage"]')).toBeNull();
+    expect(container.querySelectorAll('.chord-card')).toHaveLength(0);
+    expect(container.querySelectorAll('.play-button')).toHaveLength(0);
+    expect(container.querySelector('.empty')).not.toBeNull();
+  });
+
+  it('bietet keinen Grundton an, solange keine Skala gewählt ist', () => {
+    const { container } = openApp();
+
+    // Ein Grundton ohne Skala wäre eine Tonika für einen Hals, der keine hat.
+    expect(container.querySelector('[aria-label="Grundton"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Skala"]')).not.toBeNull();
+  });
+
+  it('holt mit einer gewählten Skala alles zurück, was daran hängt', async () => {
+    const user = userEvent.setup();
+    const { container } = openApp();
+
+    await user.selectOptions(
+      container.querySelector<HTMLSelectElement>('[aria-label="Skala"]')!,
+      'major',
+    );
+
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('A-Dur (Ionisch)');
+    expect(container.querySelectorAll('.chord-card')).toHaveLength(7);
+    expect(container.querySelector('[aria-label="Grundton"]')).not.toBeNull();
+    expect(container.querySelector('.neck-bar')).not.toBeNull();
+    expect(window.location.search).toContain('scale=major');
+  });
+
+  it('führt über „Alle Töne“ auch wieder zurück', async () => {
+    const user = userEvent.setup();
+    // Startet in einer Tonart, die nicht der Default-Grundton ist.
+    window.history.replaceState(null, '', '/?root=Eb&scale=minor-pentatonic');
+    const { container } = render(<App />);
+
+    await user.selectOptions(container.querySelector<HTMLSelectElement>('[aria-label="Skala"]')!, '');
+
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('Alle Töne');
+    // Der Grundton bleibt gemerkt, statt beim Zurückschalten verloren zu gehen.
+    expect(window.location.search).toContain('root=Eb');
+    expect(window.location.search).not.toContain('scale=');
   });
 });
 
@@ -154,7 +242,7 @@ describe('App — Eigene Akkordfolge', () => {
 
   it('hängt einen getippten Powerchord an und normalisiert seine Schreibung', async () => {
     const user = userEvent.setup();
-    window.history.replaceState(null, '', '/?prog=custom:C,G');
+    window.history.replaceState(null, '', '/?scale=major&prog=custom:C,G');
     const { container } = render(<App />);
 
     await user.type(container.querySelector<HTMLInputElement>('.builder-type input')!, 'e5');
@@ -165,7 +253,7 @@ describe('App — Eigene Akkordfolge', () => {
 
   it('weist einen unsinnigen Akkord ab, ohne ihn aufzunehmen', async () => {
     const user = userEvent.setup();
-    window.history.replaceState(null, '', '/?prog=custom:C');
+    window.history.replaceState(null, '', '/?scale=major&prog=custom:C');
     const { container } = render(<App />);
 
     await user.type(container.querySelector<HTMLInputElement>('.builder-type input')!, 'Xyz');
@@ -177,7 +265,7 @@ describe('App — Eigene Akkordfolge', () => {
 
   it('spielt die eigene Folge über den Transport, nicht eine Vorlage', async () => {
     const user = userEvent.setup();
-    window.history.replaceState(null, '', '/?prog=custom:C,G,Am,F');
+    window.history.replaceState(null, '', '/?scale=major&prog=custom:C,G,Am,F');
     const { container } = render(<App />);
 
     await user.click(container.querySelector<HTMLButtonElement>('.transport .play-button')!);
@@ -188,7 +276,7 @@ describe('App — Eigene Akkordfolge', () => {
 
   it('spielt einen Slash-Akkord über seinen Griff, mit dem Bass unten', async () => {
     const user = userEvent.setup();
-    window.history.replaceState(null, '', '/?prog=custom:C/G');
+    window.history.replaceState(null, '', '/?scale=major&prog=custom:C/G');
     const { container } = render(<App />);
 
     // Der Slash-Akkord bekommt jetzt einen echten Griff (Diagramm), keinen Leerhinweis.
@@ -205,7 +293,7 @@ describe('App — Eigene Akkordfolge', () => {
 
   it('gibt Taktart und Schlagmuster an den Transport weiter', async () => {
     const user = userEvent.setup();
-    window.history.replaceState(null, '', '/?prog=custom:C,G&sig=3&rhythm=dud-du');
+    window.history.replaceState(null, '', '/?scale=major&prog=custom:C,G&sig=3&rhythm=dud-du');
     const { container } = render(<App />);
 
     await user.click(container.querySelector<HTMLButtonElement>('.transport .play-button')!);
@@ -217,7 +305,7 @@ describe('App — Eigene Akkordfolge', () => {
 
   it('hält Takt und Schlagmuster hinter einem Auslöser, der ihren Wert nennt', async () => {
     const user = userEvent.setup();
-    window.history.replaceState(null, '', '/?prog=custom:C,G');
+    window.history.replaceState(null, '', '/?scale=major&prog=custom:C,G');
     const { container } = render(<App />);
 
     // Zugeklappt: der Auslöser spricht den Wert aus, das Gitter liegt nicht offen.
@@ -237,7 +325,7 @@ describe('App — Eigene Akkordfolge', () => {
 
   it('lässt die Länge je Akkord in Takten einstellen', async () => {
     const user = userEvent.setup();
-    window.history.replaceState(null, '', '/?prog=custom:C,G');
+    window.history.replaceState(null, '', '/?scale=major&prog=custom:C,G');
     const { container } = render(<App />);
 
     // Ein Klick auf den Takt-Knopf des ersten Akkords: 1 → 2 Takte.
@@ -274,7 +362,7 @@ describe('App — Einstellungen', () => {
   });
 
   it('nennt Stimmung, Kapo und Bünde im Auslöser, ohne dass man ihn öffnen muss', () => {
-    window.history.replaceState(null, '', '/?tuning=drop-d&capo=3&frets=12');
+    window.history.replaceState(null, '', '/?scale=major&tuning=drop-d&capo=3&frets=12');
     const { container } = render(<App />);
 
     expect(container.querySelector('.setup-trigger .trigger-value')?.textContent).toBe(
@@ -336,7 +424,7 @@ describe('App — Eigene Stimmung', () => {
 
   it('stimmt eine Saite um und schreibt die eigene Stimmung in die URL', async () => {
     const user = userEvent.setup();
-    window.history.replaceState(null, '', '/?tuning=custom:E,A,D,G,B,E');
+    window.history.replaceState(null, '', '/?scale=major&tuning=custom:E,A,D,G,B,E');
     const { container } = render(<App />);
 
     await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
@@ -856,7 +944,7 @@ describe('App — Transport der Akkordfolge', () => {
 
   it('nimmt auch krumme Tempi an', async () => {
     const user = userEvent.setup();
-    window.history.replaceState(null, '', '/?bpm=92');
+    window.history.replaceState(null, '', '/?scale=major&bpm=92');
     const { container } = render(<App />);
 
     expect(container.querySelector('.tempo output')?.textContent).toBe('92');
@@ -868,7 +956,7 @@ describe('App — Transport der Akkordfolge', () => {
 
   it('leitet die Taktlänge aus Tempo und Taktart ab', async () => {
     const user = userEvent.setup();
-    window.history.replaceState(null, '', '/?bpm=120');
+    window.history.replaceState(null, '', '/?scale=major&bpm=120');
     const { container } = render(<App />);
 
     await user.click(transportButton(container));
@@ -1077,7 +1165,7 @@ describe('App — CAGED-Overlay', () => {
 
   it('verschweigt den Picker in einer Stimmung, in der die Formen nicht gelten', () => {
     // Lieber kein Angebot als ein falsches — dieselbe Regel wie bei den Griffen.
-    window.history.replaceState(null, '', '/?tuning=drop-d');
+    window.history.replaceState(null, '', '/?scale=major&tuning=drop-d');
     const { container } = render(<App />);
 
     expect(picker(container)).toBeNull();
@@ -1085,7 +1173,7 @@ describe('App — CAGED-Overlay', () => {
   });
 
   it('ignoriert eine unbekannte Form aus der URL, statt zu stolpern', () => {
-    window.history.replaceState(null, '', '/?caged=Z');
+    window.history.replaceState(null, '', '/?scale=major&caged=Z');
     const { container } = render(<App />);
     expect(container.querySelectorAll('.note-caged')).toHaveLength(0);
   });

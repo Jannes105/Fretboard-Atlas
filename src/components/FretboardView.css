@@ -220,6 +220,17 @@
   font-size: 14px;
 }
 
+/*
+ * Two names on one dot, on the keyless neck. Smaller because two lines have to
+ * clear a 28-unit circle, and lighter because five of every twelve dots carry
+ * one — at bold they out-shouted the naturals, which are the letters you
+ * actually navigate the neck by.
+ */
+.note-label--stacked {
+  font-size: 9.5px;
+  font-weight: var(--weight-medium);
+}
+
 .note-label--picked {
   fill: var(--chord-text);
 }

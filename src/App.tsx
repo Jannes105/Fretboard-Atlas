@@ -48,6 +48,12 @@ import {
 import './App.css';
 
 /**
+ * The neck with no key on it — where the app opens. Named once because it is both
+ * the heading and the option that leads back to it.
+ */
+const ALL_NOTES_LABEL = 'Alle Töne';
+
+/**
  * What is currently picked out on the neck. A chord and a single scale degree are
  * the same idea — "show me these tones" — so they share one slot and one
  * mechanism, and picking one clears the other.
@@ -88,7 +94,14 @@ export default function App() {
     click,
   } = state;
 
+  /**
+   * The key on the neck — or null, which is the app's opening state: every note
+   * named, nothing picked out. Everything that needs a root hangs off this being
+   * non-null, and there is a lot of it: degrees, boxes, CAGED, the diatonic chords
+   * and with them the whole progression half of the page.
+   */
   const scale = useMemo(() => {
+    if (scaleTypeId === null) return null;
     const type = SCALE_TYPES.find((t) => t.id === scaleTypeId) ?? SCALE_TYPES[0];
     return new Scale(Note.parse(root), type);
   }, [root, scaleTypeId]);
@@ -124,7 +137,7 @@ export default function App() {
    * same root. Everything chord-shaped hangs off this rather than off `scale`,
    * which is why a pentatonic now has chords, a progression and a transport at all.
    */
-  const chordScale = useMemo(() => scale.chordSource(), [scale]);
+  const chordScale = useMemo(() => scale?.chordSource() ?? null, [scale]);
 
   const chords = useMemo(
     () => (chordScale ? diatonicChords(chordScale, chordSize) : []),
@@ -150,7 +163,11 @@ export default function App() {
 
   const caged = cagedForms.find((placement) => placement.form === state.cagedForm) ?? null;
 
-  const boxes = useMemo(() => fretboard.scalePositions(scale), [fretboard, scale]);
+  // No key, no boxes: a position is a window onto a scale, and there is none.
+  const boxes = useMemo(
+    () => (scale ? fretboard.scalePositions(scale) : []),
+    [fretboard, scale],
+  );
 
   // A box number from the URL — or left over from another scale — may not exist here.
   const box = boxes.find((b) => b.number === state.boxNumber) ?? null;
@@ -163,6 +180,7 @@ export default function App() {
   // in). Playback derives from these, so what you hear matches what you see —
   // a box up the neck sounds higher, a capo raises everything.
   const visiblePositions = useMemo(() => {
+    if (scale === null) return [];
     const all = fretboard.mapScale(scale);
     return box ? all.filter((p) => p.fret >= box.startFret && p.fret <= box.endFret) : all;
   }, [fretboard, scale, box]);
@@ -203,7 +221,7 @@ export default function App() {
       return { pitchClasses: chord.pitchClasses, label: chord.name() };
     }
 
-    const note = scale.notes[highlight.index];
+    const note = scale?.notes[highlight.index];
     if (!note) return null;
     return {
       pitchClasses: [note.pitchClass],
@@ -247,7 +265,10 @@ export default function App() {
       }
       // Roman numerals are measured against the key the harmony lives in, so a
       // self-built sequence over a pentatonic is numbered from its parent key.
-      return { steps: customSteps(chordScale ?? scale, chords), chordBars: bars };
+      // Without a key there is nothing to number against, so a self-built sequence
+      // is only reachable once one is chosen.
+      const key = chordScale ?? scale;
+      return { steps: key ? customSteps(key, chords) : [], chordBars: key ? bars : [] };
     }
     const chosen = progressions.find((p) => p.id === progressionId) ?? progressions[0] ?? null;
     const built = chosen && chordScale ? buildProgression(chordScale, chosen, chordSize) : [];
@@ -372,7 +393,7 @@ export default function App() {
   const [soundingIndex, setSoundingIndex] = useState<number | null>(null);
 
   const scaleSequence = useMemo(
-    () => scaleMidiSequence(scale, { baseMidi: lowestMidi, descend: true }),
+    () => (scale ? scaleMidiSequence(scale, { baseMidi: lowestMidi, descend: true }) : []),
     [scale, lowestMidi],
   );
 
@@ -431,7 +452,7 @@ export default function App() {
 
   const pickDegree = (index: number) => {
     setHighlight({ kind: 'degree', index });
-    const note = scale.notes[index];
+    const note = scale?.notes[index];
     if (note) {
       player().play(positionsToMidi(visiblePositions, [note.pitchClass]), {
         mode: 'strum',
@@ -516,35 +537,46 @@ export default function App() {
            * separate line of text saying the same thing was pure duplication.
            * The heading stays for screen readers and the document outline.
            */}
-          <h2 className="sr-only">{scale.name()}</h2>
+          <h2 className="sr-only">{scale ? scale.name() : ALL_NOTES_LABEL}</h2>
 
           {/*
            * The visible text sizes the control and the select lies invisibly on
            * top of it: a select is as wide as its LONGEST option, which for a
            * headline leaves the underline and caret trailing off into space.
            */}
-          <span className="key-select key-select--root">
-            <span className="key-select-text" aria-hidden="true">
-              <NoteText name={root} />
+          {/* Without a key a root would be picking a tonic for a neck that has
+              none — the scale picker alone decides whether there is one. */}
+          {scale ? (
+            <span className="key-select key-select--root">
+              <span className="key-select-text" aria-hidden="true">
+                <NoteText name={root} />
+              </span>
+              <select aria-label="Grundton" value={root} onChange={(e) => update('root', e.target.value)}>
+                {ROOT_CHOICES.map((choice) => (
+                  // The value stays ASCII — it is the state, and it is what lands
+                  // in the URL. Only what the reader sees gets the real accidental.
+                  <option key={choice} value={choice}>
+                    {withAccidentals(choice)}
+                  </option>
+                ))}
+              </select>
             </span>
-            <select aria-label="Grundton" value={root} onChange={(e) => update('root', e.target.value)}>
-              {ROOT_CHOICES.map((choice) => (
-                // The value stays ASCII — it is the state, and it is what lands
-                // in the URL. Only what the reader sees gets the real accidental.
-                <option key={choice} value={choice}>
-                  {withAccidentals(choice)}
-                </option>
-              ))}
-            </select>
-          </span>
+          ) : null}
 
           <span className="key-select">
-            <span className="key-select-text" aria-hidden="true">{scale.type.name}</span>
+            <span className="key-select-text" aria-hidden="true">
+              {scale ? scale.type.name : ALL_NOTES_LABEL}
+            </span>
             <select
               aria-label="Skala"
-              value={scaleTypeId}
-              onChange={(e) => update('scaleTypeId', e.target.value)}
+              value={scaleTypeId ?? ''}
+              onChange={(e) =>
+                update('scaleTypeId', e.target.value === '' ? null : e.target.value)
+              }
             >
+              {/* First, and its own option rather than a group: it is where the
+                  app starts, not a scale among scales. */}
+              <option value="">{ALL_NOTES_LABEL}</option>
               <optgroup label="Grundlagen">
                 {scaleTypesInGroup('basics').map((type) => (
                   <option key={type.id} value={type.id}>
@@ -562,15 +594,17 @@ export default function App() {
             </select>
           </span>
 
-          <button
-            type="button"
-            className="play-button"
-            onClick={playScale}
-            aria-label={`${scale.name()} abspielen`}
-            title="Skala abspielen"
-          >
-            ▶
-          </button>
+          {scale ? (
+            <button
+              type="button"
+              className="play-button"
+              onClick={playScale}
+              aria-label={`${scale.name()} abspielen`}
+              title="Skala abspielen"
+            >
+              ▶
+            </button>
+          ) : null}
 
           <KeyFinder
             onPick={(pickedRoot, pickedScaleTypeId) =>
@@ -600,7 +634,13 @@ export default function App() {
        * "Notennamen", "CAGED aus"), and three uppercase captions weighed more than
        * the controls they named. The aria-labels carry the names for anyone who
        * cannot see the values — which is also how the phone layout already worked.
+       *
+       * The whole row goes with the key: every control in it needs a tonic. There
+       * are no positions without a scale to window, no CAGED form without a chord
+       * to place, and "Stufen" has nothing to count from. An empty bar of dead
+       * controls would be worse than no bar.
        */}
+      {scale ? (
       <div className="neck-bar">
         {/* The zoom belongs TO the position, not beside it, so the two sit in one
             group and the button is visibly the smaller of the pair. */}
@@ -694,6 +734,7 @@ export default function App() {
           </button>
         </div>
       </div>
+      ) : null}
 
       <FretboardView
         scale={scale}
@@ -718,6 +759,9 @@ export default function App() {
        * neck bar, and they put a third row of controls between the headline and
        * the instrument.
        */}
+      {/* A legend of degrees needs degrees. Without a key the neck names every
+          note on itself, which is the whole point of that view. */}
+      {scale ? (
       <section className="neck-legend" aria-label="Töne der Tonart">
         <ul className="degree-chips">
           {scale.notes.map((note, i) => (
@@ -759,6 +803,7 @@ export default function App() {
           </p>
         ) : null}
       </section>
+      ) : null}
 
       {chords.length > 0 ? (
         <>
@@ -784,7 +829,7 @@ export default function App() {
 
             <p className="hint">
               {isBorrowedHarmony
-                ? `${scale.type.name} hat keine eigenen Stufenakkorde — diese kommen aus ${chordScale.name()}, der Tonart dahinter. Anklicken: du hörst den Akkord und siehst, welche seiner Töne im Hals liegen.`
+                ? `${scale?.type.name} hat keine eigenen Stufenakkorde — diese kommen aus ${chordScale.name()}, der Tonart dahinter. Anklicken: du hörst den Akkord und siehst, welche seiner Töne im Hals liegen.`
                 : 'Anklicken: du hörst den Akkord und siehst seine Töne im Hals.'}
             </p>
 
@@ -898,6 +943,16 @@ export default function App() {
             onClickChange={(next) => update('click', next)}
           />
         </>
+      ) : scale === null ? (
+        /*
+         * The opening state. Says what the neck is showing and what picking a key
+         * adds, rather than apologising for what is missing — nothing is broken
+         * here, the map just has no key on it yet.
+         */
+        <p className="empty">
+          Der Hals zeigt gerade jeden Ton, mit beiden Schreibweisen. Wähl oben eine
+          Tonart, und dazu kommen Lagen, Stufenakkorde und die Akkordfolge.
+        </p>
       ) : (
         /*
          * Unreachable today: every scale on offer either has seven degrees of its

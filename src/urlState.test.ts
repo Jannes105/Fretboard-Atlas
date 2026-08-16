@@ -36,6 +36,17 @@ describe('readState', () => {
     expect(state).toEqual(DEFAULT_STATE);
   });
 
+  it('öffnet ohne Tonart, wenn die URL keine nennt', () => {
+    // "Alle Töne" ist der Startzustand, nicht eine Skala unter Skalen.
+    expect(readState('').scaleTypeId).toBeNull();
+    expect(readState('?root=Eb').scaleTypeId).toBeNull();
+  });
+
+  it('schreibt nur eine gewählte Tonart in die URL', () => {
+    expect(writeState({ ...DEFAULT_STATE, scaleTypeId: null })).not.toContain('scale=');
+    expect(writeState({ ...DEFAULT_STATE, scaleTypeId: 'dorian' })).toContain('scale=dorian');
+  });
+
   it('liest die Akkordgröße bis zum Nonakkord', () => {
     expect(readState('?chords=4').chordSize).toBe(4);
     expect(readState('?chords=5').chordSize).toBe(5);

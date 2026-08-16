@@ -1,5 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
-import { HARD_RELEASE, type CagedPlacement, type Fretboard, type Scale, type ScalePosition } from '../theory';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  HARD_RELEASE,
+  pitchClassNames,
+  type CagedPlacement,
+  type Fretboard,
+  type FretPosition,
+  type ScalePosition,
+  type Scale,
+} from '../theory';
 import {
   DOT_RADIUS,
   DOUBLE_INLAY_OFFSET,
@@ -20,8 +28,47 @@ import './FretboardView.css';
 /** Show the note name on each dot, or its scale degree. */
 export type LabelMode = 'note' | 'degree';
 
+/**
+ * One dot as the neck draws it, with the key already resolved away.
+ *
+ * Both modes end up here so the drawing loop is written once: a scale note knows
+ * its spelling and its degree, a keyless one knows only which pitch it is and
+ * answers to both of its names.
+ */
+interface DrawnNote extends FretPosition {
+  /** What the dot says. Two lines only where a pitch has two names and no key. */
+  readonly lines: readonly string[];
+  /** Named for the title and the accessible text, in one piece. */
+  readonly spoken: string;
+  readonly isRoot: boolean;
+}
+
+function drawnNotes(
+  fretboard: Fretboard,
+  scale: Scale | null,
+  labelMode: LabelMode,
+): DrawnNote[] {
+  if (scale === null) {
+    // No key to spell them, so every accidental carries both readings — see
+    // pitchClassNames. Naturals stay one line and one size, which keeps the
+    // letters you navigate by the loudest thing on the board.
+    return fretboard.allPositions().map((position) => {
+      const names = pitchClassNames(position.pitchClass);
+      return { ...position, lines: names, spoken: names.join(' oder '), isRoot: false };
+    });
+  }
+
+  return fretboard.mapScale(scale).map((note) => ({
+    ...note,
+    lines: [labelMode === 'note' ? note.note.name() : note.degree],
+    spoken: note.note.name(),
+    isRoot: note.isRoot,
+  }));
+}
+
 interface FretboardViewProps {
-  scale: Scale;
+  /** The key on the neck, or null to name every note instead. */
+  scale: Scale | null;
   fretboard: Fretboard;
   labelMode: LabelMode;
   /** Restrict to one box: notes outside its fret window fade into the background. */
@@ -73,7 +120,7 @@ export function FretboardView({
 }: FretboardViewProps) {
   const { fretCount, stringCount, capo, tuning } = fretboard;
 
-  const notes = fretboard.mapScale(scale);
+  const notes = useMemo(() => drawnNotes(fretboard, scale, labelMode), [fretboard, scale, labelMode]);
   const inlays = fretboard.inlayFrets();
   const labels = tuning.stringLabels;
 
@@ -96,7 +143,7 @@ export function FretboardView({
   const noteX = (fret: number) => noteXAt(fret, capo);
 
   const described = [
-    scale.name(),
+    scale ? scale.name() : 'alle Töne',
     position ? `Lage ${position.number}` : null,
     cropped ? `Bünde ${position.startFret}–${position.endFret}` : null,
     highlightLabel,
@@ -360,7 +407,6 @@ export function FretboardView({
             {notes.map((note) => {
               const cx = noteX(note.fret);
               const cy = stringY(note.stringIndex, stringCount);
-              const label = labelMode === 'note' ? note.note.name() : note.degree;
 
               const outsideBox = !inBox(note.fret);
               const isPicked = picked?.has(note.pitchClass) ?? false;
@@ -436,7 +482,7 @@ export function FretboardView({
                   }
                 >
                   {/* A title makes the pitch discoverable on hover and to a screen reader. */}
-                  {onHoldNote ? <title>{`${note.note.name()} — halten zum Hören`}</title> : null}
+                  {onHoldNote ? <title>{`${note.spoken} — halten zum Hören`}</title> : null}
                   {/*
                    * The marker, as its own ring UNDER the dot rather than a class on
                    * it: the dot already carries a root/picked/dimmed cascade, and a
@@ -495,6 +541,7 @@ export function FretboardView({
                       'note-label',
                       note.isRoot ? 'note-label--root' : '',
                       isPicked && !note.isRoot && !outsideBox ? 'note-label--picked' : '',
+                      note.lines.length > 1 ? 'note-label--stacked' : '',
                       dimmed ? 'is-dimmed' : '',
                     ]
                       .filter(Boolean)
@@ -504,7 +551,22 @@ export function FretboardView({
                     textAnchor="middle"
                     dominantBaseline="central"
                   >
-                    <NoteTspans name={label} />
+                    {note.lines.length === 1 ? (
+                      <NoteTspans name={note.lines[0]} />
+                    ) : (
+                      /*
+                       * Both names, stacked. A dot is 28 units across and "C♯/D♭"
+                       * on one line does not fit at a readable size — two short
+                       * lines do, and they also read as what they are: one fret,
+                       * two names. The x has to be repeated on every line; a tspan
+                       * otherwise continues where the last one ended.
+                       */
+                      note.lines.map((line, index) => (
+                        <tspan key={line} x={cx} dy={index === 0 ? '-0.5em' : '1em'}>
+                          <NoteTspans name={line} />
+                        </tspan>
+                      ))
+                    )}
                   </text>
                 </g>
               );

@@ -5,6 +5,11 @@ Akkorde und Griffe. Läuft komplett im Browser — kein Backend, keine API.
 
 Ein Atlas kartiert und lässt navigieren — genau das tut die App mit dem Hals.
 
+Offen wird zuerst die Karte selbst gezeigt: **jeder Ton auf dem Hals**, die
+schwarzen Tasten mit beiden Schreibweisen, weil ohne Tonart keine von beiden
+richtiger ist. Eine Tonart ist etwas, das man wählt — und erst mit ihr kommen
+Stufen, Lagen, Stufenakkorde und die Akkordfolge dazu.
+
 ## Entwicklung
 
 ```bash
@@ -130,6 +135,11 @@ Alles steht in der URL (`?root=Eb&scale=minor-pentatonic&tuning=drop-d&capo=3`).
 Damit übersteht die Ansicht einen Reload und lässt sich als Link verschicken —
 was `localStorage` nicht könnte. Geschrieben wird nur, was vom Default abweicht;
 Unsinn in der URL fällt auf die Defaults zurück, statt zu werfen.
+
+`scale` fehlt genau dann, wenn keine Tonart gewählt ist — `scaleTypeId: null` ist
+der Default und damit die leere URL. Ein unbekannter Skalenname landet ebenfalls
+dort statt in irgendeiner Tonart, nach der die URL nie gefragt hat: alle Töne zu
+zeigen ist die eine Antwort, die nicht falsch sein kann.
 
 **Eine Ausnahme: die Darstellung (hell/dunkel) liegt im `localStorage`.** Genau
 das Argument für die URL spricht hier dagegen — ein Link soll die Musik

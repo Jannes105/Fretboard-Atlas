@@ -40,6 +40,19 @@ export function pitchClassName(pitchClass: number, preferFlats = true): string {
   return (preferFlats ? flats : sharps)[mod(pitchClass, 12)];
 }
 
+/**
+ * Every name a pitch class answers to: one for a natural, two for the others.
+ *
+ * For the neck with no key on it, where preferring one spelling would be taking a
+ * side the music has not taken — the 6th fret of the low E really is both F# and
+ * Gb, and which one you write depends on a key that has not been chosen yet.
+ */
+export function pitchClassNames(pitchClass: number): string[] {
+  const sharp = pitchClassName(pitchClass, false);
+  const flat = pitchClassName(pitchClass, true);
+  return sharp === flat ? [sharp] : [sharp, flat];
+}
+
 export class Note {
   /** Diatonic letter index (0 = C .. 6 = B). */
   readonly letter: LetterIndex;

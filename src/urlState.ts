@@ -32,7 +32,13 @@ import {
  */
 export interface AppState {
   root: string;
-  scaleTypeId: string;
+  /**
+   * The scale on the neck — or null for the plain map of every note, which is
+   * where the app opens. A key is something you choose, not something you have to
+   * dismiss first. `root` keeps its last value meanwhile, so choosing a scale does
+   * not also lose the root you had picked.
+   */
+  scaleTypeId: string | null;
   tuningId: string;
   capo: number;
   fretCount: number;
@@ -79,7 +85,7 @@ export interface AppState {
 
 export const DEFAULT_STATE: AppState = {
   root: 'A',
-  scaleTypeId: 'major',
+  scaleTypeId: null,
   tuningId: 'standard',
   capo: 0,
   /*
@@ -201,6 +207,17 @@ function pickFrom<T extends string>(raw: string | null, allowed: readonly T[], f
 }
 
 /**
+ * The scale from the URL, or null for all notes.
+ *
+ * A misspelt scale falls back to the plain neck rather than to some key the URL
+ * never asked for: showing every note is the one answer that cannot be wrong.
+ */
+function readScaleType(raw: string | null): string | null {
+  if (raw === null) return null;
+  return SCALE_TYPES.some((type) => type.id === raw) ? raw : null;
+}
+
+/**
  * One tone control, in whole decibels.
  *
  * The app's first continuous-looking value, and it deliberately is not one: the
@@ -248,11 +265,7 @@ export function readState(search: string): AppState {
 
   return {
     root: pickFrom(params.get('root'), ROOT_CHOICES as readonly string[], DEFAULT_STATE.root),
-    scaleTypeId: pickFrom(
-      params.get('scale'),
-      SCALE_TYPES.map((type) => type.id),
-      DEFAULT_STATE.scaleTypeId,
-    ),
+    scaleTypeId: readScaleType(params.get('scale')),
     tuningId: readTuning(params.get('tuning')),
     capo: pickInt(params.get('capo'), (v) => v >= 0 && v <= MAX_CAPO, DEFAULT_STATE.capo),
     fretCount: pickInt(params.get('frets'), (v) => FRET_COUNTS.includes(v), DEFAULT_STATE.fretCount),
@@ -297,7 +310,8 @@ export function writeState(state: AppState): string {
   };
 
   add('root', state.root, DEFAULT_STATE.root);
-  add('scale', state.scaleTypeId, DEFAULT_STATE.scaleTypeId);
+  // Null is the default, so only a chosen scale is ever written.
+  if (state.scaleTypeId !== null) params.set('scale', state.scaleTypeId);
   add('tuning', state.tuningId, DEFAULT_STATE.tuningId);
   add('capo', state.capo, DEFAULT_STATE.capo);
   add('frets', state.fretCount, DEFAULT_STATE.fretCount);

@@ -1,4 +1,4 @@
-export { Note, LETTERS, mod, pitchClassName, type LetterIndex } from './Note';
+export { Note, LETTERS, mod, pitchClassName, pitchClassNames, type LetterIndex } from './Note';
 export { splitAccidental, withAccidentals, type NamePart } from './format';
 export {
   SCALE_TYPES,
