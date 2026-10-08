@@ -94,15 +94,16 @@ describe('App — Alle Töne', () => {
     expect(container.querySelectorAll('.note-dot')).toHaveLength(board.allPositions().length);
   });
 
-  it('nennt die schwarzen Tasten mit beiden Schreibweisen', () => {
+  it('nennt jeden Bund mit einem Namen — lesbar statt zweizeilig', () => {
     const { container } = openApp();
 
-    const stacked = [...container.querySelectorAll('.note-label--stacked')];
-    expect(stacked.length).toBeGreaterThan(0);
-    // Fünf von zwölf Tonklassen haben zwei Namen, die Stammtöne genau einen.
-    expect(stacked.length).toBeLessThan(container.querySelectorAll('.note-label').length);
-    // Der erste ist der 2. Bund der tiefen E-Saite — F♯ und G♭ sind derselbe Bund.
-    expect(stacked[0].textContent).toBe('F♯G♭');
+    // Zwei Namen je schwarzer Taste waren korrekt, aber 9-px-Schrift auf dem
+    // allerersten Bildschirm. Der zweite Name steht weiterhin im Titel.
+    expect(container.querySelectorAll('.note-label--stacked')).toHaveLength(0);
+    const titles = [...container.querySelectorAll('.fretboard .note title')].map(
+      (title) => title.textContent ?? '',
+    );
+    expect(titles.some((title) => title.startsWith('F♯ oder G♭') || title.startsWith('F# oder Gb'))).toBe(true);
   });
 
   it('verschweigt alles, was einen Grundton braucht', () => {
@@ -118,51 +119,113 @@ describe('App — Alle Töne', () => {
     expect(container.querySelector('.empty')).not.toBeNull();
   });
 
-  it('bietet keinen Grundton an, solange keine Skala gewählt ist', () => {
+  it('sagt auf dem Knopf, was er tut: „Tonart wählen"', () => {
+    const { container } = openApp();
+    expect(container.querySelector('.key-trigger')?.textContent).toContain('Tonart wählen');
+  });
+
+  it('macht aus einem Grundton allein gleich eine Tonart — Dur', async () => {
+    const user = userEvent.setup();
     const { container } = openApp();
 
-    // Ein Grundton ohne Skala wäre eine Tonika für einen Hals, der keine hat.
-    expect(container.querySelector('[aria-label="Grundton"]')).toBeNull();
-    expect(container.querySelector('[aria-label="Skala"]')).not.toBeNull();
+    await openKeyPicker(user, container);
+    await user.click(rootButton(container, 'G'));
+
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('G-Dur (Ionisch)');
+    expect(container.querySelectorAll('.chord-card')).toHaveLength(7);
+    expect(container.querySelector('.neck-bar')).not.toBeNull();
+    expect(window.location.search).toContain('scale=major');
   });
 
   it('holt mit einer gewählten Skala alles zurück, was daran hängt', async () => {
     const user = userEvent.setup();
     const { container } = openApp();
 
-    await user.selectOptions(
-      container.querySelector<HTMLSelectElement>('[aria-label="Skala"]')!,
-      'major',
-    );
+    await openKeyPicker(user, container);
+    await user.click(scaleButton(container, 'Dur (Ionisch)'));
 
     expect(container.querySelector('.scale-title h2')?.textContent).toBe('A-Dur (Ionisch)');
     expect(container.querySelectorAll('.chord-card')).toHaveLength(7);
-    expect(container.querySelector('[aria-label="Grundton"]')).not.toBeNull();
     expect(container.querySelector('.neck-bar')).not.toBeNull();
     expect(window.location.search).toContain('scale=major');
   });
 
-  it('führt über „Alle Töne“ auch wieder zurück', async () => {
+  it('führt über „Keine Tonart" auch wieder zurück', async () => {
     const user = userEvent.setup();
     // Startet in einer Tonart, die nicht der Default-Grundton ist.
     window.history.replaceState(null, '', '/?root=Eb&scale=minor-pentatonic');
     const { container } = render(<App />);
 
-    await user.selectOptions(container.querySelector<HTMLSelectElement>('[aria-label="Skala"]')!, '');
+    await openKeyPicker(user, container);
+    await user.click(
+      [...container.querySelectorAll<HTMLButtonElement>('.key-panel .link-button')].find((b) =>
+        b.textContent?.includes('Keine Tonart'),
+      )!,
+    );
 
     expect(container.querySelector('.scale-title h2')?.textContent).toBe('Alle Töne');
     // Der Grundton bleibt gemerkt, statt beim Zurückschalten verloren zu gehen.
     expect(window.location.search).toContain('root=Eb');
     expect(window.location.search).not.toContain('scale=');
   });
+
+  it('öffnet den Wähler auch von den Startkarten aus', async () => {
+    const user = userEvent.setup();
+    const { container } = openApp();
+
+    const cards = [...container.querySelectorAll<HTMLButtonElement>('button.start-card')];
+    await user.click(cards.find((card) => card.textContent?.includes('Song'))!);
+
+    // Gleich auf dem Reiter, der zu der Karte gehört.
+    expect(container.querySelector('.keyfinder-field input')).not.toBeNull();
+  });
+
+  it('stellt per Schnellstart eine Tonart mit einem Tipp ein', async () => {
+    const user = userEvent.setup();
+    const { container } = openApp();
+
+    await user.click(
+      [...container.querySelectorAll<HTMLButtonElement>('.quick-start')].find(
+        (b) => b.textContent === 'E-Moll-Pentatonik',
+      )!,
+    );
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('E-Moll-Pentatonik');
+  });
 });
+
+/** Open the key picker on its first tab. */
+async function openKeyPicker(user: ReturnType<typeof userEvent.setup>, container: HTMLElement) {
+  await user.click(container.querySelector<HTMLButtonElement>('.key-trigger')!);
+}
+
+/** Open the key picker on the chord-lookup tab. */
+async function openFinder(user: ReturnType<typeof userEvent.setup>, container: HTMLElement) {
+  await openKeyPicker(user, container);
+  await user.click(
+    [...container.querySelectorAll<HTMLButtonElement>('.key-tabs button')].find((b) =>
+      b.textContent?.includes('erkennen'),
+    )!,
+  );
+}
+
+function rootButton(container: HTMLElement, root: string): HTMLButtonElement {
+  return container.querySelector<HTMLButtonElement>(
+    `.root-grid button[aria-label="${root}"]`,
+  )!;
+}
+
+function scaleButton(container: HTMLElement, name: string): HTMLButtonElement {
+  return [...container.querySelectorAll<HTMLButtonElement>('.key-option')].find(
+    (b) => b.textContent === name,
+  )!;
+}
 
 describe('App — Tonart finden', () => {
   it('setzt Grundton und Skala aus den eingegebenen Akkorden', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    await user.click(container.querySelector<HTMLButtonElement>('.keyfinder-trigger')!);
+    await openFinder(user, container);
     await user.type(container.querySelector<HTMLInputElement>('.keyfinder-field input')!, 'Am F C G');
 
     // Am F C G ist mehrdeutig — es müssen mehrere Kandidaten erscheinen.
@@ -174,14 +237,14 @@ describe('App — Tonart finden', () => {
 
     // Der Klick stellt die ganze App auf C-Dur und schließt das Panel.
     expect(container.querySelector('.scale-title h2')?.textContent).toBe('C-Dur (Ionisch)');
-    expect(container.querySelectorAll('.keyfinder-panel')).toHaveLength(0);
+    expect(container.querySelectorAll('.key-panel')).toHaveLength(0);
   });
 
   it('meldet ein nicht erkanntes Token, statt still zu schlucken', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    await user.click(container.querySelector<HTMLButtonElement>('.keyfinder-trigger')!);
+    await openFinder(user, container);
     // H gibt es in der internationalen Notation nicht.
     await user.type(container.querySelector<HTMLInputElement>('.keyfinder-field input')!, 'G H');
 
@@ -192,13 +255,29 @@ describe('App — Tonart finden', () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    await user.click(container.querySelector<HTMLButtonElement>('.keyfinder-trigger')!);
+    await openFinder(user, container);
     await user.type(container.querySelector<HTMLInputElement>('.keyfinder-field input')!, 'G D Em C');
     await user.click(container.querySelector<HTMLButtonElement>('.keyfinder-adopt')!);
 
     // Der Kreis schließt sich: Tonart gesetzt UND die Folge im Builder.
     expect(container.querySelector('.scale-title h2')?.textContent).toBe('G-Dur (Ionisch)');
     expect(chipSymbols(container)).toEqual(['G', 'D', 'Em', 'C']);
+    // Und die Folge zeigt sich: ▶ hat den Fokus, statt dass er im Nichts landet.
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Akkordfolge abspielen');
+  });
+
+  it('greift G – D – Em – C mit den offenen Griffen, die man zuerst lernt', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await openFinder(user, container);
+    await user.type(container.querySelector<HTMLInputElement>('.keyfinder-field input')!, 'G D Em C');
+    await user.click(container.querySelector<HTMLButtonElement>('.keyfinder-adopt')!);
+
+    const captions = [...container.querySelectorAll('.progression .voicing-switch, .progression .voicing-caption')].map(
+      (el) => el.textContent ?? '',
+    );
+    expect(captions.every((caption) => caption.includes('offen'))).toBe(true);
   });
 });
 
@@ -345,18 +424,22 @@ describe('App — Einstellungen', () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    const rootSelect = container.querySelector<HTMLSelectElement>('[aria-label="Grundton"]')!;
-    await user.selectOptions(rootSelect, 'C');
+    await openKeyPicker(user, container);
+    await user.click(rootButton(container, 'C'));
 
     // Die Überschrift bleibt für Screenreader und folgt der Auswahl.
     expect(container.querySelector('.scale-title h2')?.textContent).toBe('C-Dur (Ionisch)');
+    // Der Knopf selbst nennt die neue Tonart.
+    expect(container.querySelector('.key-trigger')?.textContent).toContain('Dur (Ionisch)');
   });
 
-  it('hält den Kopf frei: über dem Hals stehen nur Grundton und Skala', () => {
+  it('hält den Kopf frei: über dem Hals steht ein einziger Tonart-Knopf', () => {
     const { container } = render(<App />);
 
-    // Vorher waren es acht gleichrangige Dropdowns in einem Block.
-    expect(container.querySelectorAll('.scale-strip select')).toHaveLength(2);
+    // Vorher waren es acht gleichrangige Dropdowns in einem Block, dann zwei
+    // unsichtbare Selects über einer Überschrift.
+    expect(container.querySelectorAll('.scale-strip select')).toHaveLength(0);
+    expect(container.querySelectorAll('.scale-strip .key-trigger')).toHaveLength(1);
     // Und das Setup steht als Text da, statt als Regler aufzuklappen.
     expect(container.querySelectorAll('.setup-panel')).toHaveLength(0);
   });
@@ -383,10 +466,9 @@ describe('App — Einstellungen', () => {
     const { container } = render(<App />);
 
     await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
-    // Stimmung, Kapo, Bünde, Klang — vier, und alle vier beschreiben das
-    // Instrument. Die Darstellung ist raus: sie beschreibt den Betrachter und
-    // steht jetzt im Fuß der Seite.
-    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(4);
+    // Stimmung, Kapo, Bünde — drei, und alle drei beschreiben das Instrument.
+    // Der Klang ist ganz ins Klang-Fach gezogen, die Darstellung in den Fuß.
+    expect(container.querySelectorAll('.setup-panel select')).toHaveLength(3);
     expect(container.querySelector('.app-footer select')).not.toBeNull();
 
     await user.keyboard('{Escape}');
@@ -444,14 +526,29 @@ describe('App — Klang', () => {
     // Beim Start wird der Default gesetzt.
     expect(player.setTimbre).toHaveBeenCalledWith('clean');
 
-    await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
-    const soundSelect = [...container.querySelectorAll<HTMLSelectElement>('.setup-panel select')].find(
+    await user.click(container.querySelector<HTMLButtonElement>('.sound-trigger')!);
+    const soundSelect = [...container.querySelectorAll<HTMLSelectElement>('.sound-panel select')].find(
       (select) => [...select.options].some((option) => option.value === 'electric'),
     )!;
     await user.selectOptions(soundSelect, 'electric');
 
     expect(player.setTimbre).toHaveBeenCalledWith('electric');
     expect(window.location.search).toContain('sound=electric');
+  });
+
+  it('stellt mit einer Voreinstellung den ganzen Klang auf einmal', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.sound-trigger')!);
+    const presets = [...container.querySelectorAll<HTMLButtonElement>('.sound-panel .preset-button')];
+    // Die Vorgabe der App IST „Clean" — und steht deshalb als gewählt da.
+    expect(presets.find((b) => b.textContent === 'Clean')?.getAttribute('aria-pressed')).toBe('true');
+
+    await user.click(presets.find((b) => b.textContent === 'Crunch')!);
+    expect(player.setTimbre).toHaveBeenCalledWith('electric');
+    expect(player.setAmp).toHaveBeenCalledWith('british-crunch');
+    expect(container.querySelector('.sound-trigger .trigger-value')?.textContent).toBe('Crunch');
   });
 
   it('bietet die Verstärkerwahl erst zum Overdrive an und gibt sie weiter', async () => {
@@ -469,15 +566,12 @@ describe('App — Klang', () => {
     await openSound();
     expect(ampSelect()).toBeUndefined();
 
-    // Die Stimme selbst bleibt im Instrument-Fach, weil sie entscheidet, ob es
-    // überhaupt einen Verstärker gibt.
-    await user.click(container.querySelector<HTMLButtonElement>('.setup-trigger')!);
-    const soundSelect = [...container.querySelectorAll<HTMLSelectElement>('.setup-panel select')].find(
+    // Die Verzerrung steht im selben Fach, in der Feinabstimmung.
+    const soundSelect = [...container.querySelectorAll<HTMLSelectElement>('.sound-panel select')].find(
       (select) => [...select.options].some((option) => option.value === 'electric'),
     )!;
     await user.selectOptions(soundSelect, 'electric');
 
-    await openSound();
     await user.selectOptions(ampSelect()!, 'modern-high-gain');
 
     expect(player.setAmp).toHaveBeenCalledWith('modern-high-gain');
@@ -659,11 +753,13 @@ describe('App — Hervorhebung', () => {
     expect(chips[2].getAttribute('aria-pressed')).toBe('false');
     expect(cards[0].getAttribute('aria-pressed')).toBe('true');
 
-    // A ist der Skalengrundton und behält bewusst seine Grundton-Farbe, statt als
-    // Akkordton eingefärbt zu werden — gepickt (teal) sind daher nur Terz und Quinte.
-    expect(new Set(pickedLabels(container))).toEqual(new Set(['C♯', 'E']));
-    // Aber es gibt weiterhin Grundton-Punkte (A) auf dem Hals.
-    expect(container.querySelectorAll('.note-dot--root').length).toBeGreaterThan(0);
+    // Der ganze Akkord in einer Farbe — auch das A, obwohl es der Skalengrundton
+    // ist. Vorher blieb es orange, und der Akkord sah aus wie zwei Dinge.
+    expect(new Set(pickedLabels(container))).toEqual(new Set(['A', 'C♯', 'E']));
+    // Sein Grundton ist der große Punkt: der Grundton des AKKORDS.
+    expect(container.querySelectorAll('.note-dot--chord-root').length).toBeGreaterThan(0);
+    // Das A gehört hier zum Akkord, also steht kein Punkt mehr in Tonart-Orange.
+    expect(container.querySelectorAll('.note-dot--root')).toHaveLength(0);
   });
 
   it('löscht die Hervorhebung über „aufheben“', async () => {
@@ -805,7 +901,10 @@ describe('App — Lage', () => {
 
     // Über das Label statt über die Position: ein Layout-Umbau darf diesen Test
     // nicht brechen — genau das ist hier schon einmal passiert.
-    await user.selectOptions(container.querySelector<HTMLSelectElement>('[aria-label="Lage"]')!, '1');
+    await user.click(boxButton(container, 1));
+    // Ganzer Hals statt Ausschnitt, damit es überhaupt etwas zu dimmen gibt.
+    await openView(user, container);
+    await user.click(container.querySelector<HTMLInputElement>('.view-panel input[type="checkbox"]')!);
 
     const all = container.querySelectorAll('.note-dot').length;
     const dimmed = container.querySelectorAll('.note-dot.is-dimmed').length;
@@ -816,24 +915,33 @@ describe('App — Lage', () => {
     expect(dimmed).toBeLessThan(all);
   });
 
-  it('sagt am Lupen-Knopf, was der nächste Klick tut, statt immer dasselbe zu behaupten', async () => {
+  it('wählt eine Lage mit einem Tipp und markiert sie als gewählt', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
-    await user.selectOptions(container.querySelector<HTMLSelectElement>('[aria-label="Lage"]')!, '1');
+    await user.click(boxButton(container, 1));
+    expect(boxButton(container, 1).getAttribute('aria-pressed')).toBe('true');
+    expect(window.location.search).toContain('box=1');
+  });
 
-    // Frisch gewählt ist die Lage beschnitten, der Knopf bietet also den ganzen Hals an.
-    const zoom = () => container.querySelector<HTMLButtonElement>('.icon-toggle')!;
-    expect(zoom().title).toBe('Ganzen Hals zeigen');
+  it('bietet den Ausschnitt nur an, wenn eine Lage gewählt ist', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
 
-    await user.click(zoom());
-
-    // Jetzt liegt der ganze Hals offen — und der Knopf bietet den Weg zurück an,
-    // statt weiter zu versprechen, was schon zu sehen ist.
-    expect(zoom().title).toBe('Nur die Lage zeigen');
-    expect(zoom().getAttribute('aria-label')).toBe('Nur die Lage zeigen');
+    await openView(user, container);
+    expect(container.querySelector('.view-panel input[type="checkbox"]')).toBeNull();
   });
 });
+
+function boxButton(container: HTMLElement, number: number): HTMLButtonElement {
+  return [...container.querySelectorAll<HTMLButtonElement>('.box-picker button')].find(
+    (b) => b.textContent === String(number),
+  )!;
+}
+
+async function openView(user: ReturnType<typeof userEvent.setup>, container: HTMLElement) {
+  await user.click(container.querySelector<HTMLButtonElement>('.view-trigger')!);
+}
 
 describe('App — Audio-Verdrahtung', () => {
   it('spielt beim Skala-▶ die volle auf- und absteigende Tonleiter (15 Töne)', async () => {
@@ -1157,17 +1265,27 @@ describe('App — CAGED-Overlay', () => {
     expect(container.querySelectorAll('.note-caged').length).toBeGreaterThan(0);
   });
 
-  it('zeigt ohne Auswahl kein Overlay, aber den Picker', () => {
+  it('legt die Form auch als eine Fläche unter die Hand', () => {
+    window.history.replaceState(null, '', '/?root=A&scale=major&caged=E');
+    const { container } = render(<App />);
+    expect(container.querySelectorAll('.caged-shape')).toHaveLength(1);
+  });
+
+  it('zeigt ohne Auswahl kein Overlay, aber den Picker', async () => {
+    const user = userEvent.setup();
     const { container } = render(<App />);
     expect(container.querySelectorAll('.note-caged')).toHaveLength(0);
+    await openView(user, container);
     expect(picker(container)).not.toBeNull();
   });
 
-  it('verschweigt den Picker in einer Stimmung, in der die Formen nicht gelten', () => {
+  it('verschweigt den Picker in einer Stimmung, in der die Formen nicht gelten', async () => {
     // Lieber kein Angebot als ein falsches — dieselbe Regel wie bei den Griffen.
+    const user = userEvent.setup();
     window.history.replaceState(null, '', '/?scale=major&tuning=drop-d');
     const { container } = render(<App />);
 
+    await openView(user, container);
     expect(picker(container)).toBeNull();
     expect(container.querySelectorAll('.note-caged')).toHaveLength(0);
   });
@@ -1178,13 +1296,109 @@ describe('App — CAGED-Overlay', () => {
     expect(container.querySelectorAll('.note-caged')).toHaveLength(0);
   });
 
-  it('bietet in einer Molltonart nur die drei greifbaren Formen an', () => {
+  it('bietet in einer Molltonart nur die drei greifbaren Formen an — und sagt warum', async () => {
+    const user = userEvent.setup();
     window.history.replaceState(null, '', '/?root=A&scale=natural-minor');
     const { container } = render(<App />);
 
+    await openView(user, container);
+    expect(container.querySelector('.view-hint')?.textContent).toContain('In Moll');
     const forms = [...picker(container)!.querySelectorAll('option')]
       .map((option) => option.value)
       .filter(Boolean);
     expect(new Set(forms)).toEqual(new Set(['A', 'E', 'D']));
+  });
+});
+
+describe('App — Neues aus dem UX-Review', () => {
+  it('nennt die Vorlagen mit Akkordnamen statt nur mit römischen Ziffern', () => {
+    window.history.replaceState(null, '', '/?root=G&scale=major');
+    const { container } = render(<App />);
+
+    const select = [...container.querySelectorAll<HTMLSelectElement>('.panel-head select')].find((s) =>
+      [...s.options].some((o) => o.value === 'custom'),
+    )!;
+    const first = [...select.options].find((o) => o.value === 'I-V-vi-IV')!;
+    expect(first.textContent).toBe('G – D – Em – C');
+  });
+
+  it('transponiert eine eigene Folge mit der Tonart', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?root=G&scale=major&prog=custom:G,D,Em,C');
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('[aria-label="Einen Halbton höher"]')!);
+    await user.click(container.querySelector<HTMLButtonElement>('[aria-label="Einen Halbton höher"]')!);
+
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('A-Dur (Ionisch)');
+    expect(chipSymbols(container)).toEqual(['A', 'E', 'F#m', 'D']);
+  });
+
+  it('schaltet zwischen offenen Griffen und kürzesten Wegen um', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?root=G&scale=major');
+    const { container } = render(<App />);
+
+    const captions = () =>
+      [...container.querySelectorAll('.progression .voicing-switch, .progression .voicing-caption')].map(
+        (el) => el.textContent ?? '',
+      );
+    expect(captions().every((c) => c.includes('offen'))).toBe(true);
+
+    await user.click(
+      [...container.querySelectorAll<HTMLButtonElement>('[aria-label="Griffe"] button')].find((b) =>
+        b.textContent?.includes('Kürzeste'),
+      )!,
+    );
+    expect(window.location.search).toContain('grips=near');
+  });
+
+  it('zeigt bei einem Modus den Ton, an dem man ihn erkennt', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?root=D&scale=dorian');
+    const { container } = render(<App />);
+
+    // D-Dorisch: die große Sexte, B.
+    const hint = container.querySelector('.characteristic-hint')!;
+    expect(hint.textContent).toContain('B');
+    expect(hint.textContent).toContain('Dorisch von Moll');
+    expect(container.querySelectorAll('.note-characteristic').length).toBeGreaterThan(0);
+
+    await user.click(hint.querySelector<HTMLButtonElement>('.link-button')!);
+    expect(new Set(pickedLabels(container))).toEqual(new Set(['B']));
+  });
+
+  it('schweigt über einen Charakterton, wo es keinen gibt', () => {
+    const { container } = render(<App />);
+    expect(container.querySelector('.characteristic-hint')).toBeNull();
+  });
+
+  it('stellt mit einem Rhythmus-Stil alle vier Regler auf einmal', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.rhythm-trigger')!);
+    await user.click(
+      [...container.querySelectorAll<HTMLButtonElement>('.rhythm-panel .preset-button')].find(
+        (b) => b.textContent === 'Blues-Shuffle',
+      )!,
+    );
+
+    expect(window.location.search).toContain('feel=shuffle');
+    expect(container.querySelector('.rhythm-trigger .trigger-value')?.textContent).toContain(
+      'Blues-Shuffle',
+    );
+  });
+
+  it('merkt sich Linkshänder auf dem Gerät, nicht im Link', async () => {
+    const user = userEvent.setup();
+    window.localStorage.removeItem('fretboard:view');
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLInputElement>('.footer-toggle input')!);
+
+    expect(window.location.search).not.toContain('lefty');
+    expect(window.localStorage.getItem('fretboard:view')).toContain('"lefty":true');
+    window.localStorage.removeItem('fretboard:view');
   });
 });

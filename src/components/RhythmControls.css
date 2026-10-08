@@ -17,9 +17,18 @@
 }
 
 
-/* The rest comes from .popover. */
+/*
+ * The rest comes from .popover.
+ *
+ * Still anchored to the transport row, as the note above explains — but to its
+ * RIGHT edge, where the trigger is. Hung from the left edge it opened a whole row's
+ * width away from the button that opened it, over the grips below. The row spans
+ * the page, so with the max-width below the right edge cannot run off-screen
+ * either: the panel is never wider than the row it hangs from.
+ */
 .rhythm-panel {
-  left: 0;
+  right: 0;
+  left: auto;
   display: grid;
   gap: 0.8rem;
   width: max-content;
@@ -51,4 +60,14 @@
   scrollbar-width: thin;
   /* Room for the scrollbar, so it never sits on top of the bottom row of slots. */
   padding-bottom: 0.15rem;
+}
+
+/*
+ * A field stretches to the full width of the panel, and the field's caret is drawn at
+ * the field's right edge — so in here it hung far off to the right of a narrow
+ * select, attached to nothing. Shrinking the field to its content puts the caret
+ * back inside the select it belongs to.
+ */
+.rhythm-panel .field--inline {
+  width: fit-content;
 }

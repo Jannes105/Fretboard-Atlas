@@ -37,8 +37,10 @@ describe('Akkordformen klingen wie der Akkord, den sie behaupten', () => {
           const label = `${set.id}/${shape.name} ${chord.name()}`;
 
           const voicing = voicingsFor(chord, { tuning, maxFret: 24 }).find(
-            (v) => v.shapeName === shape.name,
+            (v) => v.shapeName === shape.name && (!shape.openOnly || v.baseFret === 0),
           );
+          // Open shapes exist on one root only: the one whose open grip they are.
+          if (shape.openOnly && voicing === undefined) continue;
           expect(voicing, label).toBeDefined();
 
           const sounding = new Set(soundingPitchClasses(tuning, voicing!.frets));
@@ -57,7 +59,8 @@ describe('Akkordformen klingen wie der Akkord, den sie behaupten', () => {
     for (const set of SHAPE_SETS) {
       const tuning = SET_TUNINGS[set.id];
 
-      for (const shape of set.shapes) {
+      // Open shapes have one home root and are checked there, below.
+      for (const shape of set.shapes.filter((candidate) => !candidate.openOnly)) {
         const chord = Chord.fromQuality(Note.parse('C'), shape.qualityId);
         const voicing = voicingsFor(chord, { tuning, maxFret: 24 }).find(
           (v) => v.shapeName === shape.name,
@@ -109,6 +112,42 @@ describe('Akkordformen klingen wie der Akkord, den sie behaupten', () => {
   });
 });
 
+describe('Offene Griffe', () => {
+  const OPEN = [
+    ['C', 'major', [-1, 3, 2, 0, 1, 0]],
+    ['G', 'major', [3, 2, 0, 0, 0, 3]],
+    ['D', 'major', [-1, -1, 0, 2, 3, 2]],
+    ['D', 'minor', [-1, -1, 0, 2, 3, 1]],
+    ['B', 'dominant7', [-1, 2, 1, 2, 0, 2]],
+    ['G', 'dominant7', [3, 2, 0, 0, 0, 1]],
+    ['D', 'dominant7', [-1, -1, 0, 2, 1, 2]],
+  ] as const;
+
+  it('bietet die Lagerfeuer-Griffe an, die jeder zuerst lernt — mit dem Grundton im Bass', () => {
+    for (const [root, quality, frets] of OPEN) {
+      const chord = Chord.fromQuality(Note.parse(root), quality);
+      const open = voicingsFor(chord).find((v) => v.frets.join() === frets.join());
+      expect(open, chord.name()).toBeDefined();
+      expect(open!.baseFret, chord.name()).toBe(0);
+
+      const sounding = soundingPitchClasses(Tuning.STANDARD, frets);
+      expect(new Set(sounding), chord.name()).toEqual(new Set(chord.pitchClasses));
+      expect(sounding[0], `${chord.name()}: Bass`).toBe(chord.root.pitchClass);
+    }
+  });
+
+  it('schiebt die offenen Formen nie den Hals hinauf', () => {
+    const d = voicingsFor(Chord.fromQuality(Note.parse('D'), 'major'));
+    expect(d.filter((v) => v.shapeName === 'C-Form' || v.shapeName === 'G-Form')).toEqual([]);
+    expect(d.filter((v) => v.shapeName === 'D-Form').every((v) => v.baseFret === 0)).toBe(true);
+  });
+
+  it('bietet das kleine F an — zwei Saiten unter dem Zeigefinger statt sechs', () => {
+    const f = voicingsFor(Chord.fromQuality(Note.parse('F'), 'major'));
+    expect(f.some((v) => v.frets.join() === [-1, -1, 3, 2, 1, 1].join())).toBe(true);
+  });
+});
+
 describe('voicingsFor', () => {
   it('liefert offene Akkorde als Bundlage 0', () => {
     const eMajor = Chord.fromQuality(Note.parse('E'), 'major');
@@ -128,8 +167,10 @@ describe('voicingsFor', () => {
   });
 
   it('bietet für die meisten Akkorde E- und A-Form an', () => {
-    const cMajor = Chord.fromQuality(Note.parse('C'), 'major');
-    expect(voicingsFor(cMajor).map((v) => v.shapeName).sort()).toEqual(['A-Form', 'E-Form']);
+    const dbMajor = Chord.fromQuality(Note.parse('Db'), 'major');
+    expect(voicingsFor(dbMajor).map((v) => v.shapeName)).toEqual(
+      expect.arrayContaining(['A-Form', 'E-Form']),
+    );
   });
 
   it('sortiert die tiefste Lage nach vorn — die greift man wirklich', () => {
@@ -137,9 +178,9 @@ describe('voicingsFor', () => {
     const aMajor = Chord.fromQuality(Note.parse('A'), 'major');
     expect(voicingsFor(aMajor)[0]).toMatchObject({ shapeName: 'A-Form', baseFret: 0 });
 
-    // D: A-Form im 5. Bund statt E-Form im 10.
+    // D: offen (D-Form) vor der A-Form im 5. Bund und der E-Form im 10.
     const dMajor = Chord.fromQuality(Note.parse('D'), 'major');
-    expect(voicingsFor(dMajor)[0]).toMatchObject({ shapeName: 'A-Form', baseFret: 5 });
+    expect(voicingsFor(dMajor)[0]).toMatchObject({ shapeName: 'D-Form', baseFret: 0 });
 
     for (const rootName of ROOT_CHOICES) {
       const voicings = voicingsFor(Chord.fromQuality(Note.parse(rootName), 'major'));
@@ -235,10 +276,11 @@ describe('Oktavlagen', () => {
     const aMajor = Chord.fromQuality(Note.parse('A'), 'major');
     const voicings = voicingsFor(aMajor);
 
-    // A-Form offen (0), E-Form (5), A-Form eine Oktave höher (12).
+    // A-Form offen (0), E-Form und kleine Form (5), A-Form eine Oktave höher (12).
     expect(voicings.map((v) => [v.shapeName, v.baseFret])).toEqual([
       ['A-Form', 0],
       ['E-Form', 5],
+      ['Kleine Form', 5],
       ['A-Form', 12],
     ]);
   });
@@ -391,11 +433,11 @@ describe('defaultVoicingIndex', () => {
   });
 
   it('nimmt bei Akkorden ohne offene Lage schlicht die tiefste', () => {
-    const cMajor = Chord.fromQuality(Note.parse('C'), 'major');
-    const voicings = voicingsFor(cMajor);
+    const dbMajor = Chord.fromQuality(Note.parse('Db'), 'major');
+    const voicings = voicingsFor(dbMajor);
 
     expect(defaultVoicingIndex(voicings)).toBe(0);
-    expect(voicings[0]).toMatchObject({ shapeName: 'A-Form', baseFret: 3 });
+    expect(voicings[0]).toMatchObject({ shapeName: 'A-Form', baseFret: 4 });
   });
 
   it('findet für JEDE Qualität auf JEDEM Grundton eine Barré-Lage', () => {

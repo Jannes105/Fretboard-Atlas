@@ -55,6 +55,29 @@ const COMFORT_WEIGHT = 0.06;
 const COMMON_STRING_BONUS = 0.6;
 
 /**
+ * What one fret of distance from the nut costs, per chord, when open grips are
+ * preferred.
+ *
+ * The travel term alone is blind to WHERE the hand is — only to how far it moves.
+ * So G–D–Em–C came out as four barres between the 7th and 10th fret: a perfectly
+ * short path, and one no beginner can play, while the four open chords everyone
+ * learns first sit right at the nut. A small pull towards the nut breaks that tie
+ * in favour of the low position without overruling the travel: at 0.35 a chord
+ * five frets up costs less than two frets of hand movement, so a progression that
+ * genuinely lives up the neck still stays there.
+ */
+const NUT_PULL = 0.35;
+
+export interface VoicingPathOptions {
+  /**
+   * Prefer grips near the nut — the open chords — over the shortest path anywhere
+   * on the neck. What a beginner wants; the shortest path is what a player who
+   * already knows the neck wants.
+   */
+  readonly preferOpen?: boolean;
+}
+
+/**
  * The opening chord is chosen by the search like every other one, and two earlier
  * attempts to anchor it to `defaultVoicingIndex` are the reason it is not.
  *
@@ -101,8 +124,9 @@ function transitionCost(from: Voicing, to: Voicing): number {
 }
 
 /** How awkward this grip is on its own, on the same scale as the travel above. */
-function comfort(voicing: Voicing): number {
-  return gripCost(voicing.frets) * COMFORT_WEIGHT;
+function comfort(voicing: Voicing, preferOpen: boolean): number {
+  const own = gripCost(voicing.frets) * COMFORT_WEIGHT;
+  return preferOpen ? own + handPosition(voicing) * NUT_PULL : own;
 }
 
 /**
@@ -113,7 +137,10 @@ function comfort(voicing: Voicing): number {
  * from the last chord that had one, which is what actually happens when a player
  * skips a chord.
  */
-export function voicingPath(lists: readonly (readonly Voicing[])[]): number[] {
+export function voicingPath(
+  lists: readonly (readonly Voicing[])[],
+  { preferOpen = false }: VoicingPathOptions = {},
+): number[] {
   const chosen = lists.map(() => 0);
 
   // Only chords that offer a choice take part; the empty ones keep their 0.
@@ -123,7 +150,7 @@ export function voicingPath(lists: readonly (readonly Voicing[])[]): number[] {
   if (steps.length === 0) return chosen;
 
   // best[j] — cheapest total cost of arriving at candidate j of the current step.
-  let best = steps[0].voicings.map((voicing) => comfort(voicing));
+  let best = steps[0].voicings.map((voicing) => comfort(voicing, preferOpen));
   // One row per step after the first, each entry naming the predecessor that
   // produced it. This is what makes the walk back possible.
   const cameFrom: number[][] = [];
@@ -136,7 +163,7 @@ export function voicingPath(lists: readonly (readonly Voicing[])[]): number[] {
     const back = new Array<number>(current.length).fill(0);
 
     current.forEach((voicing, j) => {
-      const here = comfort(voicing);
+      const here = comfort(voicing, preferOpen);
       previous.forEach((from, k) => {
         const total = best[k] + transitionCost(from, voicing) + here;
         if (total < next[j]) {

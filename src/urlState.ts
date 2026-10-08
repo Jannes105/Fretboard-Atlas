@@ -81,7 +81,15 @@ export interface AppState {
   sustain: NoteLength;
   /** Count-in only, a click throughout, or neither. */
   click: ClickMode;
+  /**
+   * How the grips of a progression are chosen: open chords at the nut first, or
+   * the shortest hand path wherever it leads. A property of the music on screen —
+   * the same link should show the same grips — so it travels in the URL.
+   */
+  grips: GripPreference;
 }
+
+export type GripPreference = 'open' | 'near';
 
 export const DEFAULT_STATE: AppState = {
   root: 'A',
@@ -116,6 +124,7 @@ export const DEFAULT_STATE: AppState = {
   feel: 'straight',
   sustain: 'ring',
   click: 'off',
+  grips: 'open',
 };
 
 const FRET_COUNTS = [12, 15, 24];
@@ -129,6 +138,7 @@ const STRUMS: readonly StrumStyle[] = ['standard', 'arpeggio'];
 const FEELS: readonly SwingFeel[] = ['straight', 'shuffle'];
 const SUSTAINS: readonly NoteLength[] = ['ring', 'stopped'];
 const CLICKS: readonly ClickMode[] = ['off', 'countIn', 'metronome'];
+const GRIPS: readonly GripPreference[] = ['open', 'near'];
 const BEATS_PER_BAR = [2, 3, 4, 6];
 /** Exported because SetupPanel builds its dropdown from it — one limit, not two. */
 export const MAX_CAPO = 12;
@@ -296,6 +306,7 @@ export function readState(search: string): AppState {
     feel: pickFrom(params.get('feel'), FEELS, DEFAULT_STATE.feel),
     sustain: pickFrom(params.get('sustain'), SUSTAINS, DEFAULT_STATE.sustain),
     click: pickFrom(params.get('click'), CLICKS, DEFAULT_STATE.click),
+    grips: pickFrom(params.get('grips'), GRIPS, DEFAULT_STATE.grips),
     beatsPerBar,
     rhythm,
   };
@@ -336,6 +347,7 @@ export function writeState(state: AppState): string {
   add('feel', state.feel, DEFAULT_STATE.feel);
   add('sustain', state.sustain, DEFAULT_STATE.sustain);
   add('click', state.click, DEFAULT_STATE.click);
+  add('grips', state.grips, DEFAULT_STATE.grips);
   add('sig', state.beatsPerBar, DEFAULT_STATE.beatsPerBar);
   // Only a real, meter-matching pattern is worth a link; a wrong-length leftover
   // would be reset on read anyway.

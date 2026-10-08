@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type AudioPlayer, createAudioPlayer, LOOSE_ARPEGGIO_GAP, prefetchSamples } from './audio';
-import { FretboardView } from './components/FretboardView';
+import { type ChordTones, FretboardView } from './components/FretboardView';
+import { KeyPicker, type KeyPickerRequest, type KeyPickerTab } from './components/KeyPicker';
+import { NeckViewPanel } from './components/NeckViewPanel';
 import { positionKey } from './components/neckGeometry';
-import { KeyFinder } from './components/KeyFinder';
 import { NoteText } from './components/NoteText';
 import { ProgressionPanel } from './components/ProgressionPanel';
 import { SetupPanel } from './components/SetupPanel';
 import { SoundPanel } from './components/SoundPanel';
+import { TransportDock } from './components/TransportDock';
 import { useAppState } from './hooks/useAppState';
 import { type ThemeChoice, useTheme } from './hooks/useTheme';
 import { useTransport } from './hooks/useTransport';
+import { type NeckOrientation, useViewPrefs } from './hooks/useViewPrefs';
 import {
   buildProgression,
   cagedPlacements,
-  type CagedForm,
+  characteristicTone,
   Chord,
   type ChordSize,
   chordMidiTones,
@@ -33,7 +36,7 @@ import {
   Scale,
   scaleMidiSequence,
   SCALE_TYPES,
-  scaleTypesInGroup,
+  transposeSymbol,
   Tuning,
   type Voicing,
   voicingMidi,
@@ -53,6 +56,40 @@ import './App.css';
  */
 const ALL_NOTES_LABEL = 'Alle Töne';
 
+/** The interval of a major scale on each letter step — the yardstick for "b3", "#5". */
+const MAJOR_REFERENCE = [0, 2, 4, 5, 7, 9, 11];
+
+/**
+ * What each tone of a chord is, counted from the chord's own root: "1", "b3", "5",
+ * "b7", "9". The neck's degree labels count from the KEY, which tells you where a
+ * chord sits in the key — but to learn the chord itself you want its own numbers.
+ */
+function chordIntervals(chord: Chord): Map<number, string> {
+  const intervals = new Map<number, string>();
+  const isExtended = chord.notes.length >= 5;
+  for (const note of chord.notes) {
+    const semitones = (note.pitchClass - chord.root.pitchClass + 12) % 12;
+    const step = (note.letter - chord.root.letter + 7) % 7;
+    let alter = semitones - MAJOR_REFERENCE[step];
+    if (alter > 6) alter -= 12;
+    if (alter < -6) alter += 12;
+    const accidental = alter === 0 ? '' : alter > 0 ? '#'.repeat(alter) : 'b'.repeat(-alter);
+    // A second in a five-note stack is a ninth.
+    const number = step === 1 && isExtended ? 9 : step + 1;
+    intervals.set(note.pitchClass, `${accidental}${number}`);
+  }
+  return intervals;
+}
+
+/** Keys worth one tap from the opening screen: where most people start. */
+const QUICK_STARTS: readonly { root: string; scaleTypeId: string; label: string }[] = [
+  { root: 'A', scaleTypeId: 'minor-pentatonic', label: 'A-Moll-Pentatonik' },
+  { root: 'E', scaleTypeId: 'minor-pentatonic', label: 'E-Moll-Pentatonik' },
+  { root: 'G', scaleTypeId: 'major', label: 'G-Dur' },
+  { root: 'C', scaleTypeId: 'major', label: 'C-Dur' },
+  { root: 'A', scaleTypeId: 'blues', label: 'A-Blues' },
+];
+
 /**
  * What is currently picked out on the neck. A chord and a single scale degree are
  * the same idea — "show me these tones" — so they share one slot and one
@@ -68,6 +105,8 @@ export default function App() {
   // Deliberately not part of `state`: the theme belongs to the reader, not to the
   // link. See useTheme.
   const { theme, setTheme } = useTheme();
+  // Also the reader's, for the same reason: handedness and screen shape.
+  const { prefs: viewPrefs, vertical, setLefty, setOrientation } = useViewPrefs();
 
   const {
     root,
@@ -92,6 +131,7 @@ export default function App() {
     feel,
     sustain,
     click,
+    grips,
   } = state;
 
   /**
@@ -172,10 +212,6 @@ export default function App() {
   // A box number from the URL — or left over from another scale — may not exist here.
   const box = boxes.find((b) => b.number === state.boxNumber) ?? null;
 
-  // boxZoom true means the drawing is cropped to the box, so that is when the
-  // button offers the whole neck.
-  const zoomAction = state.boxZoom ? 'Ganzen Hals zeigen' : 'Nur die Lage zeigen';
-
   // The notes currently on screen, with their real pitches (tuning + capo baked
   // in). Playback derives from these, so what you hear matches what you see —
   // a box up the neck sounds higher, a capo raises everything.
@@ -218,7 +254,12 @@ export default function App() {
     if (highlight.kind === 'chord') {
       const chord = chords[highlight.index];
       if (!chord) return null;
-      return { pitchClasses: chord.pitchClasses, label: chord.name() };
+      const chordTones: ChordTones = {
+        root: chord.root.pitchClass,
+        names: new Map(chord.notes.map((note) => [note.pitchClass, note.name()])),
+        intervals: chordIntervals(chord),
+      };
+      return { pitchClasses: chord.pitchClasses, label: chord.name(), chordTones };
     }
 
     const note = scale?.notes[highlight.index];
@@ -226,6 +267,7 @@ export default function App() {
     return {
       pitchClasses: [note.pitchClass],
       label: `Stufe ${scale.degreeLabelOf(note.pitchClass)}`,
+      chordTones: null,
     };
   }, [highlight, chords, scale]);
 
@@ -289,11 +331,12 @@ export default function App() {
 
   // A different key, progression, chord size or tuning means different grips, so
   // any earlier choice is meaningless. The replacements are chosen as a sequence,
-  // not one by one: the opening grip is still the barre default, and the rest are
-  // the ones that keep the hand where it already is.
+  // not one by one — and by default with a pull towards the nut, so G–D–Em–C
+  // comes out as the four open chords everyone learns first, not as four barres
+  // at the 7th fret. "Kürzeste Wege" switches that pull off.
   useEffect(() => {
-    setChosenVoicings(voicingPath(stepVoicings));
-  }, [stepVoicings]);
+    setChosenVoicings(voicingPath(stepVoicings, { preferOpen: grips === 'open' }));
+  }, [stepVoicings, grips]);
 
   const voicingIndex = (step: number) =>
     chosenVoicings[step] ?? defaultVoicingIndex(stepVoicings[step] ?? []);
@@ -435,8 +478,8 @@ export default function App() {
    *
    * Sounded from chordPositions, not from the scale map: a borrowed chord has tones
    * the scale does not, and playing only the ones that happen to be in the
-   * pentatonic would make the VI a two-note fragment. The neck still highlights
-   * only scale tones — that gap is the lesson, not a bug.
+   * pentatonic would make the VI a two-note fragment. The neck shows the missing
+   * tones too, hollow — on the neck and playable, but visibly not in the scale.
    */
   const pickChord = (index: number) => {
     setHighlight({ kind: 'chord', index });
@@ -492,6 +535,65 @@ export default function App() {
 
   const { playingStep, isPlaying } = transport;
 
+  // ---- Ways in, and ways to land ----
+
+  /** Opening the key picker from elsewhere — the start cards. */
+  const [keyPickerRequest, setKeyPickerRequest] = useState<KeyPickerRequest | null>(null);
+  const openKeyPicker = (tab: KeyPickerTab) =>
+    setKeyPickerRequest((previous) => ({ tab, serial: (previous?.serial ?? 0) + 1 }));
+
+  /** Bumped when a progression is adopted, so the panel can show where it went. */
+  const [revealSerial, setRevealSerial] = useState(0);
+  const transportRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Move the key by a semitone, and a self-built progression with it. A preset
+   * needs nothing: it is built from degrees, so it follows the root on its own.
+   */
+  const transpose = (semitones: 1 | -1) => {
+    const index = ROOT_CHOICES.indexOf(root);
+    const nextRoot = ROOT_CHOICES[(index + semitones + ROOT_CHOICES.length) % ROOT_CHOICES.length];
+    patch((previous) => ({
+      ...previous,
+      root: nextRoot,
+      progressionId: customChordSteps
+        ? customProgId(
+            customChordSteps.map((step) => ({
+              symbol: transposeSymbol(step.symbol, Note.parse(previous.root), Note.parse(nextRoot)),
+              bars: step.bars,
+            })),
+          )
+        : previous.progressionId,
+    }));
+  };
+
+  /** What each preset spells out in this key, for the dropdown. */
+  const presetChords = useMemo(() => {
+    const names = new Map<string, string>();
+    if (chordScale === null) return names;
+    for (const progression of progressions) {
+      const built = buildProgression(chordScale, progression, chordSize);
+      // Long forms (the twelve-bar blues) are named by their distinct chords.
+      const distinct = [...new Set(built.map((step) => step.chord.name()))];
+      const list = (built.length > 6 ? distinct : built.map((step) => step.chord.name()))
+        .map(withAccidentals)
+        .join(' – ');
+      names.set(progression.id, built.length > 6 ? `${progression.name}: ${list}` : list);
+    }
+    return names;
+  }, [chordScale, progressions, chordSize]);
+
+  /** The tone this mode is recognised by, if it has one. */
+  const characteristic = useMemo(() => {
+    if (scale === null) return null;
+    const tone = characteristicTone(scale.type);
+    if (tone === null) return null;
+    const note = scale.notes[tone.index];
+    return note ? { index: tone.index, note, why: tone.why } : null;
+  }, [scale]);
+
+  const isMinorTonic = tonicChord?.quality?.id.startsWith('minor') ?? false;
+
   return (
     <main className="app">
       <header className="app-header">
@@ -507,11 +609,9 @@ export default function App() {
             isCustomTuning={isCustomTuning}
             capo={capo}
             fretCount={fretCount}
-            sound={sound}
             onTuningIdChange={(next) => update('tuningId', next)}
             onCapoChange={(next) => update('capo', next)}
             onFretCountChange={(next) => update('fretCount', next)}
-            onSoundChange={(next) => update('sound', next)}
           />
 
           <SoundPanel
@@ -521,6 +621,8 @@ export default function App() {
             tone={tone}
             reverb={reverb}
             delay={delay}
+            onSoundChange={(next) => update('sound', next)}
+            onApplyPreset={(settings) => patch((previous) => ({ ...previous, ...settings }))}
             onAmpChange={(next) => update('amp', next)}
             onPickupChange={(next) => update('pickup', next)}
             onToneChange={(next) => update('tone', next)}
@@ -532,67 +634,34 @@ export default function App() {
 
       <section className="scale-strip">
         <div className="scale-title">
-          {/*
-           * The key IS the heading — the two selects below spell it out, so a
-           * separate line of text saying the same thing was pure duplication.
-           * The heading stays for screen readers and the document outline.
-           */}
+          {/* The picker's button names the key; the heading carries it for screen
+              readers and the document outline. */}
           <h2 className="sr-only">{scale ? scale.name() : ALL_NOTES_LABEL}</h2>
 
-          {/*
-           * The visible text sizes the control and the select lies invisibly on
-           * top of it: a select is as wide as its LONGEST option, which for a
-           * headline leaves the underline and caret trailing off into space.
-           */}
-          {/* Without a key a root would be picking a tonic for a neck that has
-              none — the scale picker alone decides whether there is one. */}
-          {scale ? (
-            <span className="key-select key-select--root">
-              <span className="key-select-text" aria-hidden="true">
-                <NoteText name={root} />
-              </span>
-              <select aria-label="Grundton" value={root} onChange={(e) => update('root', e.target.value)}>
-                {ROOT_CHOICES.map((choice) => (
-                  // The value stays ASCII — it is the state, and it is what lands
-                  // in the URL. Only what the reader sees gets the real accidental.
-                  <option key={choice} value={choice}>
-                    {withAccidentals(choice)}
-                  </option>
-                ))}
-              </select>
-            </span>
-          ) : null}
-
-          <span className="key-select">
-            <span className="key-select-text" aria-hidden="true">
-              {scale ? scale.type.name : ALL_NOTES_LABEL}
-            </span>
-            <select
-              aria-label="Skala"
-              value={scaleTypeId ?? ''}
-              onChange={(e) =>
-                update('scaleTypeId', e.target.value === '' ? null : e.target.value)
-              }
-            >
-              {/* First, and its own option rather than a group: it is where the
-                  app starts, not a scale among scales. */}
-              <option value="">{ALL_NOTES_LABEL}</option>
-              <optgroup label="Grundlagen">
-                {scaleTypesInGroup('basics').map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Weitere">
-                {scaleTypesInGroup('more').map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </span>
+          <KeyPicker
+            scale={scale}
+            root={root}
+            onRootChange={(next) => update('root', next)}
+            onScaleTypeChange={(next) => update('scaleTypeId', next)}
+            onPickKey={(pickedRoot, pickedScaleTypeId) =>
+              patch((previous) => ({
+                ...previous,
+                root: pickedRoot,
+                scaleTypeId: pickedScaleTypeId,
+              }))
+            }
+            onAdopt={(symbols, pickedRoot, pickedScaleTypeId) => {
+              patch((previous) => ({
+                ...previous,
+                root: pickedRoot,
+                scaleTypeId: pickedScaleTypeId,
+                // Adopted chords start at one bar each.
+                progressionId: customProgId(symbols.map((symbol) => ({ symbol, bars: 1 }))),
+              }));
+              setRevealSerial((serial) => serial + 1);
+            }}
+            request={keyPickerRequest}
+          />
 
           {scale ? (
             <button
@@ -605,135 +674,57 @@ export default function App() {
               ▶
             </button>
           ) : null}
-
-          <KeyFinder
-            onPick={(pickedRoot, pickedScaleTypeId) =>
-              patch((previous) => ({
-                ...previous,
-                root: pickedRoot,
-                scaleTypeId: pickedScaleTypeId,
-              }))
-            }
-            onAdopt={(symbols, pickedRoot, pickedScaleTypeId) =>
-              patch((previous) => ({
-                ...previous,
-                root: pickedRoot,
-                scaleTypeId: pickedScaleTypeId,
-                // Adopted chords start at one bar each.
-                progressionId: customProgId(symbols.map((symbol) => ({ symbol, bars: 1 }))),
-              }))
-            }
-          />
         </div>
       </section>
 
       {/*
-       * These all change only what the neck shows, so they sit on the neck.
+       * Above the neck: where on it you are, and how it is drawn. The positions
+       * stay out in the open — they are how you move around the neck, and one tap
+       * each. Everything that only changes how the same notes are drawn sits
+       * behind „Ansicht".
        *
-       * No visible labels: every value says what it is ("Ganzer Hals",
-       * "Notennamen", "CAGED aus"), and three uppercase captions weighed more than
-       * the controls they named. The aria-labels carry the names for anyone who
-       * cannot see the values — which is also how the phone layout already worked.
-       *
-       * The whole row goes with the key: every control in it needs a tonic. There
-       * are no positions without a scale to window, no CAGED form without a chord
-       * to place, and "Stufen" has nothing to count from. An empty bar of dead
-       * controls would be worse than no bar.
+       * The whole row goes with the key: there are no positions without a scale
+       * to window, and nothing for „Stufen" to count from.
        */}
       {scale ? (
-      <div className="neck-bar">
-        {/* The zoom belongs TO the position, not beside it, so the two sit in one
-            group and the button is visibly the smaller of the pair. */}
-        <div className="control-pair">
-          <label className="field field--inline">
-            <select
-              aria-label="Lage"
-              value={box ? state.boxNumber : 0}
-              onChange={(e) => update('boxNumber', Number(e.target.value))}
-            >
-              <option value={0}>Ganzer Hals</option>
-              {boxes.map((option) => (
-                <option key={option.number} value={option.number}>
-                  Lage {option.number} ({option.anchorFret}. Bund)
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {/* Only meaningful with a position selected — there is nothing else to
-              crop to, and offering it on the whole neck would be a dead control. */}
-          {box ? (
-            /*
-             * The button names the NEXT click, not the current state — which is
-             * why it carries no aria-pressed: "Nur die Lage zeigen, pressed"
-             * says two things at once. Where you are is visible on the neck.
-             */
+        <div className="neck-bar">
+          <span className="neck-bar-label" aria-hidden="true">
+            Lage
+          </span>
+          <div className="segmented box-picker" role="group" aria-label="Lage">
             <button
               type="button"
-              className="icon-toggle"
-              aria-label={zoomAction}
-              title={zoomAction}
-              onClick={() => update('boxZoom', !state.boxZoom)}
+              aria-pressed={box === null}
+              onClick={() => update('boxNumber', 0)}
             >
-              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                {state.boxZoom ? (
-                  /* Arrows pushing outward: widen the view past the box. */
-                  <path d="M6.5 3.5 3 8l3.5 4.5M9.5 3.5 13 8l-3.5 4.5" />
-                ) : (
-                  /* And inward: pull it back to the box. */
-                  <path d="M3 3.5 6.5 8 3 12.5M13 3.5 9.5 8 13 12.5" />
-                )}
-              </svg>
+              Ganzer Hals
             </button>
-          ) : null}
-        </div>
+            {boxes.map((option) => (
+              <button
+                key={option.number}
+                type="button"
+                aria-pressed={box?.number === option.number}
+                aria-label={`Lage ${option.number}, ab ${option.anchorFret}. Bund`}
+                title={`Lage ${option.number} (${option.anchorFret}. Bund)`}
+                onClick={() => update('boxNumber', option.number)}
+              >
+                {option.number}
+              </button>
+            ))}
+          </div>
 
-        {/* Hidden where the forms would not hold — a wrong grip beats no grip
-            nowhere, and that rule applies to a teaching overlay too. */}
-        {cagedForms.length > 0 ? (
-          <label className="field field--inline">
-            <select
-              aria-label="CAGED-Form"
-              value={state.cagedForm ?? ''}
-              onChange={(e) =>
-                update('cagedForm', e.target.value === '' ? null : (e.target.value as CagedForm))
-              }
-            >
-              {/*
-               * The options carry the word, since no caption does any more — but
-               * only the form's letter after it. A select is as wide as its
-               * longest option, and "CAGED E-Form (5. Bund)" pushed the row onto
-               * a third line on a phone. In CAGED the letter IS the name.
-               */}
-              <option value="">CAGED aus</option>
-              {cagedForms.map((placement) => (
-                <option key={placement.form} value={placement.form}>
-                  CAGED {placement.form} ({placement.startFret}. Bund)
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-
-        {/* Two options are not worth a dropdown: both fit side by side, and the
-            choice is then one click rather than two. */}
-        <div className="segmented" role="group" aria-label="Beschriftung">
-          <button
-            type="button"
-            aria-pressed={labelMode === 'note'}
-            onClick={() => update('labelMode', 'note')}
-          >
-            Notennamen
-          </button>
-          <button
-            type="button"
-            aria-pressed={labelMode === 'degree'}
-            onClick={() => update('labelMode', 'degree')}
-          >
-            Stufen
-          </button>
+          <NeckViewPanel
+            labelMode={labelMode}
+            onLabelModeChange={(next) => update('labelMode', next)}
+            hasBox={box !== null}
+            boxZoom={state.boxZoom}
+            onBoxZoomChange={(next) => update('boxZoom', next)}
+            cagedForms={cagedForms}
+            cagedForm={state.cagedForm}
+            onCagedFormChange={(next) => update('cagedForm', next)}
+            minorTonic={isMinorTonic}
+          />
         </div>
-      </div>
       ) : null}
 
       <FretboardView
@@ -746,63 +737,79 @@ export default function App() {
         caged={caged}
         highlight={picked?.pitchClasses ?? null}
         highlightLabel={picked?.label ?? null}
+        chordTones={picked?.chordTones ?? null}
+        characteristic={characteristic?.note.pitchClass ?? null}
+        vertical={vertical}
+        lefty={viewPrefs.lefty}
         onHoldNote={(midi) => player().holdNote(midi)}
       />
 
       {/*
-       * The neck's legend, and below it rather than above.
-       *
-       * These chips show the same notes in the same roles as the dots on the
-       * board, and clicking one picks that tone out up there — so they explain
-       * the picture and they act on it. A legend belongs beside the thing it
-       * explains; up in the key line they were separated from it by the whole
-       * neck bar, and they put a third row of controls between the headline and
-       * the instrument.
+       * The neck's legend, below it: the same notes in the same roles as the dots,
+       * and clicking one picks that tone out up there.
        */}
-      {/* A legend of degrees needs degrees. Without a key the neck names every
-          note on itself, which is the whole point of that view. */}
       {scale ? (
-      <section className="neck-legend" aria-label="Töne der Tonart">
-        <ul className="degree-chips">
-          {scale.notes.map((note, i) => (
-            <li key={note.name()}>
+        <section className="neck-legend" aria-label="Töne der Tonart">
+          <ul className="degree-chips">
+            {scale.notes.map((note, i) => (
+              <li key={note.name()}>
+                <button
+                  type="button"
+                  className={[
+                    'degree-chip',
+                    i === 0 ? 'is-root' : '',
+                    characteristic?.index === i ? 'is-characteristic' : '',
+                    isDegreeActive(i) ? 'is-active' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  aria-pressed={isDegreeActive(i)}
+                  onClick={() => pickDegree(i)}
+                >
+                  <span className="note-name">
+                    <NoteText name={note.name()} />
+                  </span>
+                  <span className="note-degree">
+                    <NoteText name={scale.degreeLabelOf(note.pitchClass) ?? ''} />
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {/*
+           * The one tone that makes this mode sound like itself. Six of its seven
+           * notes are the neighbour's too; without this line the neck shows two
+           * pictures nobody can tell apart.
+           */}
+          {characteristic ? (
+            <p className="characteristic-hint">
+              <span className="characteristic-mark" aria-hidden="true" />
+              Charakterton{' '}
+              <strong>
+                <NoteText name={characteristic.note.name()} />
+              </strong>{' '}
+              ({withAccidentals(scale.degreeLabelOf(characteristic.note.pitchClass) ?? '')}):{' '}
+              {characteristic.why}.{' '}
               <button
                 type="button"
-                className={[
-                  'degree-chip',
-                  i === 0 ? 'is-root' : '',
-                  isDegreeActive(i) ? 'is-active' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                aria-pressed={isDegreeActive(i)}
-                onClick={() => pickDegree(i)}
+                className="link-button"
+                onClick={() => pickDegree(characteristic.index)}
               >
-                <span className="note-name">
-                  <NoteText name={note.name()} />
-                </span>
-                <span className="note-degree">
-                  <NoteText name={scale.degreeLabelOf(note.pitchClass) ?? ''} />
-                </span>
+                Im Hals zeigen
               </button>
-            </li>
-          ))}
-        </ul>
+            </p>
+          ) : null}
 
-        {/*
-         * Only for a highlight that STARTED here. The chord panel further down
-         * carries its own way out, and showing both at once meant two links for
-         * one state — 765 px apart and worded differently, so they did not even
-         * read as the same action. Each now sits where the click happened.
-         */}
-        {highlight?.kind === 'degree' && picked ? (
-          <p className="picked-actions">
-            <button type="button" className="link-button" onClick={() => setHighlight(null)}>
-              Hervorhebung aufheben
-            </button>
-          </p>
-        ) : null}
-      </section>
+          {/* Only for a highlight that STARTED here; the chord panel has its own. */}
+          {highlight?.kind === 'degree' && picked ? (
+            <p className="picked-actions">
+              <button type="button" className="link-button" onClick={() => setHighlight(null)}>
+                Hervorhebung aufheben
+              </button>
+            </p>
+          ) : null}
+        </section>
       ) : null}
 
       {chords.length > 0 ? (
@@ -829,8 +836,8 @@ export default function App() {
 
             <p className="hint">
               {isBorrowedHarmony
-                ? `${scale?.type.name} hat keine eigenen Stufenakkorde — diese kommen aus ${chordScale.name()}, der Tonart dahinter. Anklicken: du hörst den Akkord und siehst, welche seiner Töne im Hals liegen.`
-                : 'Anklicken: du hörst den Akkord und siehst seine Töne im Hals.'}
+                ? `${scale?.type.name} hat keine eigenen Stufenakkorde — diese kommen aus ${chordScale.name()}, der Tonart dahinter. Anklicken: du hörst den Akkord und siehst ihn im Hals; Töne außerhalb der Skala sind hohl gezeichnet.`
+                : 'Anklicken: du hörst den Akkord und siehst seine Töne im Hals. „+" hängt ihn an die Akkordfolge an.'}
             </p>
 
             <ol className="chord-row">
@@ -851,17 +858,7 @@ export default function App() {
                     </span>
                   </button>
 
-                  {/*
-                   * These seven chords used to be drawn a second time inside the
-                   * builder just to add them. One set, two actions instead.
-                   *
-                   * Always here, not only once a self-built progression is open:
-                   * hiding it put a discovery gate — an option at the bottom of a
-                   * dropdown — in front of the very feature it serves. From a
-                   * preset the click adopts what is on screen and appends to it,
-                   * seeded exactly as ProgressionPanel seeds "Eigene Folge", so
-                   * the two paths agree by construction.
-                   */}
+                  {/* One set of cards, two actions: hear it, or append it. */}
                   <button
                     type="button"
                     className="chord-add tap-target"
@@ -884,9 +881,6 @@ export default function App() {
               ))}
             </ol>
 
-            {/* The way back belongs where the click happened — and only there.
-                Same wording as the one under the neck, because it is the same
-                action; only one of the two is ever on screen. */}
             {highlight?.kind === 'chord' ? (
               <p className="chord-row-actions">
                 <button type="button" className="link-button" onClick={() => setHighlight(null)}>
@@ -898,6 +892,7 @@ export default function App() {
 
           <ProgressionPanel
             progressions={progressions}
+            presetChords={presetChords}
             preset={preset}
             isCustom={isCustom}
             customChordSteps={customChordSteps}
@@ -941,23 +936,69 @@ export default function App() {
             onFeelChange={(next) => update('feel', next)}
             onSustainChange={(next) => update('sustain', next)}
             onClickChange={(next) => update('click', next)}
+            onApplyStyle={(settings) => patch((previous) => ({ ...previous, ...settings }))}
+            grips={grips}
+            onGripsChange={(next) => update('grips', next)}
+            onTranspose={transpose}
+            transportRef={transportRef}
+            revealSerial={revealSerial}
+          />
+
+          <TransportDock
+            anchor={transportRef}
+            steps={steps}
+            isPlaying={isPlaying}
+            playingStep={playingStep}
+            bpm={bpm}
+            onToggle={transport.toggle}
           />
         </>
       ) : scale === null ? (
         /*
-         * The opening state. Says what the neck is showing and what picking a key
-         * adds, rather than apologising for what is missing — nothing is broken
-         * here, the map just has no key on it yet.
+         * The opening state: three ways in, named by what someone came to do, and
+         * a handful of keys one tap away. It used to be a sentence telling you to
+         * „choose a key above" — next to no control by that name.
          */
-        <p className="empty">
-          Der Hals zeigt gerade jeden Ton, mit beiden Schreibweisen. Wähl oben eine
-          Tonart, und dazu kommen Lagen, Stufenakkorde und die Akkordfolge.
-        </p>
+        <section className="empty start" aria-labelledby="start-heading">
+          <h2 id="start-heading">Womit möchtest du anfangen?</h2>
+          <div className="start-cards">
+            <button type="button" className="start-card" onClick={() => openKeyPicker('choose')}>
+              <strong>Eine Tonart erkunden</strong>
+              <span>Grundton und Skala wählen — Lagen, Akkorde und Akkordfolgen kommen dazu.</span>
+            </button>
+            <button type="button" className="start-card" onClick={() => openKeyPicker('detect')}>
+              <strong>Akkorde zu einem Song</strong>
+              <span>Akkorde eintippen, die Tonart erkennen lassen und die Folge mitspielen.</span>
+            </button>
+            <div className="start-card start-card--note">
+              <strong>Den Hals kennenlernen</strong>
+              <span>Oben steht jeder Ton. Tippe einen an, um ihn zu hören.</span>
+            </div>
+          </div>
+          <p className="quick-starts">
+            <span>Schnellstart:</span>
+            {QUICK_STARTS.map((entry) => (
+              <button
+                key={entry.label}
+                type="button"
+                className="quick-start"
+                onClick={() =>
+                  patch((previous) => ({
+                    ...previous,
+                    root: entry.root,
+                    scaleTypeId: entry.scaleTypeId,
+                  }))
+                }
+              >
+                {entry.label}
+              </button>
+            ))}
+          </p>
+        </section>
       ) : (
         /*
          * Unreachable today: every scale on offer either has seven degrees of its
-         * own or names the key it borrows from. It stays as the honest answer for
-         * a future scale that has neither — a whole-tone scale, say.
+         * own or names the key it borrows from.
          */
         <p className="empty">
           {scale.type.name} hat {scale.notes.length} Stufen und keine Tonart, aus der sich
@@ -966,21 +1007,30 @@ export default function App() {
       )}
 
       {/*
-       * The one setting that is not about the music.
-       *
-       * It used to sit in the setup drawer between the tuning and the fret count,
-       * which is the very distinction this app draws everywhere else: every field
-       * in AppState describes the instrument or the music, and the theme is the
-       * only preference that describes the READER — which is exactly why it lives
-       * in localStorage and not in the shareable URL. Filing it with the tuning
-       * contradicted that, and forced the drawer to be called "Instrument &
-       * Darstellung" to cover it.
-       *
-       * Down here rather than in the header: it is set once per device and never
-       * again, and the top of this page belongs to the neck. The foot of a page is
-       * also where people look for it.
+       * The settings that are about the READER, not the music: colours, which hand
+       * plays, how the neck lies on this screen. Kept on the device, never in the
+       * link — see useTheme and useViewPrefs.
        */}
       <footer className="app-footer">
+        <label className="field field--inline">
+          <span>Hals</span>
+          <select
+            value={viewPrefs.orientation}
+            onChange={(e) => setOrientation(e.target.value as NeckOrientation)}
+          >
+            <option value="auto">Automatisch</option>
+            <option value="horizontal">Waagerecht</option>
+            <option value="vertical">Senkrecht</option>
+          </select>
+        </label>
+        <label className="toggle footer-toggle">
+          <input
+            type="checkbox"
+            checked={viewPrefs.lefty}
+            onChange={(e) => setLefty(e.target.checked)}
+          />
+          <span>Linkshänder</span>
+        </label>
         <label className="field field--inline">
           <span>Darstellung</span>
           <select value={theme} onChange={(e) => setTheme(e.target.value as ThemeChoice)}>

@@ -17,6 +17,25 @@
   mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
 }
 
+/* The same fade, on the other side: a mirrored neck continues to the left. */
+.fretboard-scroll--more-left {
+  mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent 100%);
+}
+
+/*
+ * Upright, the page scrolls down the neck and nothing scrolls sideways. Capped and
+ * centred, so a desktop that asks for the upright neck does not get one a metre
+ * tall.
+ */
+.fretboard-scroll--vertical {
+  overflow-x: visible;
+}
+
+.fretboard--vertical {
+  max-width: 26rem;
+  margin: 0 auto;
+}
+
 .fretboard-hint {
   margin-top: 0.35rem;
 }
@@ -233,6 +252,69 @@
 
 .note-label--picked {
   fill: var(--chord-text);
+}
+
+/*
+ * A chord tone the scale does not contain. Hollow and dashed: it is on the neck
+ * and it can be played, but it is visibly not one of the scale's own dots.
+ */
+.note-dot--ghost {
+  fill: color-mix(in srgb, var(--chord) 38%, var(--board));
+  stroke: var(--chord-stroke);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+
+.note-label--ghost {
+  fill: var(--chord-stroke);
+}
+
+/* The root of the picked chord: bigger (see the radius) and with a heavier rim. */
+.note-dot--chord-root {
+  stroke: var(--nut);
+  stroke-width: 3;
+}
+
+/*
+ * The tone a mode is recognised by. A dashed ring in the root's warm colour, so it
+ * reads as „this one matters" without competing with the root dot itself.
+ */
+.note-characteristic {
+  fill: none;
+  stroke: var(--root-stroke);
+  stroke-width: 2;
+  stroke-dasharray: 3 3;
+}
+
+.note-characteristic.is-dimmed {
+  opacity: var(--dimmed);
+}
+
+/* The CAGED grip as one hand shape, under the notes it stops. */
+.caged-shape {
+  fill: var(--chord);
+  stroke: var(--chord);
+  /* Rounded and padded past the dots, so it reads as an area under the hand. */
+  stroke-width: 40;
+  stroke-linejoin: round;
+  /* On the element, not on fill and stroke: those two would overlap at the edge
+     and draw a darker band there. One layer, composited once, is even. */
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+/* Where the keyboard cursor stands. */
+.neck-cursor {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  pointer-events: none;
+}
+
+.fretboard:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
 
 /* A scale tone this grip stops. */
