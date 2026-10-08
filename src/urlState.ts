@@ -362,31 +362,13 @@ export function writeState(state: AppState): string {
   return query === '' ? '' : `?${query}`;
 }
 
-/** Below this width the CSS switches to its phone layout (see App.css). */
-export const NARROW_VIEWPORT = 700;
-/** Even fifteen frets are more than a phone can hold at readable size; twelve fit. */
-export const NARROW_FRET_COUNT = 12;
-
 /**
- * What a device should start from: the URL, plus a device-appropriate value for
- * anything the URL did not spell out. Only the fret count qualifies today.
+ * Below this width the CSS switches to its phone layout (see App.css), and under
+ * „Automatisch" the neck stands upright (see useViewPrefs).
  *
- * Kept apart from readState so that stays a pure function of its string — a
- * property urlState.test.ts pins down in its very first assertion, and the reason
- * DEFAULT_STATE.fretCount stays at 15 no matter what device is asking.
- *
- * The seed does not create a hidden mode: writeState omits only DEFAULTS, so the
- * moment it applies, `frets=12` lands in the URL. A phone user's link is therefore
- * explicit and opens as twelve frets anywhere. A desktop link at 15 (unwritten)
- * opening on a phone as 12 is the correct reading of "the sender did not say".
+ * The neck no longer shrinks to twelve frets here. That seed existed because a
+ * lying neck at fifteen frets needed a swipe and still showed only five; upright,
+ * fifteen frets read at full size, and the seed only ever wrote `frets=12` into a
+ * link nobody asked it to touch.
  */
-export function initialState(search: string, viewportWidth: number): AppState {
-  const state = readState(search);
-
-  const urlIsSilentAboutFrets = new URLSearchParams(search).get('frets') === null;
-  if (urlIsSilentAboutFrets && viewportWidth > 0 && viewportWidth < NARROW_VIEWPORT) {
-    return { ...state, fretCount: NARROW_FRET_COUNT };
-  }
-
-  return state;
-}
+export const NARROW_VIEWPORT = 700;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { type AppState, initialState, writeState } from '../urlState';
+import { type AppState, readState, writeState } from '../urlState';
 
 export interface AppStateHandle {
   state: AppState;
@@ -17,12 +17,8 @@ export interface AppStateHandle {
  * a shared link restores the view exactly.
  */
 export function useAppState(): AppStateHandle {
-  // Seeded once, at mount: a phone starts on twelve frets unless the link says
-  // otherwise. Deliberately not repeated on resize — that would overrule a choice
-  // the user made, every time they rotate the device.
-  const [state, setState] = useState<AppState>(() =>
-    initialState(window.location.search, window.innerWidth),
-  );
+  // Read once, at mount: the URL is the whole state, on every device alike.
+  const [state, setState] = useState<AppState>(() => readState(window.location.search));
 
   // Replace rather than push, so the back button does not walk through every
   // twiddle of a dropdown.

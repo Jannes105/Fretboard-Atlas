@@ -102,3 +102,4 @@ export {
   type PlayablePosition,
 } from './pitch';
 export { transposeSymbol } from './transpose';
+export { chordIntervals } from './chordIntervals';

@@ -17,9 +17,12 @@ interface TransportDockProps {
  *
  * The marker that walks the neck while a progression plays is the app's best
  * idea — and on a laptop you could never watch it: the play button sat a whole
- * screen below the neck, so you saw either the control or the picture. The dock
- * appears whenever the real transport has scrolled out of sight, and only then,
- * so there are never two play buttons on screen at once.
+ * screen below the neck, so you saw either the control or the picture.
+ *
+ * It appears only while something is PLAYING and the real transport is out of
+ * sight. Shown whenever the transport was off-screen, it sat on a phone's neck the
+ * whole time — over the very notes you came to find — to offer a ▶ nobody had
+ * asked for. Its job is to stop what is running, and to say which chord it is on.
  */
 export function TransportDock({
   anchor,
@@ -41,7 +44,7 @@ export function TransportDock({
   }, [anchor, steps.length]);
 
   // Leave room at the foot of the page, so the dock never covers the last of it.
-  const shown = !anchorVisible && steps.length > 0;
+  const shown = isPlaying && !anchorVisible && steps.length > 0;
   useEffect(() => {
     document.body.classList.toggle('has-dock', shown);
     return () => document.body.classList.remove('has-dock');

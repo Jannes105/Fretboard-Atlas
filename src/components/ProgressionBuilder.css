@@ -26,12 +26,57 @@
   align-items: center;
   min-height: var(--tap);
   gap: 0.3rem;
-  padding: 0 0.2rem 0 0.7rem;
+  padding: 0 0.2rem;
   border-radius: var(--radius-round);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--text);
   font-weight: var(--weight-medium);
   font-size: var(--text-md);
+}
+
+/*
+ * The chord name is also the handle: press and drag it to a new place, or focus
+ * it and use the arrow keys. touch-action: none, or a finger dragging sideways
+ * would scroll the page instead of moving the chord.
+ */
+.builder-handle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: var(--tap);
+  padding: 0 0.35rem 0 0.4rem;
+  border: 0;
+  border-radius: var(--radius-round);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: grab;
+  touch-action: none;
+}
+
+.builder-grip {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1;
+}
+
+.builder-chip.is-dragging {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.builder-chip.is-dragging .builder-handle {
+  cursor: grabbing;
+}
+
+.builder-undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.4rem;
+  margin: -0.35rem 0 0.6rem;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
 }
 
 /* The bar count — click to cycle 1×→2×→3×→4×. Muted so a plain 1× is quiet. */

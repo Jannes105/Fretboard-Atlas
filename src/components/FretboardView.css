@@ -303,6 +303,29 @@
   pointer-events: none;
 }
 
+/*
+ * The very pitch you touched, wherever else it can be played. The same note in
+ * other octaves is picked out too, but without this ring — so the eye can tell
+ * "this C" from "every C".
+ */
+.note-unison {
+  fill: none;
+  stroke: var(--nut);
+  stroke-width: 2.5;
+}
+
+/*
+ * Upright on a phone the drawing renders only a little over 1:1, so the names
+ * get a size more — they are what you are reading the neck for.
+ */
+.fretboard--vertical .note-label {
+  font-size: 14.5px;
+}
+
+.fretboard--vertical .note-label--root {
+  font-size: 15.5px;
+}
+
 /* Where the keyboard cursor stands. */
 .neck-cursor {
   fill: none;

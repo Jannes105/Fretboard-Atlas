@@ -11,6 +11,7 @@ import {
 import {
   DOT_RADIUS,
   DOUBLE_INLAY_OFFSET,
+  INLAY_RADIUS,
   FRET_WIDTH,
   fretCenterX,
   neckLayout,
@@ -27,6 +28,9 @@ import './FretboardView.css';
 
 /** Show the note name on each dot, or its scale degree. */
 export type LabelMode = 'note' | 'degree';
+
+/** Which name a black key gets where no key decides it. */
+export type Spelling = 'sharp' | 'flat';
 
 /**
  * A chord picked out on the neck, beyond the bare pitch classes in `highlight`:
@@ -56,22 +60,34 @@ interface DrawnNote extends FretPosition {
   readonly isGhost?: boolean;
 }
 
+/** The one name a keyless dot shows: the reader's choice of ♯ or ♭. */
+function keylessName(pitchClass: number, spelling: Spelling): string {
+  const names = pitchClassNames(pitchClass);
+  return spelling === 'flat' && names.length > 1 ? names[1] : names[0];
+}
+
 function drawnNotes(
   fretboard: Fretboard,
   scale: Scale | null,
   labelMode: LabelMode,
+  spelling: Spelling,
 ): DrawnNote[] {
   if (scale === null) {
     /*
      * One name per dot. Both spellings on every black key („F♯ über G♭") were
      * correct — without a key neither is truer — but they turned five dots in
-     * twelve into 9-px print that nobody could read at a glance, on the very
-     * first screen. The sharp is what a guitarist reads off a neck chart; the
-     * other name is still on the title and in the accessible text.
+     * twelve into 9-px print that nobody could read at a glance. Which of the two
+     * is the reader's choice (♯ or ♭, see useViewPrefs); the other name is still
+     * on the title and in the accessible text.
      */
     return fretboard.allPositions().map((position) => {
       const names = pitchClassNames(position.pitchClass);
-      return { ...position, lines: [names[0]], spoken: names.join(' oder '), isRoot: false };
+      return {
+        ...position,
+        lines: [keylessName(position.pitchClass, spelling)],
+        spoken: names.join(' oder '),
+        isRoot: false,
+      };
     });
   }
 
@@ -122,6 +138,20 @@ interface FretboardViewProps {
    * and hand back the handle that ends it.
    */
   onHoldNote?: (midi: number) => { release(fade?: number): void };
+  /**
+   * A dot was touched (or chosen by keyboard). Separate from onHoldNote: that one
+   * is about SOUND and ends when the finger lifts; this one is about FINDING —
+   * the app answers by picking out every place that note lives on the neck.
+   */
+  onPickNote?: (position: FretPosition) => void;
+  /**
+   * The exact pitch that was touched. Every dot with this very pitch gets a ring;
+   * the same note in other octaves is picked out too, but without one — so „all
+   * the C's" and „this C, in all the places you can play it" read apart.
+   */
+  unisonMidi?: number | null;
+  /** ♯ or ♭ for black keys where no key spells them. */
+  spelling?: Spelling;
   /** Crop the drawing to the selected position instead of showing the whole neck. */
   zoom?: boolean;
   /** Positions sounding right now, as keys from positionKey. */
@@ -145,6 +175,9 @@ export function FretboardView({
   highlightLabel = null,
   chordTones = null,
   onHoldNote,
+  onPickNote,
+  unisonMidi = null,
+  spelling = 'sharp',
   zoom = false,
   sounding = null,
   caged = null,
@@ -154,7 +187,10 @@ export function FretboardView({
 }: FretboardViewProps) {
   const { fretCount, stringCount, capo, tuning } = fretboard;
 
-  const notes = useMemo(() => drawnNotes(fretboard, scale, labelMode), [fretboard, scale, labelMode]);
+  const notes = useMemo(
+    () => drawnNotes(fretboard, scale, labelMode, spelling),
+    [fretboard, scale, labelMode, spelling],
+  );
   const allPositions = useMemo(() => fretboard.allPositions(), [fretboard]);
   const inlays = fretboard.inlayFrets();
   const labels = tuning.stringLabels;
@@ -379,7 +415,10 @@ export function FretboardView({
       if (event.repeat || keyHold.current) return;
       const target = cursorPosition ?? allPositions.find((p) => p.stringIndex === 0 && p.fret === capo);
       if (!cursor) setCursor(start);
-      if (target) keyHold.current = onHoldNote(target.midi);
+      if (target) {
+        keyHold.current = onHoldNote(target.midi);
+        onPickNote?.(target);
+      }
     }
   };
 
@@ -445,6 +484,7 @@ export function FretboardView({
     const isCagedTone = caged?.frets[note.stringIndex] === note.fret;
     const isCharacteristic =
       characteristic !== null && note.pitchClass === characteristic && !note.isGhost;
+    const isUnison = unisonMidi !== null && note.midi === unisonMidi && !dimmed;
     const radius = big ? ROOT_RADIUS : DOT_RADIUS;
     const hit = R(noteX(note.fret) - FRET_WIDTH / 2, stringY(note.stringIndex, stringCount) - STRING_GAP / 2, FRET_WIDTH, STRING_GAP);
 
@@ -460,6 +500,7 @@ export function FretboardView({
             ? (event) => {
                 if (holds.current.has(event.pointerId)) return;
                 holds.current.set(event.pointerId, onHoldNote(note.midi));
+                onPickNote?.(note);
 
                 const target = event.currentTarget;
                 if (typeof target.setPointerCapture !== 'function') return;
@@ -498,6 +539,7 @@ export function FretboardView({
             r={radius + 5}
           />
         ) : null}
+        {isUnison ? <circle className="note-unison" cx={cx} cy={cy} r={radius + 5} /> : null}
         {/* The tap target: one fret by one string, so neighbours never overlap. */}
         {onHoldNote ? <rect className="note-hit" {...hit} /> : null}
         <circle className={classes} cx={cx} cy={cy} r={radius} />
@@ -601,13 +643,13 @@ export function FretboardView({
                 <g key={fret}>
                   {[-1, 1].map((side) => {
                     const [cx, cy] = P(fretCenterX(fret), inlayY + side * DOUBLE_INLAY_OFFSET);
-                    return <circle key={side} className="inlay" cx={cx} cy={cy} r={6} />;
+                    return <circle key={side} className="inlay" cx={cx} cy={cy} r={INLAY_RADIUS} />;
                   })}
                 </g>
               ) : (
                 (() => {
                   const [cx, cy] = P(fretCenterX(fret), inlayY);
-                  return <circle key={fret} className="inlay" cx={cx} cy={cy} r={6} />;
+                  return <circle key={fret} className="inlay" cx={cx} cy={cy} r={INLAY_RADIUS} />;
                 })()
               ),
             )}

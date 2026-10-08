@@ -1402,3 +1402,114 @@ describe('App — Neues aus dem UX-Review', () => {
     window.localStorage.removeItem('fretboard:view');
   });
 });
+
+describe('App — Noten finden', () => {
+  const openKeyless = () => {
+    window.history.replaceState(null, '', '/');
+    return render(<App />);
+  };
+
+  /** The dot drawn at one string and fret, by its position on the board. */
+  const dotAt = (container: HTMLElement, label: string, nth = 0) =>
+    [...container.querySelectorAll<SVGGElement>('.fretboard .note')].filter(
+      (g) => g.querySelector('.note-label')?.textContent === label,
+    )[nth];
+
+  it('hebt beim Antippen jede Stelle mit demselben Ton hervor', () => {
+    const { container } = openKeyless();
+
+    fireEvent.pointerDown(dotAt(container, 'C'), { pointerId: 1 });
+    fireEvent.pointerUp(dotAt(container, 'C'), { pointerId: 1 });
+
+    const picked = pickedLabels(container);
+    const board = new Fretboard(undefined, 15);
+    expect(picked).toHaveLength(board.allPositions().filter((p) => p.pitchClass === 0).length);
+    expect(new Set(picked)).toEqual(new Set(['C']));
+    // Und die Legende sagt, wie viele Stellen es sind.
+    expect(container.querySelector('.picked-note')?.textContent).toContain('Stellen');
+  });
+
+  it('umrandet nur die Stellen mit genau derselben Tonhöhe', () => {
+    const { container } = openKeyless();
+
+    // Das erste C ist das tiefste: A-Saite, 3. Bund (C3, MIDI 48).
+    fireEvent.pointerDown(dotAt(container, 'C'), { pointerId: 1 });
+
+    const rings = container.querySelectorAll('.note-unison').length;
+    expect(rings).toBeGreaterThan(0);
+    // Nicht jedes C hat dieselbe Tonhöhe — andere Oktaven bleiben ohne Ring.
+    expect(rings).toBeLessThan(pickedLabels(container).length);
+    expect(container.querySelector('.picked-note')?.textContent).toMatch(/C\d/);
+  });
+
+  it('wählt unter einer Tonart beim Antippen die passende Stufe', () => {
+    const { container } = render(<App />); // A-Dur
+
+    fireEvent.pointerDown(dotAt(container, 'E'), { pointerId: 1 });
+
+    const chips = [...container.querySelectorAll<HTMLButtonElement>('.degree-chip')];
+    expect(chips[4].getAttribute('aria-pressed')).toBe('true'); // E = 5. Stufe
+  });
+
+  it('lässt eine Akkord-Hervorhebung stehen, während man darüber spielt', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[0]);
+    fireEvent.pointerDown(dotAt(container, 'B'), { pointerId: 1 });
+
+    expect(container.querySelectorAll('.chord-card')[0].getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('schaltet die Schreibweise der schwarzen Tasten um', async () => {
+    const user = userEvent.setup();
+    window.localStorage.removeItem('fretboard:view');
+    const { container } = openKeyless();
+
+    const labels = () =>
+      new Set([...container.querySelectorAll('.note-label')].map((el) => el.textContent));
+    expect(labels().has('F♯')).toBe(true);
+
+    await user.click(container.querySelector<HTMLButtonElement>('[aria-label="Mit B (♭)"]')!);
+    expect(labels().has('G♭')).toBe(true);
+    expect(labels().has('F♯')).toBe(false);
+    window.localStorage.removeItem('fretboard:view');
+  });
+});
+
+describe('App — Eigene Folge bearbeiten', () => {
+  it('macht „Leeren" rückgängig', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?root=G&scale=major&prog=custom:G,D,Em,C');
+    const { container } = render(<App />);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.builder-clear')!);
+    expect(chipSymbols(container)).toEqual([]);
+
+    await user.click(container.querySelector<HTMLButtonElement>('.builder-undo .link-button')!);
+    expect(chipSymbols(container)).toEqual(['G', 'D', 'Em', 'C']);
+  });
+
+  it('bietet das Rückgängig nicht mehr an, wenn sich danach etwas anderes geändert hat', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?root=G&scale=major&prog=custom:G,D,Em,C');
+    const { container } = render(<App />);
+
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.builder-remove')[1]);
+    expect(container.querySelector('.builder-undo')).not.toBeNull();
+
+    // Ein „+" an einer Akkordkarte ändert die Folge — Rückgängig würde das mitnehmen.
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-add')[0]);
+    expect(container.querySelector('.builder-undo')).toBeNull();
+  });
+
+  it('verschiebt einen Akkord mit den Pfeiltasten', () => {
+    window.history.replaceState(null, '', '/?root=G&scale=major&prog=custom:G,D,Em,C');
+    const { container } = render(<App />);
+
+    const handles = container.querySelectorAll<HTMLButtonElement>('.builder-handle');
+    fireEvent.keyDown(handles[0], { key: 'ArrowRight' });
+
+    expect(chipSymbols(container)).toEqual(['D', 'G', 'Em', 'C']);
+  });
+});

@@ -5,7 +5,6 @@ import {
   customTuningId,
   customTuningNotes,
   DEFAULT_STATE,
-  initialState,
   readState,
   writeState,
 } from './urlState';
@@ -294,31 +293,11 @@ describe('writeState', () => {
   });
 });
 
-describe('initialState — Startwert je nach Geraet', () => {
-  it('startet auf einem schmalen Bildschirm mit zwoelf Buenden', () => {
-    expect(initialState('', 375).fretCount).toBe(12);
-  });
-
-  it('laesst breite Bildschirme beim Standardhals', () => {
-    expect(initialState('', 1280).fretCount).toBe(15);
-  });
-
-  it('laesst eine ausdrueckliche Angabe in der URL immer gewinnen', () => {
-    // Ein geteilter Link schlaegt den Geraetevorschlag — sonst zeigte er auf dem
-    // Handy etwas anderes als beim Absender.
-    expect(initialState('?frets=24', 375).fretCount).toBe(24);
-    expect(initialState('?frets=15', 375).fretCount).toBe(15);
-  });
-
-  it('aendert an allem uebrigen nichts', () => {
-    const { fretCount: _wide, ...wide } = initialState('?root=G', 1280);
-    const { fretCount: _narrow, ...narrow } = initialState('?root=G', 375);
-    expect(narrow).toEqual(wide);
-  });
-
-  it('schreibt den Geraetewert in die URL, statt ihn zu verstecken', () => {
-    // writeState laesst nur Defaults weg. Der Seed weicht vom Default ab, landet
-    // also im Link — der Zustand ist damit ausdruecklich, nie ein stiller Modus.
-    expect(writeState(initialState('', 375))).toContain('frets=12');
+describe('Gerätebreite', () => {
+  it('ändert nichts am Zustand — ein Handy liest denselben Link wie ein Desktop', () => {
+    // Früher setzte ein schmaler Bildschirm still zwölf Bünde und schrieb sie in
+    // den Link. Der Zustand ist jetzt allein die URL.
+    expect(readState('').fretCount).toBe(15);
+    expect(writeState(readState(''))).toBe('');
   });
 });

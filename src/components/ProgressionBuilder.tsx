@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type KeyboardEvent, type PointerEvent, useRef, useState } from 'react';
 import { Chord } from '../theory';
 import type { CustomStep } from '../urlState';
 import { NoteText } from './NoteText';
@@ -13,14 +13,48 @@ interface ProgressionBuilderProps {
   onChange: (steps: CustomStep[]) => void;
 }
 
+/** The sequence with one chord moved from one place to another. */
+function moved(steps: readonly CustomStep[], from: number, to: number): CustomStep[] {
+  const next = [...steps];
+  const [step] = next.splice(from, 1);
+  next.splice(to, 0, step);
+  return next;
+}
+
+const sameSteps = (a: readonly CustomStep[], b: readonly CustomStep[]) =>
+  a.length === b.length && a.every((step, i) => step.symbol === b[i].symbol && step.bars === b[i].bars);
+
 /**
- * The sequence itself: reorderable chips with their bar counts, plus a field for
- * anything the vocabulary knows (power chords, suspensions, slash chords). The
- * diatonic chords are added from their cards above — they are not drawn twice.
+ * The sequence itself: chips that can be dragged into a new order, with their bar
+ * counts, plus a field for anything the vocabulary knows (power chords,
+ * suspensions, slash chords). The diatonic chords are added from their cards
+ * above — they are not drawn twice.
  */
 export function ProgressionBuilder({ steps, onChange }: ProgressionBuilderProps) {
   const [typed, setTyped] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * The way back from a removal or „Leeren". Kept with the sequence it produced,
+   * and offered only while that is still what is on screen — once anything else
+   * has changed it (a „+" on a chord card, say), undoing would throw that away too.
+   */
+  const [undo, setUndo] = useState<{ before: CustomStep[]; after: CustomStep[]; what: string } | null>(
+    null,
+  );
+  const canUndo = undo !== null && sameSteps(undo.after, steps);
+
+  /**
+   * Which chip is being dragged, if any. Twice: the ref is what the pointer
+   * handlers read, because a quick flick sends its first move before React has
+   * re-rendered with the new state; the state is what the chip is drawn from.
+   */
+  const [dragging, setDraggingState] = useState<number | null>(null);
+  const dragRef = useRef<number | null>(null);
+  const setDragging = (index: number | null) => {
+    dragRef.current = index;
+    setDraggingState(index);
+  };
 
   const add = (symbol: string) => onChange([...steps, { symbol, bars: 1 }]);
 
@@ -37,15 +71,65 @@ export function ProgressionBuilder({ steps, onChange }: ProgressionBuilderProps)
     }
   };
 
-  const removeAt = (index: number) => onChange(steps.filter((_, i) => i !== index));
+  const destructive = (next: CustomStep[], what: string) => {
+    setUndo({ before: [...steps], after: next, what });
+    onChange(next);
+  };
+
+  const removeAt = (index: number) =>
+    destructive(
+      steps.filter((_, i) => i !== index),
+      `${steps[index].symbol} entfernt`,
+    );
 
   // Click cycles the bar count 1 → 2 → 3 → 4 → 1.
   const cycleBars = (index: number) =>
     onChange(
-      steps.map((step, i) =>
-        i === index ? { ...step, bars: (step.bars % MAX_BARS) + 1 } : step,
-      ),
+      steps.map((step, i) => (i === index ? { ...step, bars: (step.bars % MAX_BARS) + 1 } : step)),
     );
+
+  const moveTo = (from: number, to: number) => {
+    if (to < 0 || to >= steps.length || to === from) return;
+    onChange(moved(steps, from, to));
+  };
+
+  // ---- Dragging: pointer events, so a finger works as well as a mouse ----
+
+  const onHandleDown = (event: PointerEvent<HTMLButtonElement>, index: number) => {
+    setDragging(index);
+    try {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    } catch {
+      // No active pointer — the drag simply ends at the first move.
+    }
+  };
+
+  const onHandleMove = (event: PointerEvent<HTMLButtonElement>) => {
+    const from = dragRef.current;
+    if (from === null || typeof document.elementFromPoint !== 'function') return;
+    // Whichever chip is under the finger right now is where the dragged one goes.
+    const under = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>('.builder-chip');
+    const target = under ? Number(under.dataset.index) : NaN;
+    if (Number.isInteger(target) && target !== from) {
+      onChange(moved(steps, from, target));
+      setDragging(target);
+    }
+  };
+
+  const endDrag = () => setDragging(null);
+
+  // The same, by keyboard: arrows move the focused chord one place.
+  const onHandleKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveTo(index, index - 1);
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveTo(index, index + 1);
+    }
+  };
 
   return (
     <div className="builder">
@@ -54,8 +138,29 @@ export function ProgressionBuilder({ steps, onChange }: ProgressionBuilderProps)
           <span className="builder-empty">Noch leer — tippe Akkorde an oder gib welche ein.</span>
         ) : (
           steps.map((step, i) => (
-            <span key={`${step.symbol}#${i}`} className="builder-chip">
-              <NoteText name={step.symbol} />
+            <span
+              // eslint-disable-next-line react/no-array-index-key
+              key={`${step.symbol}#${i}`}
+              className={dragging === i ? 'builder-chip is-dragging' : 'builder-chip'}
+              data-index={i}
+            >
+              <button
+                type="button"
+                className="builder-handle"
+                aria-label={`${step.symbol} verschieben — ziehen oder Pfeiltasten`}
+                title="Ziehen zum Umsortieren"
+                onPointerDown={(event) => onHandleDown(event, i)}
+                onPointerMove={onHandleMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                onLostPointerCapture={endDrag}
+                onKeyDown={(event) => onHandleKey(event, i)}
+              >
+                <span className="builder-grip" aria-hidden="true">
+                  ⠿
+                </span>
+                <NoteText name={step.symbol} />
+              </button>
               <button
                 type="button"
                 className="builder-bars"
@@ -78,15 +183,33 @@ export function ProgressionBuilder({ steps, onChange }: ProgressionBuilderProps)
         )}
 
         {steps.length > 0 ? (
-          <button type="button" className="builder-clear" onClick={() => onChange([])}>
+          <button
+            type="button"
+            className="builder-clear"
+            onClick={() => destructive([], 'Folge geleert')}
+          >
             Leeren
           </button>
         ) : null}
       </div>
 
+      {canUndo ? (
+        <p className="builder-undo" role="status">
+          {undo.what}.{' '}
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => {
+              onChange(undo.before);
+              setUndo(null);
+            }}
+          >
+            Rückgängig
+          </button>
+        </p>
+      ) : null}
+
       <div className="builder-add">
-        {/* The seven diatonic chords are NOT repeated here — they already sit
-            above as cards, each with a "+" that appends. One set, not two. */}
         <form
           className="builder-type"
           onSubmit={(event) => {

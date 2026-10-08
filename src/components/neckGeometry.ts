@@ -31,10 +31,22 @@ export const ROOT_RADIUS = 16;
 /** A real neck is wider than the span of its strings. */
 export const BOARD_MARGIN = 18;
 /**
- * Vertical offset of the two dots on octave frets. A whole STRING_GAP would put
- * them right on a string, where the note dots hide them — 0.85 lands between.
+ * Offset of the two dots on octave frets from the single-dot line.
+ *
+ * A whole STRING_GAP. The single dot sits halfway between the 3rd and 4th string
+ * — the middle of six — so one gap further out is again halfway between two
+ * strings, in the clear between the note dots. The 0.85 this used to be came
+ * from the belief that a whole gap lands ON a string, which is only true for an
+ * odd number of them; at 0.85 the dots sat 15 units from a string and slid under
+ * the notes on it.
  */
-export const DOUBLE_INLAY_OFFSET = STRING_GAP * 0.85;
+export const DOUBLE_INLAY_OFFSET = STRING_GAP;
+
+/**
+ * Small enough to sit in the 15-unit gap between two note dots with room to
+ * spare, so a dot is never half-hidden under a note.
+ */
+export const INLAY_RADIUS = 5;
 
 /**
  * Room kept at the left edge of a cropped view for the string names. Without it a

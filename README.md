@@ -6,14 +6,20 @@ Akkorde und Griffe. Läuft komplett im Browser — kein Backend, keine API.
 Ein Atlas kartiert und lässt navigieren — genau das tut die App mit dem Hals.
 
 Offen wird zuerst die Karte selbst gezeigt: **jeder Ton auf dem Hals**, darunter
-drei Wege hinein („Eine Tonart erkunden", „Akkorde zu einem Song", „Den Hals
-kennenlernen") und ein paar Tonarten zum Antippen. Eine Tonart ist etwas, das man
+drei Wege hinein („Eine Tonart erkunden", „Akkorde zu einem Song", „Einen Ton
+finden") und ein paar Tonarten zum Antippen. Eine Tonart ist etwas, das man
 wählt — über den einen Knopf „Tonart wählen" — und erst mit ihr kommen Stufen,
 Lagen, Stufenakkorde und die Akkordfolge dazu.
 
-Die schwarzen Tasten tragen auf der offenen Karte nur noch **einen** Namen (den
-mit ♯). Beide Schreibweisen waren richtig, aber zweizeilige 9-px-Schrift auf dem
-allerersten Bildschirm; der zweite Name steht weiter im Titel jedes Punkts.
+Die schwarzen Tasten tragen auf der offenen Karte **einen** Namen — ♯ oder ♭, per
+Schalter neben dem Tonart-Knopf. Beide gleichzeitig waren richtig, aber
+zweizeilige 9-px-Schrift; der andere Name steht weiter im Titel jedes Punkts.
+
+**Ein Ton wird gefunden, indem man ihn antippt.** Er klingt, und jede Stelle mit
+demselben Ton leuchtet auf; die Stellen mit *genau derselben Tonhöhe* sind
+zusätzlich umrandet, damit „dieses C" von „jedem C" zu unterscheiden ist. Unter
+einer Tonart wählt das Antippen die passende Stufe. Während ein Akkord
+hervorgehoben ist, bleibt er stehen — man spielt dann über ihn.
 
 ## Bedienung in drei Ebenen
 
@@ -43,6 +49,11 @@ npm run build      # Typecheck + Produktions-Build nach dist/
 sich das Icon ändert — die PNGs liegen fertig im Repo.
 
 ## Aufbau
+
+`App.tsx` setzt nur zusammen. Was aus dem Zustand folgt, steckt in Hooks:
+`useNeckModel` (Tonart, Hals, Lagen, CAGED), `useProgression` (Folge und Griffe),
+`useHighlight` (was hervorgehoben ist), `useAudioPlayer`, `useScaleRun` und
+`useTransport`.
 
 Die Musiktheorie steckt vollständig in `src/theory/` und kennt weder React noch
 das DOM:
@@ -172,10 +183,11 @@ der Default und damit die leere URL. Ein unbekannter Skalenname landet ebenfalls
 dort statt in irgendeiner Tonart, nach der die URL nie gefragt hat: alle Töne zu
 zeigen ist die eine Antwort, die nicht falsch sein kann.
 
-**Ausnahmen: Darstellung (hell/dunkel), Linkshänder und Halsausrichtung liegen
-im `localStorage`** (`useTheme`, `useViewPrefs`). Auf dem Handy steht der Hals
-unter „Automatisch" senkrecht — dann passen alle zwölf Bünde lesbar auf den
-Schirm statt fünf und ein Wisch.
+**Ausnahmen: Darstellung (hell/dunkel), Linkshänder, Halsausrichtung und ♯/♭
+liegen im `localStorage`** (`useTheme`, `useViewPrefs`). Auf dem Handy steht der
+Hals unter „Automatisch" senkrecht — dann sind alle Bünde lesbar untereinander
+statt fünf und ein Wisch. Deshalb setzt ein schmaler Bildschirm auch keine
+12 Bünde mehr in die URL: ein Link liest sich auf jedem Gerät gleich.
 
 Für die Darstellung im Einzelnen: Genau
 das Argument für die URL spricht hier dagegen — ein Link soll die Musik

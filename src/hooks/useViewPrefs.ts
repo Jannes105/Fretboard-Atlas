@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { Spelling } from '../components/FretboardView';
 import { NARROW_VIEWPORT } from '../urlState';
 
 /** How the neck lies: across the page, down it, or whichever suits the screen. */
@@ -8,10 +9,12 @@ export interface ViewPrefs {
   /** Mirror the neck, nut on the right — a left-handed guitar seen from the front. */
   lefty: boolean;
   orientation: NeckOrientation;
+  /** ♯ or ♭ for black keys, where no key spells them. */
+  spelling: Spelling;
 }
 
 const STORAGE_KEY = 'fretboard:view';
-const DEFAULTS: ViewPrefs = { lefty: false, orientation: 'auto' };
+const DEFAULTS: ViewPrefs = { lefty: false, orientation: 'auto', spelling: 'sharp' };
 
 function read(): ViewPrefs {
   try {
@@ -24,6 +27,7 @@ function read(): ViewPrefs {
         parsed.orientation === 'horizontal' || parsed.orientation === 'vertical'
           ? parsed.orientation
           : 'auto',
+      spelling: parsed.spelling === 'flat' ? 'flat' : 'sharp',
     };
   } catch {
     return DEFAULTS;
@@ -78,5 +82,6 @@ export function useViewPrefs() {
     setLefty: (lefty: boolean) => setPrefs((previous) => ({ ...previous, lefty })),
     setOrientation: (orientation: NeckOrientation) =>
       setPrefs((previous) => ({ ...previous, orientation })),
+    setSpelling: (spelling: Spelling) => setPrefs((previous) => ({ ...previous, spelling })),
   };
 }
