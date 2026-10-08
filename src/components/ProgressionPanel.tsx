@@ -7,10 +7,11 @@ import type {
   SwingFeel,
   Voicing,
 } from '../theory';
-import { customProgId, type CustomStep, MAX_BPM, MIN_BPM } from '../urlState';
+import { type RefObject, useEffect, useRef, useState } from 'react';
+import { customProgId, type CustomStep, type GripPreference, MAX_BPM, MIN_BPM } from '../urlState';
 import { ProgressionBuilder } from './ProgressionBuilder';
 import { ProgressionChord } from './ProgressionChord';
-import { RhythmControls } from './RhythmControls';
+import { RhythmControls, type RhythmStyleSettings } from './RhythmControls';
 
 /**
  * The click track. 'Einzähler' counts you in and then leaves you to the guitar;
@@ -26,6 +27,11 @@ const CLICKS: readonly { value: ClickMode; label: string }[] = [
 interface ProgressionPanelProps {
   /** The presets that fit this key, plus "Eigene Folge". */
   progressions: readonly Progression[];
+  /**
+   * What each preset spells out in this key — "Am – F – C – G". Roman numerals are
+   * the theory behind a progression; the chord names are what a player recognises.
+   */
+  presetChords: ReadonlyMap<string, string>;
   preset: Progression | null;
   isCustom: boolean;
   customChordSteps: CustomStep[] | null;
@@ -59,6 +65,21 @@ interface ProgressionPanelProps {
   onFeelChange: (feel: SwingFeel) => void;
   onSustainChange: (sustain: NoteLength) => void;
   onClickChange: (click: ClickMode) => void;
+  onApplyStyle: (settings: RhythmStyleSettings) => void;
+
+  grips: GripPreference;
+  onGripsChange: (grips: GripPreference) => void;
+  /** Move the key — and the progression with it — by a semitone. */
+  onTranspose: (semitones: 1 | -1) => void;
+
+  /** The transport row, watched by the dock that stands in for it off-screen. */
+  transportRef: RefObject<HTMLDivElement | null>;
+  /**
+   * Bumped when a progression has just been adopted from elsewhere — the panel
+   * then scrolls into view, lights up and hands the focus to ▶, so the click that
+   * created it visibly lands somewhere.
+   */
+  revealSerial: number;
 }
 
 /**
@@ -68,6 +89,7 @@ interface ProgressionPanelProps {
  */
 export function ProgressionPanel({
   progressions,
+  presetChords,
   preset,
   isCustom,
   customChordSteps,
@@ -98,9 +120,35 @@ export function ProgressionPanel({
   onFeelChange,
   onSustainChange,
   onClickChange,
+  onApplyStyle,
+  grips,
+  onGripsChange,
+  onTranspose,
+  transportRef,
+  revealSerial,
 }: ProgressionPanelProps) {
+  const sectionRef = useRef<HTMLElement>(null);
+  const playRef = useRef<HTMLButtonElement>(null);
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    if (revealSerial === 0) return;
+    sectionRef.current?.scrollIntoView?.({
+      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start',
+    });
+    playRef.current?.focus({ preventScroll: true });
+    setRevealed(true);
+    const timer = window.setTimeout(() => setRevealed(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [revealSerial]);
+
   return (
-    <section className="panel">
+    <section
+      ref={sectionRef}
+      className={revealed ? 'panel progression-panel is-revealed' : 'panel progression-panel'}
+      aria-label="Akkordfolge"
+    >
       <div className="panel-head">
         <h2>Akkordfolge</h2>
         <select
@@ -118,7 +166,7 @@ export function ProgressionPanel({
         >
           {progressions.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name}
+              {presetChords.get(p.id) ?? p.name}
             </option>
           ))}
           <option value="custom">Eigene Folge</option>
@@ -130,12 +178,16 @@ export function ProgressionPanel({
           steps={customChordSteps ?? []}
           onChange={(next) => onProgressionIdChange(customProgId(next))}
         />
-      ) : preset?.hint ? (
-        <p className="hint">{preset.hint}</p>
-      ) : null}
+      ) : (
+        <p className="hint">
+          {preset ? <span className="roman-hint">{preset.name}</span> : null}
+          {preset?.hint ? ` — ${preset.hint}` : null}
+        </p>
+      )}
 
-      <div className="transport">
+      <div className="transport" ref={transportRef}>
         <button
+          ref={playRef}
           type="button"
           className={isPlaying ? 'play-button is-playing' : 'play-button'}
           onClick={onToggleTransport}
@@ -200,7 +252,29 @@ export function ProgressionPanel({
           onStrumChange={onStrumChange}
           onFeelChange={onFeelChange}
           onSustainChange={onSustainChange}
+          onApplyStyle={onApplyStyle}
         />
+      </div>
+
+      <div className="progression-tools">
+        <div className="segmented" role="group" aria-label="Griffe">
+          <button type="button" aria-pressed={grips === 'open'} onClick={() => onGripsChange('open')}>
+            Offene Griffe zuerst
+          </button>
+          <button type="button" aria-pressed={grips === 'near'} onClick={() => onGripsChange('near')}>
+            Kürzeste Wege
+          </button>
+        </div>
+
+        <div className="transpose" role="group" aria-label="Transponieren">
+          <span>Tonart</span>
+          <button type="button" onClick={() => onTranspose(-1)} aria-label="Einen Halbton tiefer">
+            −½
+          </button>
+          <button type="button" onClick={() => onTranspose(1)} aria-label="Einen Halbton höher">
+            +½
+          </button>
+        </div>
       </div>
 
       <ol className="progression">

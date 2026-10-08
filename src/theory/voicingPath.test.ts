@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Chord } from './Chord';
 import { buildProgression, PROGRESSIONS } from './Progression';
 import { defaultVoicingIndex, voicingsFor, type Voicing } from './ChordShape';
 import { Note } from './Note';
@@ -105,5 +106,37 @@ describe('voicingPath', () => {
   it('kommt mit einer leeren Folge klar', () => {
     expect(voicingPath([])).toEqual([]);
     expect(voicingPath([[], []])).toEqual([0, 0]);
+  });
+});
+
+describe('voicingPath mit Vorrang für offene Griffe', () => {
+  const CHORDS = (symbols: string[]) =>
+    symbols.map((symbol) => voicingsFor(Chord.parse(symbol), { tuning: Tuning.STANDARD }));
+
+  const picked = (symbols: string[]) => {
+    const lists = CHORDS(symbols);
+    return voicingPath(lists, { preferOpen: true }).map((index, i) => lists[i][index]);
+  };
+
+  it('spielt G – D – Em – C mit den vier Lagerfeuer-Griffen statt mit Barrés im 7. Bund', () => {
+    const grips = picked(['G', 'D', 'Em', 'C']);
+    expect(grips.map((v) => v.baseFret)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('greift Am – F – C – G am Sattel, das F als kleine Form oder Barré im 1. Bund', () => {
+    const grips = picked(['Am', 'F', 'C', 'G']);
+    expect(grips.map((v) => v.baseFret)).toEqual([0, 1, 0, 0]);
+  });
+
+  it('bleibt bei einer Folge, die nur oben gut liegt, trotzdem dort', () => {
+    // Keine dieser Akkorde hat einen offenen Griff; die Hand soll nicht springen.
+    const grips = picked(['Ab', 'Db', 'Eb', 'Ab']);
+    const positions = grips.map((v) => Math.min(...v.frets.filter((f) => f > 0)));
+    expect(Math.max(...positions) - Math.min(...positions)).toBeLessThanOrEqual(4);
+  });
+
+  it('ändert ohne die Option nichts am bisherigen Weg', () => {
+    const lists = CHORDS(['G', 'D', 'Em', 'C']);
+    expect(voicingPath(lists)).toEqual(voicingPath(lists, { preferOpen: false }));
   });
 });

@@ -3,6 +3,12 @@
 Sortiert nach Verhältnis von Nutzen zu Aufwand. Jeder Punkt nennt die Datei, an
 der er ansetzt.
 
+> **Stand 8. Oktober 2026:** zusätzlich erledigt sind **A3** (Charakterton je
+> Modus — Ring auf dem Hals, gestrichelter Chip und ein Satz, wogegen er den Modus
+> abgrenzt; Avoid Notes noch offen) und ein Teil von **A4**: die „kleine Form"
+> (Dur/Moll auf den oberen vier Saiten). Dazu aus dem UX-Review: offene Griffe am
+> Sattel, Transponieren, Linkshänder-Ansicht, senkrechter Hals auf dem Handy.
+>
 > **Stand 5. August 2026 — schon erledigt:** A2 (Nonakkorde), A5 (D Standard und
 > Drop C), B1 (Voice Leading), B4 (Swing — Sechzehntel noch nicht) und **der
 > ganze Abschnitt C**: C1 (Tone Stack), C2 (Amp-Archetypen), C3 (Reverb), C4
@@ -47,7 +53,7 @@ aber weiterhin handbreit); ohne sie fand ein Fünfklang auf sechs Saiten nichts.
 7sus4, 6/9). Bei 11 über Dur fliegt die Terz statt der Quinte — `droppableTones`
 in `voicingSearch.ts` ist die Stelle dafür.
 
-### A3 — Charakteristischer Ton und Avoid Note pro Modus
+### A3 — Charakteristischer Ton und Avoid Note pro Modus — **[erledigt für den Charakterton]**
 `ScaleType.ts` (zwei optionale Felder), `FretboardView.tsx` (Darstellung).
 
 Der eine Ton, der Dorisch von Äolisch unterscheidet, hervorgehoben. Didaktisch

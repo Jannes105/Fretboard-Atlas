@@ -18,6 +18,8 @@ export {
   MAJOR_PENTATONIC,
   MINOR_PENTATONIC,
   BLUES,
+  characteristicTone,
+  type CharacteristicTone,
   type ScaleType,
   type ScaleGroup,
 } from './ScaleType';
@@ -43,7 +45,7 @@ export {
   type VoicingOptions,
 } from './ChordShape';
 export { generateVoicings, gripCost } from './voicingSearch';
-export { voicingPath } from './voicingPath';
+export { voicingPath, type VoicingPathOptions } from './voicingPath';
 export {
   CAGED_ORDER,
   CAGED_SHAPES,
@@ -99,3 +101,4 @@ export {
   type ScaleSequenceOptions,
   type PlayablePosition,
 } from './pitch';
+export { transposeSymbol } from './transpose';

@@ -5,10 +5,29 @@ Akkorde und Griffe. Läuft komplett im Browser — kein Backend, keine API.
 
 Ein Atlas kartiert und lässt navigieren — genau das tut die App mit dem Hals.
 
-Offen wird zuerst die Karte selbst gezeigt: **jeder Ton auf dem Hals**, die
-schwarzen Tasten mit beiden Schreibweisen, weil ohne Tonart keine von beiden
-richtiger ist. Eine Tonart ist etwas, das man wählt — und erst mit ihr kommen
-Stufen, Lagen, Stufenakkorde und die Akkordfolge dazu.
+Offen wird zuerst die Karte selbst gezeigt: **jeder Ton auf dem Hals**, darunter
+drei Wege hinein („Eine Tonart erkunden", „Akkorde zu einem Song", „Den Hals
+kennenlernen") und ein paar Tonarten zum Antippen. Eine Tonart ist etwas, das man
+wählt — über den einen Knopf „Tonart wählen" — und erst mit ihr kommen Stufen,
+Lagen, Stufenakkorde und die Akkordfolge dazu.
+
+Die schwarzen Tasten tragen auf der offenen Karte nur noch **einen** Namen (den
+mit ♯). Beide Schreibweisen waren richtig, aber zweizeilige 9-px-Schrift auf dem
+allerersten Bildschirm; der zweite Name steht weiter im Titel jedes Punkts.
+
+## Bedienung in drei Ebenen
+
+Die Oberfläche ist nach Häufigkeit geordnet, nicht nach Vollständigkeit:
+
+1. **Immer sichtbar:** Tonart-Knopf, Hals, Lagen (1 Tipp je Lage), Stufen-Chips,
+   Stufenakkorde, Akkordfolge, ▶.
+2. **Ein Klick:** „Ansicht" (Notennamen/Stufen, Lagen-Ausschnitt, CAGED),
+   Griffwahl je Akkord, Rhythmus-Stile, Klang-Voreinstellungen.
+3. **Für Fortgeschrittene, eingeklappt:** Stimmung, Kapo, Bünde, Verstärker,
+   Tonabnehmer, EQ, Hall, Delay, Taktart, Schlagmuster, Groove.
+
+Faustregel für Neues: *Hilft es, den Hals zu verstehen? Ebene 1–2. Klingt es nur
+schöner? Ebene 3.*
 
 ## Entwicklung
 
@@ -38,6 +57,7 @@ das DOM:
 | `Chord.ts` | Leitereigene Akkorde durch Terzschichtung |
 | `ChordShape.ts` | Greifbare Akkordformen je Stimmung |
 | `voicingPath.ts` | Ein Griff je Akkord — als Folge, nicht einzeln |
+| `transpose.ts` | Akkordsymbole in eine andere Tonart verschieben, richtig buchstabiert |
 | `Progression.ts` | Gängige Akkordfolgen |
 | `format.ts` | Namen für die Anzeige: `#`/`b` werden zu ♯/♭ |
 
@@ -74,6 +94,17 @@ Tonarten sank die Handbewegung von 240 auf 128 Bünde.
 Das Gewicht der Bequemlichkeit gegen den Weg ist gemessen und nicht geraten — bei
 vollem Gewicht wandert die Hand zehn Bünde weit für eine offene Saite, und der
 12-Takt-Blues in A wurde damit schlechter statt besser.
+
+**Der kürzeste Weg allein war aber blind dafür, *wo* die Hand ist.** G – D – Em – C
+kam als vier Barrés zwischen dem 7. und 10. Bund heraus: ein kurzer Weg, den kein
+Anfänger greifen kann. Zwei Dinge haben das behoben. Erstens kennt
+`ChordShape.ts` jetzt die offenen Griffe, die jeder zuerst lernt (C, G, D, Dm, D7,
+G7, B7, Cmaj7 …) — als `openOnly`-Formen, die nur am Sattel platziert werden und
+deshalb nie als unspielbare Streckgriffe den Hals hinaufwandern — und die „kleine
+Form" auf den oberen vier Saiten, mit der fast jeder das F zuerst spielt. Zweitens
+zieht `voicingPath` mit `preferOpen` jeden Akkord leicht zum Sattel
+(`NUT_PULL`). Das ist die Vorgabe („Offene Griffe zuerst"); „Kürzeste Wege"
+schaltet den Zug ab.
 
 Eine Lage ("Box") ist übrigens nichts anderes als ein **Fünf-Bund-Fenster**. Die
 berühmte Box 1 der A-Moll-Pentatonik ist exakt "alle Skalentöne zwischen Bund 4
@@ -141,7 +172,12 @@ der Default und damit die leere URL. Ein unbekannter Skalenname landet ebenfalls
 dort statt in irgendeiner Tonart, nach der die URL nie gefragt hat: alle Töne zu
 zeigen ist die eine Antwort, die nicht falsch sein kann.
 
-**Eine Ausnahme: die Darstellung (hell/dunkel) liegt im `localStorage`.** Genau
+**Ausnahmen: Darstellung (hell/dunkel), Linkshänder und Halsausrichtung liegen
+im `localStorage`** (`useTheme`, `useViewPrefs`). Auf dem Handy steht der Hals
+unter „Automatisch" senkrecht — dann passen alle zwölf Bünde lesbar auf den
+Schirm statt fünf und ein Wisch.
+
+Für die Darstellung im Einzelnen: Genau
 das Argument für die URL spricht hier dagegen — ein Link soll die Musik
 transportieren, nicht die Augen des Absenders. `?theme=dark` würde dem Empfänger
 im Sonnenlicht eine fremde Vorliebe aufzwingen. Jedes Feld in `AppState`

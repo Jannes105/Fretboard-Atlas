@@ -1,0 +1,197 @@
+.key-picker {
+  position: relative;
+}
+
+/*
+ * The key is still the headline of the page — but now it LOOKS like what it is:
+ * a button. A border, a caret and a hover state, at headline size. The dashed
+ * underline it had before said „editable" only to someone who already knew.
+ */
+.key-trigger {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-height: var(--tap);
+  padding: 0.3rem 0.85rem 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--border-control));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.key-trigger:hover,
+.key-trigger.is-open {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+}
+
+.key-trigger-root {
+  color: var(--accent-text);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  line-height: 1;
+}
+
+.key-trigger-type {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.015em;
+}
+
+.key-trigger .trigger-caret {
+  align-self: center;
+  color: var(--text-muted);
+}
+
+.key-trigger.is-open .trigger-caret {
+  transform: rotate(180deg);
+}
+
+/* The rest comes from .popover. */
+.key-panel {
+  left: 0;
+  width: min(25rem, calc(100vw - 2rem));
+}
+
+.key-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  padding: 2px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--panel-sunken);
+}
+
+.key-tabs button {
+  flex: 1;
+  min-height: var(--tap);
+  padding: 0 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.key-tabs button[aria-selected='true'] {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: var(--weight-medium);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+}
+
+.key-section {
+  margin: 0.25rem 0 0.4rem;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+/* Six by two: the twelve roots in chromatic order, the way the neck counts frets. */
+.root-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+}
+
+.root-option,
+.key-option {
+  min-height: var(--tap);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.root-option {
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+.key-option {
+  padding: 0.35rem 0.6rem;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.root-option:hover,
+.key-option:hover {
+  border-color: var(--accent);
+}
+
+.root-option[aria-pressed='true'],
+.key-option[aria-pressed='true'] {
+  border-color: var(--accent-text);
+  /* The darker accent: light text on the plain one fails contrast in light mode. */
+  background: var(--accent-text);
+  color: var(--bg);
+  font-weight: var(--weight-medium);
+}
+
+.scale-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.3rem;
+}
+
+.more-scales {
+  margin-top: 0.75rem;
+}
+
+.key-panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.key-done {
+  min-height: var(--tap);
+  padding: 0 1.1rem;
+  border: 1px solid var(--accent-text);
+  border-radius: var(--radius-md);
+  background: var(--accent-text);
+  color: var(--bg);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .key-trigger-root {
+    font-size: var(--text-2xl);
+  }
+
+  .key-trigger-type {
+    font-size: var(--text-lg);
+  }
+
+  /* The trigger can sit mid-row; anchor to the key row instead, which starts at
+     the page margin — so the panel's width cannot carry it off the right edge. */
+  .key-picker {
+    position: static;
+  }
+
+  .scale-title {
+    position: relative;
+  }
+}

@@ -28,6 +28,13 @@ export interface ChordShape {
    * down, so a root fretted there sits two frets higher than the rest of the shape.
    */
   readonly frets: readonly number[];
+  /**
+   * Only ever placed at the nut. The open C, G and D grips are what every beginner
+   * learns first — and slid up the neck they turn into stretches nobody plays, which
+   * is the reason caged.ts gives for keeping them out of here. Pinned to fret 0
+   * they are exactly the chords people mean, and nothing else.
+   */
+  readonly openOnly?: boolean;
 }
 
 export interface ShapeSet {
@@ -71,6 +78,31 @@ const STANDARD_SHAPES: readonly ChordShape[] = [
   { qualityId: 'sus4', name: 'A-Form', rootString: 1, frets: [-1, 0, 2, 2, 3, 0] },
   // sus2 has no comfortable root-on-low-E grip, so it lives on the A-form only.
   { qualityId: 'sus2', name: 'A-Form', rootString: 1, frets: [-1, 0, 2, 2, 0, 0] },
+
+  /*
+   * The small grip on the top four strings — root on the D string. It is the top
+   * half of the E-form, and it is how nearly everyone plays F before the full
+   * barre works: two strings under the index finger instead of six.
+   */
+  { qualityId: 'major', name: 'Kleine Form', rootString: 2, frets: [-1, -1, 2, 1, 0, 0] },
+  { qualityId: 'minor', name: 'Kleine Form', rootString: 2, frets: [-1, -1, 2, 0, 0, 0] },
+
+  // The open chords, at the nut only (see openOnly). Read off the chord charts.
+  // C: x32010, Cmaj7: x32000, B7: x21202. The open C7 (x32310) is left out: it
+  // drops the fifth, and every grip here has to sound the whole chord.
+  { qualityId: 'major', name: 'C-Form', rootString: 1, frets: [-1, 3, 2, 0, 1, 0], openOnly: true },
+  { qualityId: 'major7', name: 'C-Form', rootString: 1, frets: [-1, 3, 2, 0, 0, 0], openOnly: true },
+  { qualityId: 'dominant7', name: 'B7-Form', rootString: 1, frets: [-1, 2, 1, 2, 0, 2], openOnly: true },
+  // G: 320003, G7: 320001, Gmaj7: 320002
+  { qualityId: 'major', name: 'G-Form', rootString: 0, frets: [3, 2, 0, 0, 0, 3], openOnly: true },
+  { qualityId: 'dominant7', name: 'G-Form', rootString: 0, frets: [3, 2, 0, 0, 0, 1], openOnly: true },
+  { qualityId: 'major7', name: 'G-Form', rootString: 0, frets: [3, 2, 0, 0, 0, 2], openOnly: true },
+  // D: xx0232, Dm: xx0231, D7: xx0212, Dm7: xx0211, Dmaj7: xx0222
+  { qualityId: 'major', name: 'D-Form', rootString: 2, frets: [-1, -1, 0, 2, 3, 2], openOnly: true },
+  { qualityId: 'minor', name: 'D-Form', rootString: 2, frets: [-1, -1, 0, 2, 3, 1], openOnly: true },
+  { qualityId: 'dominant7', name: 'D-Form', rootString: 2, frets: [-1, -1, 0, 2, 1, 2], openOnly: true },
+  { qualityId: 'minor7', name: 'D-Form', rootString: 2, frets: [-1, -1, 0, 2, 1, 1], openOnly: true },
+  { qualityId: 'major7', name: 'D-Form', rootString: 2, frets: [-1, -1, 0, 2, 2, 2], openOnly: true },
 ];
 
 /**
@@ -195,8 +227,13 @@ function namedVoicings(chord: Chord, tuning: Tuning, maxFret: number): Voicing[]
     const rootFret = firstFretFor(tuning, shape.rootString, chord.root.pitchClass);
     const lowestPosition = mod(rootFret - shape.frets[shape.rootString], 12);
 
+    // An open chord exists only where its root lands on the open position.
+    if (shape.openOnly && lowestPosition !== 0) continue;
+
     // The same shape repeats an octave — 12 frets — higher up the neck.
     for (let baseFret = lowestPosition; baseFret <= maxFret; baseFret += 12) {
+      if (shape.openOnly && baseFret !== 0) break;
+
       const frets = shape.frets.map((relative) => (relative < 0 ? -1 : baseFret + relative));
 
       if (Math.max(...frets) > maxFret) break;

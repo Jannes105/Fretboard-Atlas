@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import type { Timbre } from '../audio';
+import { usePopover } from '../hooks/usePopover';
 import { pitchClassName, Tuning, withAccidentals } from '../theory';
 import { customTuningId, MAX_CAPO } from '../urlState';
 
@@ -14,15 +13,13 @@ interface SetupPanelProps {
   isCustomTuning: boolean;
   capo: number;
   fretCount: number;
-  sound: Timbre;
   onTuningIdChange: (tuningId: string) => void;
   onCapoChange: (capo: number) => void;
   onFretCountChange: (fretCount: number) => void;
-  onSoundChange: (sound: Timbre) => void;
 }
 
 /**
- * The instrument itself — tuning, capo, fret count, voice. All of it is set once
+ * The instrument itself — tuning, capo, fret count. All of it is set once
  * and then left alone, so it lives behind a trigger rather than four dropdowns
  * competing with the key for attention.
  *
@@ -38,32 +35,11 @@ export function SetupPanel({
   isCustomTuning,
   capo,
   fretCount,
-  sound,
   onTuningIdChange,
   onCapoChange,
   onFretCountChange,
-  onSoundChange,
 }: SetupPanelProps) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  const { open, toggle, containerRef } = usePopover();
 
   // A custom tuning shows its notes; a preset just its name. A capo only earns a
   // mention when there is one — the normal case is no capo.
@@ -87,7 +63,7 @@ export function SetupPanel({
         type="button"
         className={open ? 'trigger setup-trigger is-open' : 'trigger setup-trigger'}
         aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onClick={toggle}
       >
         <svg className="trigger-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
           <circle cx="8" cy="8" r="2.4" />
@@ -175,17 +151,6 @@ export function SetupPanel({
             </select>
           </label>
 
-          {/* Clean or driven stays here because it decides whether there IS an
-              amplifier at all; everything downstream of that answer — which
-              amplifier, its tone controls, the pickup, the room — lives in the
-              „Klang" drawer next door. */}
-          <label className="field">
-            <span>Klang</span>
-            <select value={sound} onChange={(e) => onSoundChange(e.target.value as Timbre)}>
-              <option value="clean">Clean</option>
-              <option value="electric">Overdrive</option>
-            </select>
-          </label>
         </div>
       ) : null}
     </div>

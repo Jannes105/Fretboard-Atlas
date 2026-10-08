@@ -388,3 +388,139 @@ describe('FretboardView — Hinweis unter dem Hals', () => {
     expect(container.querySelector('.fretboard-scroll--more')).toBeNull();
   });
 });
+
+describe('FretboardView — Lage des Halses', () => {
+  const firstDot = (container: HTMLElement) => {
+    const nut = container.querySelector('.nut')!;
+    return {
+      nutX: Number(nut.getAttribute('x1')),
+      nutY: Number(nut.getAttribute('y1')),
+      viewBox: container.querySelector('svg.fretboard')!.getAttribute('viewBox')!.split(' ').map(Number),
+    };
+  };
+
+  it('legt den Hals aufrecht: der Sattel liegt quer oben', () => {
+    const { container } = render(
+      <FretboardView scale={aMajor} fretboard={board} labelMode="note" vertical />,
+    );
+    const nut = container.querySelector('.nut')!;
+    // Quer: beide Enden auf derselben Höhe.
+    expect(nut.getAttribute('y1')).toBe(nut.getAttribute('y2'));
+    const { viewBox } = firstDot(container);
+    // Höher als breit — ein aufrechter Hals.
+    expect(viewBox[3]).toBeGreaterThan(viewBox[2]);
+  });
+
+  it('spiegelt den Hals für Linkshänder: der Sattel steht rechts', () => {
+    const right = render(<FretboardView scale={aMajor} fretboard={board} labelMode="note" />);
+    const rightNut = firstDot(right.container).nutX;
+    right.unmount();
+
+    const left = render(<FretboardView scale={aMajor} fretboard={board} labelMode="note" lefty />);
+    const { nutX, viewBox } = firstDot(left.container);
+    expect(nutX).toBeGreaterThan(viewBox[0] + viewBox[2] / 2);
+    expect(rightNut).toBeLessThan(viewBox[2] / 2);
+  });
+
+  it('zeichnet in jeder Lage gleich viele Punkte — nur an anderer Stelle', () => {
+    const counts = [false, true].flatMap((vertical) =>
+      [false, true].map((lefty) => {
+        const { container, unmount } = render(
+          <FretboardView scale={aMajor} fretboard={board} labelMode="note" vertical={vertical} lefty={lefty} />,
+        );
+        const n = dots(container).length;
+        unmount();
+        return n;
+      }),
+    );
+    expect(new Set(counts).size).toBe(1);
+  });
+});
+
+describe('FretboardView — Akkordtöne außerhalb der Skala', () => {
+  // F-Dur in A-Moll-Pentatonik: A und C liegen in der Skala, F nicht.
+  const f = Note.parse('F').pitchClass;
+  const a = Note.parse('A').pitchClass;
+  const c = Note.parse('C').pitchClass;
+  const chordTones = {
+    root: f,
+    names: new Map([
+      [f, 'F'],
+      [a, 'A'],
+      [c, 'C'],
+    ]),
+    intervals: new Map([
+      [f, '1'],
+      [a, '3'],
+      [c, '5'],
+    ]),
+  };
+
+  it('zeichnet den fehlenden Ton hohl, statt den Akkord zum Zweiklang zu machen', () => {
+    const { container } = render(
+      <FretboardView
+        scale={aMinorPentatonic}
+        fretboard={board}
+        labelMode="note"
+        highlight={[f, a, c]}
+        chordTones={chordTones}
+      />,
+    );
+    const ghosts = container.querySelectorAll('.note-dot--ghost');
+    const fPositions = board.allPositions().filter((p) => p.pitchClass === f).length;
+    expect(ghosts).toHaveLength(fPositions);
+    // Die Skala selbst bleibt unberührt: ein Punkt je Skalenposition.
+    expect(container.querySelectorAll('.note-dot:not(.note-dot--ghost)')).toHaveLength(
+      board.mapScale(aMinorPentatonic).length,
+    );
+  });
+
+  it('beschriftet im Stufen-Modus vom Akkordgrundton aus', () => {
+    const { container } = render(
+      <FretboardView
+        scale={aMinorPentatonic}
+        fretboard={board}
+        labelMode="degree"
+        highlight={[f, a, c]}
+        chordTones={chordTones}
+      />,
+    );
+    const picked = new Set(
+      [...container.querySelectorAll('.note-label--picked')].map((el) => el.textContent),
+    );
+    // A ist die Terz von F, C die Quinte — nicht „1" und „b3" der Tonart A-Moll.
+    expect(picked).toEqual(new Set(['3', '5']));
+  });
+});
+
+describe('FretboardView — Tastatur', () => {
+  it('wandert mit den Pfeiltasten und spielt mit der Leertaste', () => {
+    const release = vi.fn();
+    const onHoldNote = vi.fn(() => ({ release }));
+    const { container } = render(
+      <FretboardView scale={aMajor} fretboard={board} labelMode="note" onHoldNote={onHoldNote} />,
+    );
+    const svg = container.querySelector('svg.fretboard')!;
+
+    fireEvent.focus(svg);
+    // Vom leeren tiefen E zwei Bünde nach rechts: F#.
+    fireEvent.keyDown(svg, { key: 'ArrowRight' });
+    fireEvent.keyDown(svg, { key: 'ArrowRight' });
+    fireEvent.keyDown(svg, { key: ' ' });
+
+    expect(onHoldNote).toHaveBeenCalledWith(40 + 2);
+    fireEvent.keyUp(svg, { key: ' ' });
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('sagt an, wo der Cursor steht', () => {
+    const { container } = render(
+      <FretboardView scale={aMajor} fretboard={board} labelMode="note" onHoldNote={() => ({ release() {} })} />,
+    );
+    const svg = container.querySelector('svg.fretboard')!;
+    fireEvent.focus(svg);
+    fireEvent.keyDown(svg, { key: 'ArrowRight' });
+
+    expect(container.querySelector('[aria-live]')?.textContent).toContain('1. Bund');
+  });
+});

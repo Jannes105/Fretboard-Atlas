@@ -179,3 +179,36 @@ export function degreeLabel(type: ScaleType, index: number): string {
   const accidental = alter === 0 ? '' : alter > 0 ? '#'.repeat(alter) : 'b'.repeat(-alter);
   return `${accidental}${step + 1}`;
 }
+
+/** The one tone that gives a scale its colour, and what it sets it apart from. */
+export interface CharacteristicTone {
+  /** Index into the scale's notes. */
+  readonly index: number;
+  /** One sentence: what this tone does, against which neighbour. */
+  readonly why: string;
+}
+
+/**
+ * The tone a mode is recognised by.
+ *
+ * Modes are hard exactly because six of their seven tones are the same as the
+ * neighbour's — Dorian IS natural minor, but for one note. Point at that note and
+ * the mode becomes audible; leave it unmarked and the neck shows two pictures
+ * nobody can tell apart. Major and the pentatonics are the reference everything
+ * else is measured against, so they have none.
+ */
+const CHARACTERISTIC_TONES: Readonly<Record<string, CharacteristicTone>> = {
+  'natural-minor': { index: 5, why: 'die kleine Sexte — sie macht Moll dunkler als Dorisch' },
+  dorian: { index: 5, why: 'die große Sexte — sie unterscheidet Dorisch von Moll' },
+  phrygian: { index: 1, why: 'die kleine Sekunde — sie unterscheidet Phrygisch von Moll' },
+  lydian: { index: 3, why: 'die übermäßige Quarte — sie unterscheidet Lydisch von Dur' },
+  mixolydian: { index: 6, why: 'die kleine Septime — sie unterscheidet Mixolydisch von Dur' },
+  locrian: { index: 4, why: 'die verminderte Quinte — sie unterscheidet Lokrisch von Phrygisch' },
+  'harmonic-minor': { index: 6, why: 'die große Septime, der Leitton — sie unterscheidet Harmonisch Moll von Moll' },
+  'melodic-minor': { index: 6, why: 'die große Septime — zusammen mit der großen Sexte unterscheidet sie Melodisch Moll von Moll' },
+  blues: { index: 3, why: 'die Blue Note — der Ton zwischen Quarte und Quinte' },
+};
+
+export function characteristicTone(type: ScaleType): CharacteristicTone | null {
+  return CHARACTERISTIC_TONES[type.id] ?? null;
+}
