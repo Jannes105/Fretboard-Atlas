@@ -176,6 +176,16 @@
   font-family: 'Segoe UI Symbol', 'Apple Symbols', 'Noto Music', 'Noto Sans Symbols 2', sans-serif;
 }
 
+/*
+ * On the neck the sign is half the name: F and F♯ are different notes, and the
+ * page's 0.78em left it six pixels wide. Full size here, and bold enough to hold
+ * its own next to the letter.
+ */
+.fretboard .accidental {
+  font-size: 1.05em;
+  font-weight: var(--weight-bold);
+}
+
 /* ---------- Notes ---------- */
 
 .note-dot,
@@ -208,6 +218,16 @@
   stroke-width: 2;
 }
 
+/* A black key on the keyless map. Before .note-dot--picked, which must win. */
+.note-dot--black {
+  fill: var(--note-black);
+  stroke: var(--note-black-stroke);
+}
+
+.note-label--black {
+  fill: var(--note-black-text);
+}
+
 /* The tones you asked about — a chord, or a single degree. */
 .note-dot--picked {
   fill: var(--chord);
@@ -218,6 +238,11 @@
 /* Outside the selected box, or not among the picked tones. */
 .is-dimmed {
   opacity: var(--dimmed);
+}
+
+/* Picked, but outside the selected position: found, a step quieter. */
+.is-faint {
+  opacity: var(--faint);
 }
 
 /*

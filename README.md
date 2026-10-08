@@ -17,7 +17,10 @@ zweizeilige 9-px-Schrift; der andere Name steht weiter im Titel jedes Punkts.
 
 **Ein Ton wird gefunden, indem man ihn antippt.** Er klingt, und jede Stelle mit
 demselben Ton leuchtet auf; die Stellen mit *genau derselben Tonhöhe* sind
-zusätzlich umrandet, damit „dieses C" von „jedem C" zu unterscheiden ist. Unter
+zusätzlich umrandet, damit „dieses C" von „jedem C" zu unterscheiden ist. Derselbe Ton
+noch einmal angetippt hebt das wieder auf; mit gewählter Lage bleiben die Treffer
+außerhalb sichtbar, nur etwas leiser. Auf der Karte ohne Tonart sind die
+schwarzen Tasten dunkler gezeichnet, wie auf einer Klaviatur. Unter
 einer Tonart wählt das Antippen die passende Stufe. Während ein Akkord
 hervorgehoben ist, bleibt er stehen — man spielt dann über ihn.
 

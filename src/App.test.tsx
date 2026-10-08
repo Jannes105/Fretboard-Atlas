@@ -1513,3 +1513,58 @@ describe('App — Eigene Folge bearbeiten', () => {
     expect(chipSymbols(container)).toEqual(['D', 'G', 'Em', 'C']);
   });
 });
+
+describe('App — Noten finden, zweiter Durchgang', () => {
+  const dotAt = (container: HTMLElement, label: string, nth = 0) =>
+    [...container.querySelectorAll<SVGGElement>('.fretboard .note')].filter(
+      (g) => g.querySelector('.note-label')?.textContent === label,
+    )[nth];
+
+  it('hebt die Hervorhebung auf, wenn man denselben Ton noch einmal antippt', () => {
+    window.history.replaceState(null, '', '/');
+    const { container } = render(<App />);
+
+    fireEvent.pointerDown(dotAt(container, 'C'), { pointerId: 1 });
+    expect(pickedLabels(container).length).toBeGreaterThan(0);
+
+    // Ein anderes C — derselbe Ton, eine andere Stelle.
+    fireEvent.pointerDown(dotAt(container, 'C', 2), { pointerId: 2 });
+    expect(pickedLabels(container)).toHaveLength(0);
+  });
+
+  it('wechselt bei einem anderen Ton direkt zu diesem', () => {
+    window.history.replaceState(null, '', '/');
+    const { container } = render(<App />);
+
+    fireEvent.pointerDown(dotAt(container, 'C'), { pointerId: 1 });
+    fireEvent.pointerDown(dotAt(container, 'G'), { pointerId: 2 });
+    expect(new Set(pickedLabels(container))).toEqual(new Set(['G']));
+  });
+
+  it('nennt auch unter einer Tonart Ton, Oktave und Anzahl der Stellen', () => {
+    const { container } = render(<App />); // A-Dur
+    fireEvent.pointerDown(dotAt(container, 'E'), { pointerId: 1 });
+
+    expect(container.querySelector('.picked-note')?.textContent).toMatch(/E\d — an \d+ Stellen/);
+  });
+
+  it('zeichnet die schwarzen Tasten der Karte dunkler', () => {
+    window.history.replaceState(null, '', '/');
+    const { container } = render(<App />);
+
+    const black = [...container.querySelectorAll('.note-dot--black')].length;
+    const board = new Fretboard(undefined, 15);
+    const blackKeys = new Set([1, 3, 6, 8, 10]);
+    expect(black).toBe(board.allPositions().filter((p) => blackKeys.has(p.pitchClass)).length);
+  });
+
+  it('zeigt einen gefundenen Ton auch außerhalb der gewählten Lage', () => {
+    window.history.replaceState(null, '', '/?scale=major&box=1&zoom=0');
+    const { container } = render(<App />);
+
+    fireEvent.pointerDown(dotAt(container, 'E'), { pointerId: 1 });
+    // Die Treffer außerhalb der Lage sind leiser, aber nicht weggedimmt.
+    expect(container.querySelectorAll('.note-dot--picked.is-faint').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('.note-dot--picked.is-dimmed')).toHaveLength(0);
+  });
+});

@@ -36,6 +36,14 @@
   --note: #8b95a0;
   --note-stroke: #aab3bc;
   --note-text: #14171a;
+  /*
+   * The black keys on the keyless map: a darker dot with light lettering, the
+   * way a keyboard tells them apart. Without it F and F♯ differed only by a sign
+   * six pixels wide. The light text holds 6.8:1 on the darker fill.
+   */
+  --note-black: #4b535d;
+  --note-black-stroke: #6b7580;
+  --note-black-text: #eef1f4;
 
   /* The root is the one thing you always look for. Warm, and never error-red. */
   --root: #e0a33f;
@@ -56,8 +64,14 @@
    * seeing those neighbours tells you what lies just outside the hand — which
    * only works if they are still there. At 0.36 the dot reads as a ghost
    * (1.8:1) and stays unmistakably subordinate to the ones in the box.
+   *
+   * 0.5 since the neck became a tool for finding notes: at 0.36 the faded names
+   * could no longer be read, and with them went the sense of where on the neck
+   * the picked-out notes are. Colour, not opacity, is what still sets those apart.
    */
-  --dimmed: 0.36;
+  --dimmed: 0.5;
+  /* A picked tone outside the selected position: still found, just quieter. */
+  --faint: 0.7;
 
   /* --- The page. Follows the theme. --- */
   --bg: #faf8f4;
@@ -1545,6 +1559,21 @@ body.has-dock .app {
   .app-header h1 {
     font-size: var(--text-xs);
     letter-spacing: 0.1em;
+  }
+
+  /*
+   * The two drawers show only their icons. With both names the triggers took
+   * 290 of 358 px and the wordmark broke over two lines; the gear and the speaker
+   * say Instrument and Klang well enough, and the buttons keep their names for
+   * screen readers.
+   */
+  .setup-trigger .trigger-label,
+  .sound-trigger .trigger-label {
+    display: none;
+  }
+
+  .app-header h1 {
+    white-space: nowrap;
   }
 
   /* The subtitle explains the app once; on a phone that costs a line the neck wants. */

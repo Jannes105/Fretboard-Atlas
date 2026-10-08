@@ -158,7 +158,7 @@ export default function App() {
   const pickedNote =
     highlight && highlight.kind !== 'chord' && picked
       ? {
-          label: picked.label,
+          label: picked.noteName ?? picked.label,
           places: fretboard
             .allPositions()
             .filter((p) => p.pitchClass === picked.pitchClasses[0]).length,

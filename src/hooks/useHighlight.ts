@@ -20,6 +20,11 @@ export interface Picked {
   pitchClasses: readonly number[];
   /** Name for the neck's accessible label. */
   label: string;
+  /**
+   * The note itself for the legend — with its octave when a dot was touched
+   * ("D3"), bare when it came from a chip ("D"). Null for a chord.
+   */
+  noteName: string | null;
   chordTones: ChordTones | null;
   unisonMidi: number | null;
 }
@@ -51,6 +56,7 @@ export function useHighlight(chords: readonly Chord[], scale: Scale | null, spel
           names: new Map(chord.notes.map((note) => [note.pitchClass, note.name()])),
           intervals: chordIntervals(chord),
         },
+        noteName: null,
         unisonMidi: null,
       };
     }
@@ -61,6 +67,7 @@ export function useHighlight(chords: readonly Chord[], scale: Scale | null, spel
       return {
         pitchClasses: [highlight.pitchClass],
         label: withOctave(name, highlight.midi),
+        noteName: withOctave(name, highlight.midi),
         chordTones: null,
         unisonMidi: highlight.midi,
       };
@@ -71,6 +78,8 @@ export function useHighlight(chords: readonly Chord[], scale: Scale | null, spel
     return {
       pitchClasses: [note.pitchClass],
       label: `Stufe ${scale.degreeLabelOf(note.pitchClass)}`,
+      noteName:
+        highlight.midi === undefined ? note.name() : withOctave(note.name(), highlight.midi),
       chordTones: null,
       unisonMidi: highlight.midi ?? null,
     };
@@ -86,6 +95,15 @@ export function useHighlight(chords: readonly Chord[], scale: Scale | null, spel
    */
   const pickNote = (position: FretPosition) => {
     if (highlight?.kind === 'chord') return;
+
+    // The same note again is the way out. On a phone the link for it sits below
+    // a neck one and a half screens tall, and there is no Escape key.
+    const current = picked?.pitchClasses;
+    if (current && current.length === 1 && current[0] === position.pitchClass) {
+      setHighlight(null);
+      return;
+    }
+
     if (scale === null) {
       setHighlight({ kind: 'pitch', pitchClass: position.pitchClass, midi: position.midi });
       return;

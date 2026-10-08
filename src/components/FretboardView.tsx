@@ -56,6 +56,8 @@ interface DrawnNote extends FretPosition {
   /** Named for the title and the accessible text, in one piece. */
   readonly spoken: string;
   readonly isRoot: boolean;
+  /** A black key on the keyless map, drawn darker. */
+  readonly isBlackKey?: boolean;
   /** A chord tone the scale does not contain — drawn hollow, see below. */
   readonly isGhost?: boolean;
 }
@@ -87,6 +89,7 @@ function drawnNotes(
         lines: [keylessName(position.pitchClass, spelling)],
         spoken: names.join(' oder '),
         isRoot: false,
+        isBlackKey: names.length > 1,
       };
     });
   }
@@ -452,7 +455,14 @@ export function FretboardView({
 
     const outsideBox = !inBox(note.fret);
     const isPicked = picked?.has(note.pitchClass) ?? false;
-    const dimmed = outsideBox || (picked !== null && !isPicked);
+    /*
+     * A picked tone outside the position is not dimmed away with the rest. The
+     * box says where the hand is; the pick asks where a note IS — and answering
+     * that with half the neck greyed out was the wrong answer. It is drawn a
+     * little quieter instead, so the box still reads.
+     */
+    const faint = outsideBox && isPicked;
+    const dimmed = !faint && (outsideBox || (picked !== null && !isPicked));
 
     /*
      * Inside a chord every tone is a chord tone, the key's root included. It used
@@ -460,7 +470,7 @@ export function FretboardView({
      * as if the A were not part of it. Now the chord is one colour, and ITS root
      * is the big dot — which is the root that matters while you look at a chord.
      */
-    const asChord = chordTones !== null && isPicked && !outsideBox;
+    const asChord = chordTones !== null && isPicked;
     const isChordRoot = asChord && note.pitchClass === chordTones!.root;
     const showAsRoot = note.isRoot && !asChord;
     const big = showAsRoot || isChordRoot;
@@ -470,12 +480,17 @@ export function FretboardView({
         ? [chordTones!.intervals.get(note.pitchClass) ?? note.lines[0]]
         : note.lines;
 
+    const showAsPicked = isPicked && !showAsRoot && !note.isGhost;
+    const showAsBlack = note.isBlackKey === true && !showAsPicked;
+
     const classes = [
       note.isGhost ? 'note-dot note-dot--ghost' : 'note-dot',
       showAsRoot ? 'note-dot--root' : '',
-      isPicked && !showAsRoot && !outsideBox && !note.isGhost ? 'note-dot--picked' : '',
+      showAsBlack ? 'note-dot--black' : '',
+      showAsPicked ? 'note-dot--picked' : '',
       isChordRoot ? 'note-dot--chord-root' : '',
       dimmed ? 'is-dimmed' : '',
+      faint ? 'is-faint' : '',
     ]
       .filter(Boolean)
       .join(' ');
@@ -547,9 +562,11 @@ export function FretboardView({
           className={[
             'note-label',
             showAsRoot ? 'note-label--root' : '',
-            isPicked && !showAsRoot && !outsideBox && !note.isGhost ? 'note-label--picked' : '',
+            showAsBlack ? 'note-label--black' : '',
+            showAsPicked ? 'note-label--picked' : '',
             note.isGhost ? 'note-label--ghost' : '',
             dimmed ? 'is-dimmed' : '',
+            faint ? 'is-faint' : '',
           ]
             .filter(Boolean)
             .join(' ')}
@@ -772,7 +789,8 @@ export function FretboardView({
 
       {onHoldNote ? (
         <p className="hint fretboard-hint">
-          Antippen spielt einen Ton, gedrückt halten lässt ihn klingen.
+          Antippen: Ton hören und jede Stelle mit diesem Ton finden — nochmal antippen
+          hebt das wieder auf. Gedrückt halten lässt ihn klingen.
           {overflows
             ? lefty
               ? ' Der Hals geht links weiter — seitlich wischen.'

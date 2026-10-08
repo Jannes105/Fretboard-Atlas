@@ -89,12 +89,10 @@ export function NeckLegend({
       {pickedNote ? (
         <p className="picked-actions">
           <span className="picked-note">
-            {scale ? null : (
-              <strong>
-                <NoteText name={pickedNote.label} />
-              </strong>
-            )}
-            {scale ? null : ` — an ${pickedNote.places} Stellen auf dem Hals. `}
+            <strong>
+              <NoteText name={pickedNote.label} />
+            </strong>
+            {` — an ${pickedNote.places} Stellen auf dem Hals. `}
             {pickedNote.hasUnison ? (
               <>
                 <span className="unison-mark" aria-hidden="true" /> Umrandet: genau diese Tonhöhe.{' '}

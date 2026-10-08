@@ -179,13 +179,14 @@ export function SoundPanel({
         type="button"
         className={open ? 'trigger sound-trigger is-open' : 'trigger sound-trigger'}
         aria-expanded={open}
+        aria-label="Klang"
         onClick={toggle}
       >
         <svg className="trigger-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
           <path d="M2 9.5v-3h2.2L7.4 4v8L4.2 9.5H2z" />
           <path d="M10.2 5.6a3.4 3.4 0 0 1 0 4.8M12.4 3.4a6.5 6.5 0 0 1 0 9.2" />
         </svg>
-        Klang
+        <span className="trigger-label">Klang</span>
         <span className="trigger-value">{summary}</span>
         <span className="trigger-caret" aria-hidden="true">
           ▾
