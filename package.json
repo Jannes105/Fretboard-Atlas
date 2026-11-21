@@ -1,7 +1,30 @@
 {
   "name": "fretboard",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Tonarten auf dem Gitarrengriffbrett sichtbar machen: Skalen, Lagen, leitereigene Akkorde und Griffe.",
+  "homepage": "https://jannes105.github.io/Fretboard-Atlas/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jannes105/Fretboard-Atlas.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Jannes105/Fretboard-Atlas/issues"
+  },
+  "license": "MIT",
+  "keywords": [
+    "gitarre",
+    "guitar",
+    "fretboard",
+    "griffbrett",
+    "skalen",
+    "akkorde",
+    "musiktheorie",
+    "pwa"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

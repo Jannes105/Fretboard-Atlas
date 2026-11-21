@@ -1,0 +1,25 @@
+# Prüft Pull Requests, bevor sie nach main kommen. Der Deploy-Workflow testet
+# zwar auch — aber erst, wenn der Stand schon auf main liegt.
+name: CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

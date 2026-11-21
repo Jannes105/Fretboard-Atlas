@@ -1,13 +1,14 @@
 # Recherche-Notizen
 
 Fachliches Hintergrundwissen für die Weiterentwicklung des Fretboard Atlas.
-Keine Dokumentation des Codes — das steht im `README.md` eine Ebene höher und in
+Keine Dokumentation des Codes — die steht in [`architektur.md`](architektur.md) und in
 den Kommentaren der Quelldateien. Hier steht, **was es in der Musik und in der
 Hardware gibt**, damit eine neue Funktion nicht aus dem Gedächtnis erfunden
 werden muss.
 
 | Datei | Inhalt |
 | --- | --- |
+| [`architektur.md`](architektur.md) | Aufbau des Codes und die Entscheidungen dahinter |
 | [`musiktheorie.md`](musiktheorie.md) | Intervalle, Skalen, Akkorde, Harmonik, Voicings, Blues, Rhythmus |
 | [`e-gitarre.md`](e-gitarre.md) | Pickups, Elektronik, Mensur, Saiten, Stimmungen, Tremolo |
 | [`effektpedale.md`](effektpedale.md) | Signalkette, Effekttypen, Klassiker mit gemessenen Werten |

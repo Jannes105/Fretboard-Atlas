@@ -1,0 +1,20 @@
+# Hält Abhängigkeiten und Actions aktuell. Monatlich und gebündelt, damit nicht
+# jede Woche ein Dutzend Einzel-PRs aufläuft.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      alle:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
