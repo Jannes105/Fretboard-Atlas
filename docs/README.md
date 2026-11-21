@@ -13,6 +13,7 @@ werden muss.
 | [`effektpedale.md`](effektpedale.md) | Signalkette, Effekttypen, Klassiker mit gemessenen Werten |
 | [`verstaerker.md`](verstaerker.md) | Preamp, Tone Stack, Endstufe, Speaker, Klassiker |
 | [`feature-ideen.md`](feature-ideen.md) | Was daraus für die App folgt — sortiert nach Aufwand |
+| [`plan-handy-neuaufbau.md`](plan-handy-neuaufbau.md) | Plan: Oberfläche vom Handy her neu aufbauen (Hals immer sichtbar, Blätter von unten) |
 
 ## Wie das zu lesen ist
 
