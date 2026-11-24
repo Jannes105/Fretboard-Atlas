@@ -401,22 +401,23 @@ export default function App() {
       </Sheet>
 
       <Sheet id="sheet-view" title={SHEET_TITLES.view} open={sheet === 'view'} onClose={closeSheet}>
-        {scale ? (
-          <section className="sheet-section" aria-label="Hals">
-            <h3>Hals</h3>
-            <NeckViewPanel
-              labelMode={labelMode}
-              onLabelModeChange={(next) => update('labelMode', next)}
-              hasBox={box !== null}
-              boxZoom={state.boxZoom}
-              onBoxZoomChange={(next) => update('boxZoom', next)}
-              cagedForms={neck.cagedForms}
-              cagedForm={state.cagedForm}
-              onCagedFormChange={(next) => update('cagedForm', next)}
-              minorTonic={neck.isMinorTonic}
-            />
-          </section>
-        ) : null}
+        <section className="sheet-section" aria-label="Hals">
+          <h3>Hals</h3>
+          <NeckViewPanel
+            fretCount={state.fretCount}
+            onFretCountChange={(next) => update('fretCount', next)}
+            hasScale={scale !== null}
+            labelMode={labelMode}
+            onLabelModeChange={(next) => update('labelMode', next)}
+            hasBox={box !== null}
+            boxZoom={state.boxZoom}
+            onBoxZoomChange={(next) => update('boxZoom', next)}
+            cagedForms={neck.cagedForms}
+            cagedForm={state.cagedForm}
+            onCagedFormChange={(next) => update('cagedForm', next)}
+            minorTonic={neck.isMinorTonic}
+          />
+        </section>
 
         <section className="sheet-section" aria-label="Instrument">
           <h3>Instrument</h3>
@@ -428,7 +429,6 @@ export default function App() {
             fretCount={state.fretCount}
             onTuningIdChange={(next) => update('tuningId', next)}
             onCapoChange={(next) => update('capo', next)}
-            onFretCountChange={(next) => update('fretCount', next)}
           />
         </section>
 

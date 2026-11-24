@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import './AppShell.css';
 
 interface AppShellProps {
@@ -22,9 +22,24 @@ interface AppShellProps {
  * folding away — keeps working.
  */
 export function AppShell({ top, children, sheets, tabs }: AppShellProps) {
+  // The top bar's height, for whatever sticks below it (the neck's string names).
+  // It changes: the positions row comes and goes with the key.
+  const topRef = useRef<HTMLElement>(null);
+  const [topHeight, setTopHeight] = useState(0);
+
+  useEffect(() => {
+    const el = topRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => setTopHeight(el.offsetHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="app-shell">
-      <header className="shell-top">{top}</header>
+    <div className="app-shell" style={{ '--shell-top-h': `${topHeight}px` } as CSSProperties}>
+      <header ref={topRef} className="shell-top">
+        {top}
+      </header>
       <main className="shell-stage">{children}</main>
       {sheets}
       {tabs}

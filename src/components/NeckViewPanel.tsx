@@ -1,7 +1,12 @@
 import type { CagedForm, CagedPlacement } from '../theory';
+import { FRET_COUNTS } from '../urlState';
 import type { LabelMode } from './FretboardView';
 
 interface NeckViewPanelProps {
+  fretCount: number;
+  onFretCountChange: (fretCount: number) => void;
+  /** Labels and CAGED need a key; the fret count does not. */
+  hasScale: boolean;
   labelMode: LabelMode;
   onLabelModeChange: (mode: LabelMode) => void;
   /** Whether a position is selected — the crop needs one to crop to. */
@@ -28,6 +33,9 @@ const fretLabel = (fret: number) => (fret === 0 ? 'offen' : `${fret}. Bund`);
  * same notes are drawn lives in here.
  */
 export function NeckViewPanel({
+  fretCount,
+  onFretCountChange,
+  hasScale,
   labelMode,
   onLabelModeChange,
   hasBox,
@@ -40,26 +48,45 @@ export function NeckViewPanel({
 }: NeckViewPanelProps) {
   return (
     <div className="setup-panel view-panel">
+      {/* How much neck: shorter is the exception, so it is three taps, not a list. */}
       <div className="field field--plain">
-        <span>Beschriftung</span>
-        {/* Two options are not worth a dropdown: both fit side by side. */}
-        <div className="segmented" role="group" aria-label="Beschriftung">
-          <button
-            type="button"
-            aria-pressed={labelMode === 'note'}
-            onClick={() => onLabelModeChange('note')}
-          >
-            Notennamen
-          </button>
-          <button
-            type="button"
-            aria-pressed={labelMode === 'degree'}
-            onClick={() => onLabelModeChange('degree')}
-          >
-            Stufen
-          </button>
+        <span>Bünde</span>
+        <div className="segmented" role="group" aria-label="Bünde">
+          {FRET_COUNTS.map((count) => (
+            <button
+              key={count}
+              type="button"
+              aria-pressed={fretCount === count}
+              onClick={() => onFretCountChange(count)}
+            >
+              {count}
+            </button>
+          ))}
         </div>
       </div>
+
+      {hasScale ? (
+        <div className="field field--plain">
+          <span>Beschriftung</span>
+          {/* Two options are not worth a dropdown: both fit side by side. */}
+          <div className="segmented" role="group" aria-label="Beschriftung">
+            <button
+              type="button"
+              aria-pressed={labelMode === 'note'}
+              onClick={() => onLabelModeChange('note')}
+            >
+              Notennamen
+            </button>
+            <button
+              type="button"
+              aria-pressed={labelMode === 'degree'}
+              onClick={() => onLabelModeChange('degree')}
+            >
+              Stufen
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Only meaningful with a position selected — there is nothing else to crop to. */}
       {hasBox ? (

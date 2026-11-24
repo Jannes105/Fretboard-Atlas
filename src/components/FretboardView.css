@@ -23,17 +23,46 @@
 }
 
 /*
- * Upright, the page scrolls down the neck and nothing scrolls sideways. Capped and
- * centred, so a desktop that asks for the upright neck does not get one a metre
- * tall.
+ * Upright, the page scrolls down the neck and nothing scrolls sideways. As wide
+ * as a phone allows; capped and centred, so a desktop that asks for the upright
+ * neck does not get one a metre tall.
  */
 .fretboard-scroll--vertical {
   overflow-x: visible;
+  max-width: 26rem;
+  margin-inline: auto;
 }
 
-.fretboard--vertical {
-  max-width: 26rem;
-  margin: 0 auto;
+/* The string names, held under the top bar while the neck scrolls past. */
+.string-names {
+  position: sticky;
+  top: var(--shell-top-h, 0px);
+  z-index: 1;
+  height: 1.75rem;
+  background: var(--bg);
+}
+
+.string-name {
+  position: absolute;
+  top: 50%;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  transform: translate(-50%, -50%);
+}
+
+.fretboard-frame {
+  position: relative;
+}
+
+/* Where a tapped position scrolls to: clear of the top bar and the names. */
+.box-anchor {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  scroll-margin-top: calc(var(--shell-top-h, 0px) + 2.25rem);
 }
 
 .fretboard-hint {

@@ -195,6 +195,83 @@ describe('FretboardView — Scrollen zur Lage', () => {
   });
 });
 
+describe('FretboardView — aufrechter Hals', () => {
+  const box4 = { number: 4, anchorFret: 12, startFret: 11, endFret: 15 };
+
+  it('stellt die Saitennamen in eine eigene Zeile über den Hals, nicht ins Bild', () => {
+    // Nur außerhalb der Zeichnung können sie beim Scrollen oben stehen bleiben.
+    const { container } = render(
+      <FretboardView scale={aMajor} fretboard={board} labelMode="note" vertical />,
+    );
+    const names = [...container.querySelectorAll('.string-name')].map((el) => el.textContent);
+    expect(names).toEqual(['E', 'A', 'D', 'G', 'B', 'E']);
+    expect(container.querySelectorAll('.string-label')).toHaveLength(0);
+  });
+
+  it('ordnet die Namen von links nach rechts tief nach hoch — gespiegelt umgekehrt', () => {
+    const lefts = (lefty: boolean) => {
+      const { container, unmount } = render(
+        <FretboardView scale={aMajor} fretboard={board} labelMode="note" vertical lefty={lefty} />,
+      );
+      const values = [...container.querySelectorAll<HTMLElement>('.string-name')].map((el) =>
+        parseFloat(el.style.left),
+      );
+      unmount();
+      return values;
+    };
+    const right = lefts(false);
+    expect(right).toEqual([...right].sort((a, b) => a - b));
+    expect(lefts(true)).toEqual(right.map((v) => expect.closeTo(100 - v, 3)));
+  });
+
+  it('zeichnet die Punkte aufrecht größer — dort ist der Bildschirm ein Handy', () => {
+    const radius = (vertical: boolean) => {
+      const { container, unmount } = render(
+        <FretboardView scale={aMajor} fretboard={board} labelMode="note" vertical={vertical} />,
+      );
+      const r = Number(container.querySelector('.note-dot:not(.note-dot--root)')!.getAttribute('r'));
+      unmount();
+      return r;
+    };
+    expect(radius(true)).toBeGreaterThan(radius(false));
+  });
+
+  it('scrollt die Seite zu einer gewählten Lage', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      render(
+        <FretboardView scale={aMinorPentatonic} fretboard={board} labelMode="note" position={box4} vertical />,
+      );
+      expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: 'start' }));
+    } finally {
+      // @ts-expect-error jsdom has none; put it back the way it was.
+      delete Element.prototype.scrollIntoView;
+    }
+  });
+
+  it('scrollt nicht, wenn der Hals ohnehin auf die Lage beschnitten ist', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      render(
+        <FretboardView
+          scale={aMinorPentatonic}
+          fretboard={board}
+          labelMode="note"
+          position={box4}
+          zoom
+          vertical
+        />,
+      );
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      // @ts-expect-error jsdom has none; put it back the way it was.
+      delete Element.prototype.scrollIntoView;
+    }
+  });
+});
+
 describe('FretboardView — Trefferflaeche fuer den Finger', () => {
   it('legt unter jede spielbare Note eine unsichtbare Flaeche', () => {
     const { container } = render(

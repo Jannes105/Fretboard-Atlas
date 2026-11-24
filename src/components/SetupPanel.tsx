@@ -11,14 +11,14 @@ interface SetupPanelProps {
   tuningId: string;
   isCustomTuning: boolean;
   capo: number;
+  /** Caps the capo: it cannot sit beyond the last fret. */
   fretCount: number;
   onTuningIdChange: (tuningId: string) => void;
   onCapoChange: (capo: number) => void;
-  onFretCountChange: (fretCount: number) => void;
 }
 
 /**
- * The instrument itself — tuning, capo, fret count. All of it is set once and
+ * The instrument itself — tuning and capo. Both are set once and
  * then left alone, so it lives in the „Ansicht" sheet rather than competing with
  * the key for attention.
  */
@@ -30,7 +30,6 @@ export function SetupPanel({
   fretCount,
   onTuningIdChange,
   onCapoChange,
-  onFretCountChange,
 }: SetupPanelProps) {
   return (
     <div className="setup-panel">
@@ -95,15 +94,6 @@ export function SetupPanel({
               {fret}. Bund
             </option>
           ))}
-        </select>
-      </label>
-
-      <label className="field">
-        <span>Bünde</span>
-        <select value={fretCount} onChange={(e) => onFretCountChange(Number(e.target.value))}>
-          <option value={12}>12</option>
-          <option value={15}>15</option>
-          <option value={24}>24</option>
         </select>
       </label>
 

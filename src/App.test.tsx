@@ -83,7 +83,7 @@ function openSheet(container: HTMLElement, name: SheetName) {
   if (tab.getAttribute('aria-expanded') !== 'true') fireEvent.click(tab);
 }
 
-/** The instrument's own selects in the „Ansicht" sheet: tuning, capo, frets. */
+/** The instrument's own selects in the „Ansicht" sheet: tuning and capo. */
 const instrumentSelects = (container: HTMLElement) =>
   [...container.querySelectorAll<HTMLSelectElement>('section[aria-label="Instrument"] select')];
 
@@ -106,8 +106,8 @@ describe('App — Alle Töne', () => {
 
     expect(container.querySelector('.scale-title h2')?.textContent).toBe('Alle Töne');
 
-    // Sechs Saiten über fünfzehn Bünde plus die leeren Saiten — lückenlos.
-    const board = new Fretboard(undefined, 15);
+    // Sechs Saiten über 24 Bünde plus die leeren Saiten — lückenlos.
+    const board = new Fretboard(undefined, 24);
     expect(container.querySelectorAll('.note-dot')).toHaveLength(board.allPositions().length);
   });
 
@@ -500,16 +500,20 @@ describe('App — Einstellungen', () => {
     const { container } = render(<App />);
 
     openSheet(container, 'Ansicht');
-    expect(instrumentSelects(container).map((select) => select.value)).toEqual(['drop-d', '3', '12']);
+    expect(instrumentSelects(container).map((select) => select.value)).toEqual(['drop-d', '3']);
+    expect(
+      container.querySelector('[aria-label="Bünde"] [aria-pressed="true"]')?.textContent,
+    ).toBe('12');
   });
   it('öffnet „Ansicht" und schließt es mit Escape', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
     openSheet(container, 'Ansicht');
-    // Stimmung, Kapo, Bünde — drei, und alle drei beschreiben das Instrument.
-    // Der Klang hat einen eigenen Abschnitt, die Darstellung auch.
-    expect(instrumentSelects(container)).toHaveLength(3);
+    // Stimmung und Kapo beschreiben das Instrument. Die Bünde sagen, wie viel
+    // Hals zu sehen ist, und stehen deshalb beim Hals.
+    expect(instrumentSelects(container)).toHaveLength(2);
+    expect(container.querySelector('section[aria-label="Hals"] [aria-label="Bünde"]')).not.toBeNull();
     expect(container.querySelector('.app-footer select')).not.toBeNull();
 
     await user.keyboard('{Escape}');
@@ -523,6 +527,30 @@ describe('App — Einstellungen', () => {
     const capoSelect = instrumentSelects(container)[1];
     expect(capoSelect.querySelectorAll('option')).toHaveLength(13);
     expect(capoSelect.querySelectorAll('option')[12].textContent).toBe('12. Bund');
+  });
+});
+
+describe('App — Bünde', () => {
+  it('zeigt alle 24 Bünde, solange der Link nichts anderes sagt', () => {
+    const { container } = render(<App />);
+    const numbers = [...container.querySelectorAll('.fret-number')].map((el) => el.textContent);
+    expect(numbers.at(-1)).toBe('24');
+  });
+
+  it('kürzt den Hals unter „Ansicht" mit einem Tipp — auch ohne Tonart', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/');
+    const { container } = render(<App />);
+
+    openSheet(container, 'Ansicht');
+    await user.click(
+      [...container.querySelectorAll<HTMLButtonElement>('[aria-label="Bünde"] button')].find(
+        (button) => button.textContent === '12',
+      )!,
+    );
+
+    expect(window.location.search).toContain('frets=12');
+    expect([...container.querySelectorAll('.fret-number')].at(-1)?.textContent).toBe('12');
   });
 });
 
@@ -1501,7 +1529,7 @@ describe('App — Noten finden', () => {
     fireEvent.pointerUp(dotAt(container, 'C'), { pointerId: 1 });
 
     const picked = pickedLabels(container);
-    const board = new Fretboard(undefined, 15);
+    const board = new Fretboard(undefined, 24);
     expect(picked).toHaveLength(board.allPositions().filter((p) => p.pitchClass === 0).length);
     expect(new Set(picked)).toEqual(new Set(['C']));
     // Und die Legende sagt, wie viele Stellen es sind.
@@ -1636,7 +1664,7 @@ describe('App — Noten finden, zweiter Durchgang', () => {
     const { container } = render(<App />);
 
     const black = [...container.querySelectorAll('.note-dot--black')].length;
-    const board = new Fretboard(undefined, 15);
+    const board = new Fretboard(undefined, 24);
     const blackKeys = new Set([1, 3, 6, 8, 10]);
     expect(black).toBe(board.allPositions().filter((p) => blackKeys.has(p.pitchClass)).length);
   });

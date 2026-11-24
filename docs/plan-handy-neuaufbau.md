@@ -1,6 +1,6 @@
 # Plan: Neuaufbau für das Handy
 
-Stand: 24. November 2026. Phase 1 umgesetzt.
+Stand: 24. November 2026. Phase 1 und 2 umgesetzt.
 
 Entwurf zum Durchklicken: [Fretboard Atlas – Handy-Entwurf](https://claude.ai/artifact/VFrzDZeF1yHpjt7zZhWcPw)
 (privat, fünf Bildschirme: Start, Ton gefunden, Tonart wählen, Akkord, Akkordfolge).
@@ -92,6 +92,13 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
   danach 24.
 - Bündezahl aus `SetupPanel` nach „Ansicht" holen.
 - Lage antippen scrollt den Hals zur Lage.
+- Umgesetzt. Der aufrechte Hals ist quer auf das Brett beschnitten und füllt die
+  Breite (bis 26rem); Punkte 40 px bei 375 px. Die Saitennamen sind eine eigene
+  HTML-Zeile über der Zeichnung, die unter der Kopfleiste kleben bleibt
+  (`--shell-top-h` misst `AppShell`). Die Bündezahl ist ein 12 · 15 · 24-Schalter
+  im Abschnitt „Hals" und steht auch ohne Tonart. Gescrollt wird nur beim ganzen
+  Hals; mit „Nur die gewählte Lage zeigen" (Vorgabe) ist der Hals ohnehin
+  beschnitten.
 
 ### Phase 3 — Info-Leiste und Ruhe
 - `NeckLegend` wird eine schwebende Leiste über der Unterleiste: Ton
