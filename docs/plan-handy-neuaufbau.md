@@ -100,8 +100,8 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
 ### Phase 4 — Tonart und Lage
 - Grundton-Raster folgt der ♯/♭-Einstellung (heute immer ♭).
 - Lage-Leiste kompakt in der Kopfleiste (eine Zeile, 44 px hoch).
-- ♯/♭ bleibt in der Kopfleiste, auch mit Tonart (wirkt dann nur, wo die Tonart
-  nichts vorgibt — oder ausblenden; siehe offene Fragen).
+- ♯/♭ steht in der Kopfleiste nur ohne Tonart; mit Tonart nimmt ▶ „Skala
+  abspielen" seinen Platz ein (wie heute).
 
 ### Phase 5 — Akkorde, Folge, Ansicht
 - Akkord-Raster mit großen Trefferflächen; „+" nicht mehr halb auf dem Rand,
@@ -126,12 +126,12 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
   nicht am Ende auf einmal.
 - `npm test`, `npm run build`, `npm run lint` grün.
 
-## Offene Fragen
+## Entscheidungen (24. November 2026)
 
-- Klang-Einstellungen (Verstärker, Tonabnehmer, EQ, Hall, Delay) und
-  Rhythmus-Editor: nur eingeklappt nach hinten schieben, oder ganz entfernen?
-  Der Plan geht vom Einklappen aus.
-- ♯/♭-Schalter unter einer Tonart: ausblenden oder als Vorrang für Töne außerhalb
-  der Tonart behalten?
-- Desktop: gleiches Layout breiter, oder Blätter dort als Seitenleiste neben dem
-  waagerechten Hals?
+- **Klang und Rhythmus-Editor bleiben, eingeklappt:** Klang ganz unten unter
+  „Ansicht", Rhythmus/Schlagmuster/Groove unter „Folge → Mehr". Nichts wird entfernt.
+- **♯/♭ nur ohne Tonart:** mit Tonart benennt die Tonart jeden Ton; an der Stelle
+  steht dann ▶ „Skala abspielen" — wie heute.
+- **Desktop später:** jetzt nur sicherstellen, dass der Desktop nicht kaputtgeht
+  (gleiches Layout, breiter). Ob es eine eigene Desktop-Variante gibt (z. B.
+  Seitenleiste neben waagerechtem Hals), wird nach dem Handy-Umbau entschieden.
