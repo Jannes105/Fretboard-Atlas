@@ -336,16 +336,49 @@ describe('App — Eigene Akkordfolge', () => {
     const { container } = render(<App />);
     openSheet(container, 'Akkorde');
 
-    expect(container.querySelectorAll('.chord-add')).toHaveLength(7);
+    // Kein „+“ an jeder Karte mehr: eines, für den Akkord, den man gewählt hat.
+    expect(container.querySelector('.chord-append')).toBeNull();
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[2]); // iii = C#m
+    await user.click(container.querySelector<HTMLButtonElement>('.chord-append')!);
 
-    // Die dritte Karte ist iii = C#m.
-    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-add')[2]);
     openSheet(container, 'Folge');
-
     expect(chipSymbols(container)).toEqual(['A', 'E', 'F#m', 'D', 'C#m']);
     expect(window.location.search).toContain('prog=custom');
   });
 
+  it('zeigt zum gewählten Akkord seinen Griff, und die anderen einen Schritt weiter', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?root=C&scale=major');
+    const { container } = render(<App />);
+    openSheet(container, 'Akkorde');
+
+    expect(container.querySelector('.chord-detail')).toBeNull();
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[0]); // C
+
+    const caption = () => container.querySelector('.chord-detail .chord-diagram')?.textContent ?? '';
+    // Der erste Griff ist der, den man zuerst lernt.
+    expect(caption()).toContain('offen');
+
+    player.play.mockClear();
+    const before = caption();
+    await user.click(container.querySelector<HTMLButtonElement>('[aria-label="Nächster Griff"]')!);
+    expect(caption()).not.toBe(before);
+    // Ein anderer Griff klingt gleich mit — anklicken heißt hören.
+    expect(player.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('stellt die Akkordgröße mit einem Tipp um', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    openSheet(container, 'Akkorde');
+
+    await user.click(
+      [...container.querySelectorAll<HTMLButtonElement>('[aria-label="Akkordgröße"] button')].find(
+        (button) => button.textContent === 'Sept',
+      )!,
+    );
+    expect(container.querySelector('.chord-card .chord-symbol')?.textContent).toBe('Amaj7');
+  });
   it('hängt einen getippten Powerchord an und normalisiert seine Schreibung', async () => {
     const user = userEvent.setup();
     window.history.replaceState(null, '', '/?scale=major&prog=custom:C,G');
@@ -524,6 +557,31 @@ describe('App — Einstellungen', () => {
     const capoSelect = instrumentSelects(container)[1];
     expect(capoSelect.querySelectorAll('option')).toHaveLength(13);
     expect(capoSelect.querySelectorAll('option')[12].textContent).toBe('12. Bund');
+  });
+});
+
+describe('App — Ansicht-Blatt', () => {
+  it('stellt Hals und Gerät nach vorn und klappt Instrument und Klang zu', () => {
+    const { container } = render(<App />);
+    openSheet(container, 'Ansicht');
+
+    const sections = [...container.querySelectorAll('.sheet-section')].map((section) =>
+      section.getAttribute('aria-label'),
+    );
+    expect(sections).toEqual(['Hals', 'Auf diesem Gerät', 'Instrument', 'Klang']);
+
+    const folds = [...container.querySelectorAll<HTMLDetailsElement>('.sheet-fold')];
+    expect(folds).toHaveLength(2);
+    expect(folds.every((fold) => !fold.open)).toBe(true);
+  });
+
+  it('nennt auf der zugeklappten Zeile, worauf Instrument und Klang stehen', () => {
+    window.history.replaceState(null, '', '/?scale=major&tuning=drop-d&capo=3');
+    const { container } = render(<App />);
+    openSheet(container, 'Ansicht');
+
+    const values = [...container.querySelectorAll('.sheet-fold-value')].map((el) => el.textContent);
+    expect(values).toEqual(['Drop D · Kapo 3. Bund', 'Clean']);
   });
 });
 
@@ -991,15 +1049,15 @@ describe('App — Hervorhebung', () => {
     expect(container.querySelectorAll('.note-dot--picked').length).toBeGreaterThan(0);
   });
 
-  it('lässt Escape in einem Blatt erst das Fach darin schließen, dann das Blatt', async () => {
+  it('schließt das Blatt mit Escape, auch wenn darin ein Fach offen ist', async () => {
+    // Das Rhythmus-Fach klappt im Blatt auf, statt darüber zu schweben — es ist
+    // kein eigenes Fenster, das Escape zuerst für sich beanspruchen müsste.
     const user = userEvent.setup();
     const { container } = render(<App />);
     openSheet(container, 'Folge');
 
     await user.click(container.querySelector<HTMLButtonElement>('.rhythm-trigger')!);
-    await user.keyboard('{Escape}');
-    expect(container.querySelector('.rhythm-panel')).toBeNull();
-    expect(container.querySelector('.sheet')).not.toBeNull();
+    expect(container.querySelector('.rhythm-panel')).not.toBeNull();
 
     await user.keyboard('{Escape}');
     expect(container.querySelector('.sheet')).toBeNull();

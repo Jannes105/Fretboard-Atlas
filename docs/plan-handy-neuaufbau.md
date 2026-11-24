@@ -1,6 +1,6 @@
 # Plan: Neuaufbau für das Handy
 
-Stand: 24. November 2026. Phase 1 bis 4 umgesetzt.
+Stand: 24. November 2026. Phase 1 bis 5 umgesetzt.
 
 Entwurf zum Durchklicken: [Fretboard Atlas – Handy-Entwurf](https://claude.ai/artifact/VFrzDZeF1yHpjt7zZhWcPw)
 (privat, fünf Bildschirme: Start, Ton gefunden, Tonart wählen, Akkord, Akkordfolge).
@@ -137,6 +137,15 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
 - Griffbilder: ausgewählter Akkord zeigt seinen Griff im Blatt.
 - Folge: Rhythmus, Schlagmuster, Groove eingeklappt unter „Mehr".
 - Ansicht: Klang-Feinabstimmung ganz unten, eingeklappt.
+- Umgesetzt. Akkorde: Viererraster ohne „+" an den Karten; der gewählte Akkord
+  zeigt darunter seinen Griff (‹ › wechselt und spielt ihn, erster Griff nach
+  „Offene Griffe zuerst" wie in der Folge) und einen Knopf „+ Am zur Folge".
+  Akkordgröße als Schalter Drei · Sept · Non. Folge: Überschrift entfällt (der
+  Blatttitel sagt es), Rhythmus ist ein Fach am Ende des Blatts statt eines
+  Popovers — der Name „Mehr" wurde „Rhythmus · 4/4 · Einfach (Viertel)", weil er
+  sagt, was drin ist. Ansicht: Hals, Gerät, dann Instrument und Klang eingeklappt,
+  mit dem aktuellen Wert auf der Zeile. Damit gibt es keine Popover mehr
+  (`usePopover` entfernt).
 
 ### Phase 6 — Aufräumen
 - Instrument-Symbol (Sonne) entfällt mit dem Umzug nach „Ansicht".

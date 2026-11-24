@@ -33,6 +33,7 @@ import {
   transposeSymbol,
   type Voicing,
   voicingMidi,
+  voicingsFor,
   withAccidentals,
 } from './theory';
 import { customProgId } from './urlState';
@@ -385,6 +386,9 @@ export default function App() {
                 ]),
               )
             }
+            voicingsOf={(chord) => voicingsFor(chord, { tuning: chordTuning })}
+            onHearVoicing={hearVoicing}
+            preferOpen={state.grips === 'open'}
           />
         ) : scale ? (
           /*
@@ -472,8 +476,19 @@ export default function App() {
           />
         </section>
 
+        <section className="sheet-section" aria-label="Auf diesem Gerät">
+          <h3>Auf diesem Gerät</h3>
+          <AppFooter
+            theme={theme}
+            onThemeChange={setTheme}
+            prefs={viewPrefs}
+            onOrientationChange={setOrientation}
+            onLeftyChange={setLefty}
+          />
+        </section>
+
+        {/* Set once and left alone: folded, with the current value on the fold. */}
         <section className="sheet-section" aria-label="Instrument">
-          <h3>Instrument</h3>
           <SetupPanel
             tuning={neck.tuning}
             tuningId={state.tuningId}
@@ -486,7 +501,6 @@ export default function App() {
         </section>
 
         <section className="sheet-section" aria-label="Klang">
-          <h3>Klang</h3>
           <SoundPanel
             sound={state.sound}
             amp={state.amp}
@@ -501,17 +515,6 @@ export default function App() {
             onToneChange={(next) => update('tone', next)}
             onReverbChange={(next) => update('reverb', next)}
             onDelayChange={(next) => update('delay', next)}
-          />
-        </section>
-
-        <section className="sheet-section" aria-label="Auf diesem Gerät">
-          <h3>Auf diesem Gerät</h3>
-          <AppFooter
-            theme={theme}
-            onThemeChange={setTheme}
-            prefs={viewPrefs}
-            onOrientationChange={setOrientation}
-            onLeftyChange={setLefty}
           />
         </section>
       </Sheet>

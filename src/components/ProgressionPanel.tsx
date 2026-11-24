@@ -116,11 +116,11 @@ export function ProgressionPanel({
   onTranspose,
 }: ProgressionPanelProps) {
   return (
-    <section className="panel progression-panel" aria-label="Akkordfolge">
+    <section className="progression-panel" aria-label="Akkordfolge">
       <div className="panel-head">
-        <h2>Akkordfolge</h2>
         <select
           className="select"
+          aria-label="Vorlage"
           value={isCustom ? 'custom' : (preset?.id ?? '')}
           onChange={(e) =>
             onProgressionIdChange(
@@ -207,20 +207,6 @@ export function ProgressionPanel({
             ))}
           </select>
         </label>
-
-        <RhythmControls
-          beatsPerBar={beatsPerBar}
-          rhythm={rhythm}
-          strum={strum}
-          feel={feel}
-          sustain={sustain}
-          onBeatsPerBarChange={onBeatsPerBarChange}
-          onRhythmChange={onRhythmChange}
-          onStrumChange={onStrumChange}
-          onFeelChange={onFeelChange}
-          onSustainChange={onSustainChange}
-          onApplyStyle={onApplyStyle}
-        />
       </div>
 
       <div className="progression-tools">
@@ -259,6 +245,20 @@ export function ProgressionPanel({
           />
         ))}
       </ol>
+
+      <RhythmControls
+        beatsPerBar={beatsPerBar}
+        rhythm={rhythm}
+        strum={strum}
+        feel={feel}
+        sustain={sustain}
+        onBeatsPerBarChange={onBeatsPerBarChange}
+        onRhythmChange={onRhythmChange}
+        onStrumChange={onStrumChange}
+        onFeelChange={onFeelChange}
+        onSustainChange={onSustainChange}
+        onApplyStyle={onApplyStyle}
+      />
     </section>
   );
 }

@@ -18,9 +18,8 @@ interface SheetProps {
  * the one thing worth looking at inert. For the same reason a tap on the neck
  * does not close it; Escape, „Fertig" and the tab that opened it do.
  *
- * Escape belongs to whatever is innermost: a popover inside the sheet (the
- * rhythm drawer, a grip picker) closes first, and only the next Escape closes
- * the sheet.
+ * Escape closes it — and only it: a highlight on the neck survives, and the next
+ * Escape clears that.
  */
 export function Sheet({ id, title, open, onClose, children }: SheetProps) {
   const ref = useRef<HTMLElement>(null);
@@ -37,7 +36,6 @@ export function Sheet({ id, title, open, onClose, children }: SheetProps) {
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (ref.current?.querySelector('.popover')) return;
       onCloseRef.current();
     };
     document.addEventListener('keydown', onKey);

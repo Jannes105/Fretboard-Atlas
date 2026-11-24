@@ -195,7 +195,6 @@
      smudge on a near-white page. */
   --shadow-popover: 0 10px 24px rgb(60 50 35 / 14%);
   --transition-fast: 0.12s ease;
-  --z-popover: 20;
 }
 
 /* The OS preference — unless the reader has explicitly asked for light. */
@@ -304,23 +303,6 @@ body {
 
 .trigger.is-open .trigger-caret {
   transform: rotate(180deg);
-}
-
-/*
- * The panel each trigger opens. The three were byte-identical across six
- * declarations — position, layer, padding, border, radius, background, shadow —
- * written out three times. Each keeps only what genuinely differs: its width and
- * which edge it hangs from.
- */
-.popover {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  z-index: var(--z-popover);
-  padding: 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--panel);
-  box-shadow: var(--shadow-popover);
 }
 
 /* ---------- Settings in the „Ansicht" sheet ---------- */
@@ -598,34 +580,6 @@ button:focus-visible {
 .neck-bar .field select,
 .neck-bar .segmented button {
   font-size: var(--text-xs);
-}
-
-/*
- * Reaches a fingertip without growing to one. A transparent box centred on the
- * control, for a badge that sits ON something else — a real 44px square there
- * would cover the very card it belongs to.
- *
- * Full height, but NOT full width. At 44px wide the box overhung the next card's
- * left edge by 8px, so the first sliver of every card belonged to the previous
- * card's "+". 2.25rem is what the gutter can carry: it ends exactly where the
- * neighbour begins. The remaining 36 × 44 is still well past the 24px floor, and
- * the height — the axis with room to spare — carries the rest.
- *
- * Everything else in the app hits --tap by simply being that big; this is the one
- * exception, not a second way of doing it.
- */
-.tap-target {
-  position: relative;
-}
-
-.tap-target::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 2.25rem;
-  height: var(--tap);
-  transform: translate(-50%, -50%);
 }
 
 /*
@@ -993,75 +947,92 @@ button:focus-visible {
 
 /* ---------- Chords ---------- */
 
-.chord-row,
 .progression {
   display: flex;
   flex-wrap: wrap;
   /* Otherwise every card stretches to the height of an expanded picker. */
   align-items: flex-start;
-  /* Wide enough to hold a "+" badge and its hit area between two cards. */
   gap: 0.85rem;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-/* Holds the card plus its "add to progression" badge. */
-.chord-slot {
-  position: relative;
-  display: flex;
-}
-
-/* The card itself means "hear it and show it on the neck"; the badge appends. */
-.chord-add {
-  position: absolute;
-  /* Further into the gutter than it needs to be, so more of its invisible
-     fingertip box (see .tap-target) lands beside the card rather than on it. */
-  top: -0.6rem;
-  right: -0.6rem;
+/* Above a sheet's content: what it is drawn from, and the one setting for it. */
+.sheet-toolbar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Four to a row: every card a whole fingertip, and seven chords in two rows. */
+.chord-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  list-style: none;
+}
+
+.chord-grid .chord-card {
+  width: 100%;
+  min-width: 0;
+  min-height: 4.75rem;
+  padding: 0.5rem 0.25rem;
+}
+
+/* The picked chord: its grip, a step to the next one, and the way into the progression. */
+.chord-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.chord-detail-grip {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.grip-step {
+  width: var(--tap);
+  height: var(--tap);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-round);
   background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-lg);
+  cursor: pointer;
+}
+
+.grip-step:hover {
+  border-color: var(--text-muted);
+}
+
+.chord-append {
+  min-height: var(--tap);
+  padding: 0 1.1rem;
+  border: 1px solid var(--accent-text);
+  border-radius: var(--radius-round);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
   color: var(--accent-text);
   font: inherit;
-  font-size: var(--text-md);
-  line-height: 1;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    transform 0.08s ease;
 }
 
-.chord-add:hover {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-  transform: scale(1.1);
-}
-
-/*
- * Seven badges at full strength made a second row of buttons out of the chord
- * cards. Where there is a pointer that hovers they step back until the card is
- * reached; on touch — no hover — they stay fully visible, or they could not be
- * found at all.
- */
-@media (hover: hover) {
-  .chord-add {
-    opacity: 0.45;
-    transition:
-      opacity var(--transition-fast),
-      background var(--transition-fast),
-      transform 0.08s ease;
-  }
-
-  .chord-slot:hover .chord-add,
-  .chord-add:focus-visible {
-    opacity: 1;
-  }
+.chord-append:hover {
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel));
 }
 
 .chord-card {
@@ -1263,15 +1234,6 @@ button:focus-visible {
 /* ---------- Phone ---------- */
 
 @media (max-width: 700px) {
-  /*
-   * The rhythm trigger sits in an already-wrapping row, and there is room for its
-   * name or its value, not both. The name wins: it is what you act on, and the
-   * value is one tap away inside the panel.
-   */
-  .rhythm-trigger .trigger-value {
-    display: none;
-  }
-
   /* Let the string pickers shrink to share the width instead of overflowing. */
   .tuning-strings select {
     min-width: 0;
@@ -1299,10 +1261,6 @@ button:focus-visible {
     flex-wrap: wrap;
   }
 
-  .chord-card {
-    min-width: 4.4rem;
-    padding: 0.45rem 0.55rem;
-  }
 
   /* Anchored left it would hang off the screen edge. */
   .voicing-picker {

@@ -1,38 +1,31 @@
 /*
- * The panel is anchored to the transport row, not to the trigger, at every width.
- *
- * Anchored to the trigger it had to open leftward, because the trigger sits at the
- * right of the row — and then its width pushed it off the screen instead. That is
- * not a width problem and max-width cannot fix it: in 6/8 the pattern grid is twelve
- * slots, the panel came out 672 px wide, and right-anchored at x=550 it started at
- * -122. The transport row starts at the page margin, so opening rightward from there
- * cannot run off either edge.
+ * A fold at the end of the „Folge" sheet: its trigger spans the sheet and names
+ * the current rhythm, its content opens in place below it.
  */
 .rhythm-controls {
-  position: static;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
 }
 
-.transport {
-  position: relative;
+.rhythm-trigger {
+  width: 100%;
 }
 
+.rhythm-trigger .trigger-caret {
+  margin-left: auto;
+}
 
-/*
- * The rest comes from .popover.
- *
- * Still anchored to the transport row, as the note above explains — but to its
- * RIGHT edge, where the trigger is. Hung from the left edge it opened a whole row's
- * width away from the button that opened it, over the grips below. The row spans
- * the page, so with the max-width below the right edge cannot run off-screen
- * either: the panel is never wider than the row it hangs from.
- */
+.rhythm-trigger .trigger-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .rhythm-panel {
-  right: 0;
-  left: auto;
   display: grid;
   gap: 0.8rem;
-  width: max-content;
-  max-width: min(calc(100vw - 2rem), 100%);
+  margin-top: 0.75rem;
 }
 
 /*

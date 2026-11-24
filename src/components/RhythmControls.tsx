@@ -1,4 +1,4 @@
-import { usePopover } from '../hooks/usePopover';
+import { useState } from 'react';
 import {
   defaultPattern,
   type NoteLength,
@@ -145,8 +145,12 @@ function patternName(rhythm: string, beatsPerBar: number): string {
 }
 
 /**
- * Time signature and strum pattern: set once, then left alone — so they sit behind
- * one trigger instead of taking two permanent rows next to the transport.
+ * Time signature and strum pattern: set once, then left alone — so they sit folded
+ * at the end of the „Folge" sheet, behind a line that names their current value,
+ * instead of taking two permanent rows next to the transport.
+ *
+ * A fold and not a popover: inside a sheet that already scrolls, a panel floating
+ * over it had nowhere to go but over the grips below.
  *
  * The first thing inside is a row of named grooves. The four separate settings
  * under them used to be the only way in, labelled in studio words („Feel",
@@ -165,7 +169,7 @@ export function RhythmControls({
   onSustainChange,
   onApplyStyle,
 }: RhythmControlsProps) {
-  const { open, toggle, containerRef } = usePopover();
+  const [open, setOpen] = useState(false);
 
   const meter = METERS.find((entry) => entry.value === beatsPerBar)?.label ?? `${beatsPerBar}/4`;
   const style = matchingStyle({ rhythm, strum, feel, sustain }, beatsPerBar);
@@ -177,12 +181,12 @@ export function RhythmControls({
     }`;
 
   return (
-    <div className="rhythm-controls" ref={containerRef}>
+    <div className="rhythm-controls">
       <button
         type="button"
         className={open ? 'trigger rhythm-trigger is-open' : 'trigger rhythm-trigger'}
         aria-expanded={open}
-        onClick={toggle}
+        onClick={() => setOpen((value) => !value)}
       >
         {/* Two strokes, down and up — the same language the pattern grid speaks. */}
         <svg className="trigger-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -198,7 +202,7 @@ export function RhythmControls({
       </button>
 
       {open ? (
-        <div className="popover rhythm-panel">
+        <div className="rhythm-panel">
           <div className="preset-grid" role="group" aria-label="Rhythmus-Stil">
             {STYLES.map((entry) => (
               <button
