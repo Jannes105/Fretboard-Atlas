@@ -6,7 +6,7 @@ import { DEFAULT_REVERB, REVERB_IDS, type ReverbId } from './synth/reverb';
 import { TONE_MAX_DB, type ToneGains } from './synth/toneStack';
 import type { LabelMode } from './components/FretboardView';
 import {
-  ROOT_CHOICES,
+  ACCEPTED_ROOTS,
   SCALE_TYPES,
   type ChordSize,
   isDefaultPattern,
@@ -274,7 +274,7 @@ export function readState(search: string): AppState {
       : serializePattern(defaultPattern(beatsPerBar));
 
   return {
-    root: pickFrom(params.get('root'), ROOT_CHOICES as readonly string[], DEFAULT_STATE.root),
+    root: pickFrom(params.get('root'), ACCEPTED_ROOTS, DEFAULT_STATE.root),
     scaleTypeId: readScaleType(params.get('scale')),
     tuningId: readTuning(params.get('tuning')),
     capo: pickInt(params.get('capo'), (v) => v >= 0 && v <= MAX_CAPO, DEFAULT_STATE.capo),

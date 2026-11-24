@@ -23,7 +23,7 @@ export {
   type ScaleType,
   type ScaleGroup,
 } from './ScaleType';
-export { Scale, ROOT_CHOICES } from './Scale';
+export { ACCEPTED_ROOTS, Scale, ROOT_CHOICES, spellRoot } from './Scale';
 export { Tuning } from './Tuning';
 export {
   Fretboard,

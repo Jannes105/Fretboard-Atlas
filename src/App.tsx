@@ -27,8 +27,8 @@ import {
   defaultPattern,
   Note,
   positionsToMidi,
-  ROOT_CHOICES,
   serializePattern,
+  spellRoot,
   STANDARD_STRUM_GAP,
   transposeSymbol,
   type Voicing,
@@ -153,12 +153,19 @@ export default function App() {
   const closeSheet = () => setSheet(null);
 
   /**
+   * How a key on this pitch is written: the name with fewer accidentals in its
+   * scale, the reader's ♯ or ♭ where both cost the same. A root without a scale
+   * is about to become major — see the root grid.
+   */
+  const spelledRoot = (pitchClass: number, scaleTypeId: string | null) =>
+    spellRoot(((pitchClass % 12) + 12) % 12, scaleTypeId ?? 'major', viewPrefs.spelling === 'sharp');
+
+  /**
    * Move the key by a semitone, and a self-built progression with it. A preset
    * needs nothing: it is built from degrees, so it follows the root on its own.
    */
   const transpose = (semitones: 1 | -1) => {
-    const index = ROOT_CHOICES.indexOf(root);
-    const nextRoot = ROOT_CHOICES[(index + semitones + ROOT_CHOICES.length) % ROOT_CHOICES.length];
+    const nextRoot = spelledRoot(Note.parse(root).pitchClass + semitones, state.scaleTypeId);
     patch((previous) => ({
       ...previous,
       root: nextRoot,
@@ -272,8 +279,14 @@ export default function App() {
             Lage
           </span>
           <div className="segmented box-picker" role="group" aria-label="Lage">
-            <button type="button" aria-pressed={box === null} onClick={() => update('boxNumber', 0)}>
-              Ganzer Hals
+            <button
+              type="button"
+              className="box-whole"
+              aria-pressed={box === null}
+              aria-label="Ganzer Hals"
+              onClick={() => update('boxNumber', 0)}
+            >
+              Ganz
             </button>
             {boxes.map((option) => (
               <button
@@ -307,8 +320,27 @@ export default function App() {
         <KeyPicker
           scale={scale}
           root={root}
-          onRootChange={(next) => update('root', next)}
-          onScaleTypeChange={(next) => update('scaleTypeId', next)}
+          spelling={viewPrefs.spelling}
+          onRootChange={(pitchClass) =>
+            patch((previous) => {
+              // A root alone shows nothing — it needs a scale to be a key, and
+              // major is the scale everyone starts from.
+              const scaleTypeId = previous.scaleTypeId ?? 'major';
+              return { ...previous, scaleTypeId, root: spelledRoot(pitchClass, scaleTypeId) };
+            })
+          }
+          onScaleTypeChange={(next) =>
+            patch((previous) =>
+              next === null
+                ? { ...previous, scaleTypeId: null }
+                : // A new scale can want the other name — D♭ major, but C♯ minor.
+                  {
+                    ...previous,
+                    scaleTypeId: next,
+                    root: spelledRoot(Note.parse(previous.root).pitchClass, next),
+                  },
+            )
+          }
           onPickKey={(pickedRoot, pickedScaleTypeId) =>
             patch((previous) => ({ ...previous, root: pickedRoot, scaleTypeId: pickedScaleTypeId }))
           }

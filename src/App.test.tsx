@@ -527,6 +527,64 @@ describe('App — Einstellungen', () => {
   });
 });
 
+describe('App — Grundton-Raster', () => {
+  const blackKey = (container: HTMLElement, name: string) =>
+    container.querySelector<HTMLButtonElement>(`.root-grid button[aria-label^="${name}"]`)!;
+
+  it('nennt schwarze Tasten mit beiden Namen, den eingestellten zuerst', () => {
+    window.localStorage.removeItem('fretboard:view');
+    const { container } = render(<App />);
+    openSheet(container, 'Tonart');
+
+    expect(blackKey(container, 'C♯').getAttribute('aria-label')).toBe('C♯ oder D♭');
+    window.localStorage.removeItem('fretboard:view');
+  });
+
+  it('schreibt Dur auf einer schwarzen Taste mit B — G♯ wird A♭-Dur', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />); // A-Dur
+    openSheet(container, 'Tonart');
+
+    await user.click(blackKey(container, 'G♯'));
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('Ab-Dur (Ionisch)');
+    // Gedrückt ist die Taste trotzdem: dieselbe Tonhöhe, nur anders geschrieben.
+    expect(blackKey(container, 'G♯').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('schreibt Moll dort mit Kreuz, wo es weniger Vorzeichen braucht', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?scale=natural-minor');
+    const { container } = render(<App />);
+    openSheet(container, 'Tonart');
+
+    await user.click(blackKey(container, 'C♯'));
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('C#-Moll (Äolisch)');
+    expect(window.location.search).toContain('root=C%23');
+  });
+
+  it('schreibt den Grundton neu, wenn die Skala ihn anders braucht', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?root=Db&scale=major');
+    const { container } = render(<App />);
+    openSheet(container, 'Tonart');
+
+    await user.click(scaleButton(container, 'Moll (Äolisch)'));
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('C#-Moll (Äolisch)');
+  });
+
+  it('transponiert über eine schwarze Taste hinweg', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?root=F%23&scale=major');
+    const { container } = render(<App />);
+    openSheet(container, 'Folge');
+
+    await user.click(container.querySelector<HTMLButtonElement>('[aria-label="Einen Halbton höher"]')!);
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('G-Dur (Ionisch)');
+    await user.click(container.querySelector<HTMLButtonElement>('[aria-label="Einen Halbton höher"]')!);
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('Ab-Dur (Ionisch)');
+  });
+});
+
 describe('App — Bünde', () => {
   it('zeigt alle 24 Bünde, solange der Link nichts anderes sagt', () => {
     const { container } = render(<App />);

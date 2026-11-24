@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Note } from './Note';
-import { ROOT_CHOICES, Scale } from './Scale';
+import { ACCEPTED_ROOTS, ROOT_CHOICES, Scale, spellRoot } from './Scale';
 import {
   BLUES,
   DORIAN,
@@ -381,5 +381,48 @@ describe('Woher eine Skala ihre Akkorde borgt', () => {
     const aBlues = new Scale(Note.parse('A'), BLUES);
     const outside = aBlues.pitchClasses.filter((pc) => !aBlues.chordSource()!.contains(pc));
     expect(outside).toEqual([Note.parse('Eb').pitchClass]);
+  });
+});
+
+describe('spellRoot', () => {
+  const pc = (name: string) => Note.parse(name).pitchClass;
+
+  it('schreibt Dur auf den schwarzen Tasten mit B — sonst kämen Doppelkreuze', () => {
+    expect(['C#', 'D#', 'G#', 'A#'].map((name) => spellRoot(pc(name), 'major', true))).toEqual([
+      'Db',
+      'Eb',
+      'Ab',
+      'Bb',
+    ]);
+  });
+
+  it('schreibt Moll dort mit Kreuz, wo es weniger Vorzeichen braucht', () => {
+    expect(['C#', 'F#', 'G#'].map((name) => spellRoot(pc(name), 'natural-minor', false))).toEqual([
+      'C#',
+      'F#',
+      'G#',
+    ]);
+    expect(spellRoot(pc('Bb'), 'natural-minor', true)).toBe('Bb');
+  });
+
+  it('lässt bei Gleichstand die Vorliebe entscheiden', () => {
+    expect(spellRoot(pc('F#'), 'major', true)).toBe('F#');
+    expect(spellRoot(pc('F#'), 'major', false)).toBe('Gb');
+    expect(spellRoot(pc('D#'), 'natural-minor', true)).toBe('D#');
+    expect(spellRoot(pc('D#'), 'natural-minor', false)).toBe('Eb');
+  });
+
+  it('lässt die weißen Tasten, wie sie heißen', () => {
+    expect(spellRoot(pc('E'), 'major', false)).toBe('E');
+    expect(spellRoot(pc('B'), 'natural-minor', false)).toBe('B');
+  });
+
+  it('nimmt jeden Grundton an, den es schreiben kann', () => {
+    for (let pitchClass = 0; pitchClass < 12; pitchClass++) {
+      for (const type of ['major', 'natural-minor', 'dorian', 'minor-pentatonic', 'blues']) {
+        expect(ACCEPTED_ROOTS).toContain(spellRoot(pitchClass, type, true));
+        expect(ACCEPTED_ROOTS).toContain(spellRoot(pitchClass, type, false));
+      }
+    }
   });
 });

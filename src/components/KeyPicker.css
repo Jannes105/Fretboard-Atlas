@@ -110,9 +110,21 @@
 }
 
 .root-option {
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.2rem 0;
   font-family: var(--font-display);
   font-size: var(--text-lg);
+  line-height: 1.1;
+}
+
+/* The black key's other name: there to be found, not to compete. */
+.root-option-alt {
+  font-size: var(--text-2xs);
+  opacity: 0.7;
 }
 
 .key-option {

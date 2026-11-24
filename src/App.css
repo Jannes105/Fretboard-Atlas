@@ -591,9 +591,8 @@ button:focus-visible {
 
 .neck-bar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 1.25rem;
+  gap: 0.6rem;
 }
 
 .neck-bar .field select,
@@ -679,7 +678,7 @@ button:focus-visible {
 
 /* Names the row of numbers beside it; the group carries the same word for AT. */
 .neck-bar-label {
-  margin-right: -0.75rem;
+  flex: none;
   color: var(--text-muted);
   font-size: var(--text-2xs);
   font-weight: var(--weight-medium);
@@ -687,18 +686,29 @@ button:focus-visible {
   letter-spacing: 0.07em;
 }
 
-/* The positions: one tap each, numbers rather than a list to open. A major key
-   has seven, which with „Ganzer Hals" is wider than a phone — so the row wraps
-   instead of running off the edge and dragging the page sideways with it. */
+/*
+ * The positions: one tap each, in ONE row however many there are. A mode has
+ * seven, and wrapping them onto a second line made the top bar a third of the
+ * phone's height — the neck it is there to serve got what was left. The buttons
+ * share the width instead; „Ganz" gets a little more for its word.
+ */
 .box-picker {
-  flex-wrap: wrap;
-  max-width: 100%;
+  flex: 1;
+  min-width: 0;
+  /* On a desktop, a row of numbers a window wide is not a control any more. */
+  max-width: 28rem;
 }
 
 .box-picker button {
-  min-width: var(--tap);
+  flex: 1 1 0;
+  min-width: 0;
   justify-content: center;
-  padding: 0 0.7rem;
+  padding: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.box-picker .box-whole {
+  flex-grow: 1.6;
 }
 
 /* The play affordance: a warm round button, the app's accent. */
@@ -1253,11 +1263,6 @@ button:focus-visible {
 /* ---------- Phone ---------- */
 
 @media (max-width: 700px) {
-  /* The labels are gone everywhere now, so only the spacing needs tightening. */
-  .neck-bar {
-    gap: 0.5rem;
-  }
-
   /*
    * The rhythm trigger sits in an already-wrapping row, and there is room for its
    * name or its value, not both. The name wins: it is what you act on, and the

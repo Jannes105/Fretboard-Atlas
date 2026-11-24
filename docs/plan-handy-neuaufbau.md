@@ -1,6 +1,6 @@
 # Plan: Neuaufbau für das Handy
 
-Stand: 24. November 2026. Phase 1 bis 3 umgesetzt.
+Stand: 24. November 2026. Phase 1 bis 4 umgesetzt.
 
 Entwurf zum Durchklicken: [Fretboard Atlas – Handy-Entwurf](https://claude.ai/artifact/VFrzDZeF1yHpjt7zZhWcPw)
 (privat, fünf Bildschirme: Start, Ton gefunden, Tonart wählen, Akkord, Akkordfolge).
@@ -121,6 +121,15 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
 - Lage-Leiste kompakt in der Kopfleiste (eine Zeile, 44 px hoch).
 - ♯/♭ steht in der Kopfleiste nur ohne Tonart; mit Tonart nimmt ▶ „Skala
   abspielen" seinen Platz ein (wie heute).
+- Umgesetzt, mit einer Änderung am ersten Punkt (entschieden am 24. November):
+  Schwarze Tasten zeigen **beide** Namen, der aus der ♯/♭-Einstellung groß. Wörtlich
+  der Einstellung zu folgen hätte bei der Vorgabe ♯ Dur-Tonarten mit Doppelkreuzen
+  ergeben (G♯-Dur statt A♭-Dur). Geschrieben wird die Tonart mit dem Namen, der in
+  ihrer Skala weniger Vorzeichen braucht (`spellRoot`); bei Gleichstand entscheidet
+  die Einstellung. Das gilt auch beim Skalenwechsel, beim Transponieren und für die
+  Treffer aus „Aus Akkorden erkennen". Links nehmen jetzt auch `root=C%23` usw. an.
+  Die Lage-Leiste ist eine Zeile („Ganz" statt „Ganzer Hals"); die Kopfleiste ist
+  mit Tonart 117 px hoch statt bis zu ~190.
 
 ### Phase 5 — Akkorde, Folge, Ansicht
 - Akkord-Raster mit großen Trefferflächen; „+" nicht mehr halb auf dem Rand,

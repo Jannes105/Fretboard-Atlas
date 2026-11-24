@@ -1,4 +1,4 @@
-import { Note } from './Note';
+import { Note, pitchClassNames } from './Note';
 import {
   chordParentOf,
   degreeLabel,
@@ -99,8 +99,8 @@ export class Scale {
 }
 
 /**
- * The twelve roots offered in the UI. Enharmonic pitches use the flat spelling —
- * the usual lead-sheet convention — but Scale.parse still accepts "F#" etc.
+ * The twelve roots, one per pitch, in the flat spelling — the usual lead-sheet
+ * convention. Where a key is actually chosen, spellRoot picks the name.
  */
 export const ROOT_CHOICES: readonly string[] = [
   'C',
@@ -116,6 +116,42 @@ export const ROOT_CHOICES: readonly string[] = [
   'Bb',
   'B',
 ];
+
+/**
+ * Every root the app accepts, from the grid or a link: the twelve above, plus the
+ * sharp names of the five black keys. A key on C♯ or F♯ is often the right one —
+ * C♯ minor has four sharps where D♭ minor needs a double flat.
+ */
+export const ACCEPTED_ROOTS: readonly string[] = [
+  ...ROOT_CHOICES,
+  ...ROOT_CHOICES.filter((name) => name.includes('b')).map(
+    (name) => pitchClassNames(Note.parse(name).pitchClass)[0],
+  ),
+];
+
+/** Accidentals a key needs, counting a double one twice. */
+function accidentalCount(scale: Scale): number {
+  return scale.notes.reduce((sum, note) => sum + Math.abs(note.alter), 0);
+}
+
+/**
+ * How to write the root of a key on a given pitch: whichever name needs fewer
+ * accidentals in that scale. A black key read off the neck says „C♯ or D♭"; the
+ * scale decides. D♭ major takes five flats where C♯ major takes seven sharps, and
+ * C♯ minor four sharps where D♭ minor would need a double flat. Where both cost
+ * the same — F♯ or G♭ major, D♯ or E♭ minor — the reader's preference decides.
+ */
+export function spellRoot(pitchClass: number, scaleTypeId: string, preferSharps: boolean): string {
+  const names = pitchClassNames(pitchClass);
+  if (names.length === 1) return names[0];
+
+  const type = scaleTypeById(scaleTypeId);
+  const [sharp, flat] = names;
+  const sharps = accidentalCount(new Scale(Note.parse(sharp), type));
+  const flats = accidentalCount(new Scale(Note.parse(flat), type));
+  if (sharps !== flats) return sharps < flats ? sharp : flat;
+  return preferSharps ? sharp : flat;
+}
 
 /** Written forms accepted by Scale.parse, mapped to scale types. */
 const SCALE_ALIASES: Record<string, ScaleType> = {

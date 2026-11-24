@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ROOT_CHOICES, type Scale, scaleTypesInGroup, withAccidentals } from '../theory';
+import { Note, pitchClassNames, type Scale, scaleTypesInGroup, withAccidentals } from '../theory';
+import type { Spelling } from './FretboardView';
 import { KeyFinder } from './KeyFinder';
 import { NoteText } from './NoteText';
 import './KeyPicker.css';
@@ -10,7 +11,10 @@ interface KeyPickerProps {
   /** The key on the neck, or null for the plain map of every note. */
   scale: Scale | null;
   root: string;
-  onRootChange: (root: string) => void;
+  /** A pitch, not a name: how the key is written is the caller's to decide. */
+  onRootChange: (pitchClass: number) => void;
+  /** Which name of a black key is the big one. */
+  spelling: Spelling;
   /** null clears the key and goes back to every note. */
   onScaleTypeChange: (scaleTypeId: string | null) => void;
   /** Root and scale at once — from a match in the chord lookup. */
@@ -81,6 +85,7 @@ export function KeyPicker({
   scale,
   root,
   onRootChange,
+  spelling,
   onScaleTypeChange,
   onPickKey,
   onAdopt,
@@ -127,24 +132,35 @@ export function KeyPicker({
         <div role="tabpanel">
           <p className="key-section">Grundton</p>
           <div className="root-grid" role="group" aria-label="Grundton">
-            {ROOT_CHOICES.map((choice) => (
-              <button
-                key={choice}
-                type="button"
-                className="root-option"
-                // Without a scale there is no root on the neck to be pressed.
-                aria-pressed={scale !== null && choice === root}
-                aria-label={withAccidentals(choice)}
-                onClick={() => {
-                  onRootChange(choice);
-                  // A root alone shows nothing — it needs a scale to be a key.
-                  // Major is the scale everyone starts from.
-                  if (scale === null) onScaleTypeChange('major');
-                }}
-              >
-                <NoteText name={choice} />
-              </button>
-            ))}
+            {Array.from({ length: 12 }, (_, pitchClass) => {
+              // A black key carries both names — the one you read off the neck big,
+              // the other small. Which one the key is written with, the scale decides.
+              const names = pitchClassNames(pitchClass);
+              const [main, other] =
+                names.length === 1 ? [names[0], null] : spelling === 'flat' ? [names[1], names[0]] : names;
+              return (
+                <button
+                  key={pitchClass}
+                  type="button"
+                  className="root-option"
+                  // Without a scale there is no root on the neck to be pressed.
+                  aria-pressed={scale !== null && Note.parse(root).pitchClass === pitchClass}
+                  aria-label={
+                    other ? `${withAccidentals(main)} oder ${withAccidentals(other)}` : main
+                  }
+                  onClick={() => onRootChange(pitchClass)}
+                >
+                  <span>
+                    <NoteText name={main} />
+                  </span>
+                  {other ? (
+                    <span className="root-option-alt" aria-hidden="true">
+                      <NoteText name={other} />
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
 
           <p className="key-section">Skala</p>

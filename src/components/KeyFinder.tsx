@@ -4,7 +4,7 @@ import { NoteText } from './NoteText';
 import './KeyFinder.css';
 
 interface KeyFinderProps {
-  /** Apply a found key. root is always one of ROOT_CHOICES, id a real scale type. */
+  /** Apply a found key. root is always one of ACCEPTED_ROOTS, id a real scale type. */
   onPick: (root: string, scaleTypeId: string) => void;
   /** Take the typed chords as a playable progression, in the given key. */
   onAdopt: (symbols: string[], root: string, scaleTypeId: string) => void;
