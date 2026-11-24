@@ -655,8 +655,7 @@ button:focus-visible {
   margin-bottom: 1.1rem;
 }
 
-.scale-title,
-.panel-title {
+.scale-title {
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -1032,14 +1031,6 @@ button:focus-visible {
   margin: 0 0 0.9rem;
   color: var(--text-muted);
   font-size: var(--text-sm);
-}
-
-.hint--warn {
-  padding: 0.6rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--text);
 }
 
 .empty {
