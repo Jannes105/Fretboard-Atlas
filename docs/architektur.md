@@ -8,10 +8,10 @@ man etwas ändert.
 
 Die Oberfläche ist nach Häufigkeit geordnet, nicht nach Vollständigkeit:
 
-1. **Immer sichtbar:** Tonart-Knopf, Hals, Lagen (1 Tipp je Lage), Stufen-Chips,
-   Stufenakkorde, Akkordfolge, ▶.
-2. **Ein Klick:** „Ansicht" (Notennamen/Stufen, Lagen-Ausschnitt, CAGED),
-   Griffwahl je Akkord, Rhythmus-Stile, Klang-Voreinstellungen.
+1. **Immer sichtbar:** Tonart-Knopf, Hals, Lagen (1 Tipp je Lage), Stufen-Chips, ▶.
+2. **Ein Tipp:** die vier Blätter der Unterleiste — Tonart, Akkorde (Stufenakkorde),
+   Folge (Akkordfolge, Griffwahl je Akkord, Rhythmus-Stile), Ansicht
+   (Notennamen/Stufen, Lagen-Ausschnitt, CAGED, Klang-Voreinstellungen).
 3. **Für Fortgeschrittene, eingeklappt:** Stimmung, Kapo, Bünde, Verstärker,
    Tonabnehmer, EQ, Hall, Delay, Taktart, Schlagmuster, Groove.
 

@@ -1,6 +1,6 @@
 # Plan: Neuaufbau für das Handy
 
-Stand: 21. November 2026. Noch nicht begonnen.
+Stand: 24. November 2026. Phase 1 umgesetzt.
 
 Entwurf zum Durchklicken: [Fretboard Atlas – Handy-Entwurf](https://claude.ai/artifact/VFrzDZeF1yHpjt7zZhWcPw)
 (privat, fünf Bildschirme: Start, Ton gefunden, Tonart wählen, Akkord, Akkordfolge).
@@ -79,6 +79,11 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
 - Offenes Blatt: im Zustand der Seite, nicht in der URL.
 - `TransportDock` entfällt — die Folge spielt aus dem Blatt, der aktuelle Akkord
   steht in der Info-Leiste.
+- Umgesetzt. Abweichungen: Die Popover-Hüllen von `KeyPicker`, `NeckViewPanel`,
+  `SetupPanel` und `SoundPanel` sind weg (nur der Inhalt zog um); ein Tipp auf den
+  Hals schließt ein Blatt **nicht**, damit der Hals bedienbar bleibt — Escape,
+  „Fertig" und der Reiter schließen es. Bis zur Info-Leiste (Phase 3) zeigt ein
+  Punkt am Reiter „Folge", dass eine Folge läuft.
 
 ### Phase 2 — Hals
 - Senkrechter Hals über die volle Breite, Punkte 40 px, Saitennamen sticky.
