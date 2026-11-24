@@ -4,6 +4,7 @@ import type { DelayId } from '../synth/delay';
 import type { PickupId } from '../synth/pickup';
 import type { ReverbId } from '../synth/reverb';
 import { TONE_MAX_DB, type ToneGains } from '../synth/toneStack';
+import './SoundPanel.css';
 
 /**
  * The four amplifiers, named for what a player would recognise rather than for the

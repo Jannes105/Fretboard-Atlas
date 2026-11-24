@@ -25,6 +25,16 @@ schöner? Ebene 3.*
 `useHighlight` (was hervorgehoben ist), `useAudioPlayer`, `useScaleRun` und
 `useTransport`.
 
+Die Oberfläche ist vom Handy her gebaut: `AppShell` (Kopfleiste, Hals, Unterleiste),
+vier `Sheet`s von unten und die schwebende `InfoBar`. Der Plan dazu und seine
+Abweichungen stehen in [plan-handy-neuaufbau.md](plan-handy-neuaufbau.md).
+
+**CSS:** `App.css` hält die Tokens (Farben, Größen) und die geteilten Bausteine
+(`.trigger`, `.segmented`, `.field`, `.play-button`, Akkordkarte …) und wird in
+`App.tsx` **zuerst** geladen. Jede Komponente bringt danach ihre eigene `.css` mit.
+Die Reihenfolge trägt: bei gleicher Spezifität gewinnt die Komponente über die
+Basis (`.app-footer select` über `.field--inline select`).
+
 Die Musiktheorie steckt vollständig in `src/theory/` und kennt weder React noch
 das DOM:
 

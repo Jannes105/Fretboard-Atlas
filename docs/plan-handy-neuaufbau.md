@@ -1,6 +1,6 @@
 # Plan: Neuaufbau für das Handy
 
-Stand: 24. November 2026. Phase 1 bis 5 umgesetzt.
+Stand: 24. November 2026. Alle sechs Phasen umgesetzt.
 
 Entwurf zum Durchklicken: [Fretboard Atlas – Handy-Entwurf](https://claude.ai/artifact/VFrzDZeF1yHpjt7zZhWcPw)
 (privat, fünf Bildschirme: Start, Ton gefunden, Tonart wählen, Akkord, Akkordfolge).
@@ -154,6 +154,16 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
 - `App.css` (~1700 Zeilen) auf die neuen Komponenten verteilen.
 - Inhaltlich: i–VI–III–VII ist nicht „andalusisch verwandt" (andalusisch =
   i–VII–VI–V).
+- Umgesetzt. Das Instrument-Symbol war schon mit Phase 1 weg. Der Rahmen kam
+  nicht aus einer `:focus`-Regel, sondern aus Chromes eigenem Ring für das
+  fokussierbare SVG; `.fretboard:focus:not(:focus-visible)` nimmt ihn für Zeiger
+  weg, die Tastatur behält ihren. `App.css` (1270 Zeilen nach Phase 5) ist auf
+  Basis plus Komponenten-Dateien verteilt (`App.css` 824, davon ~240 Tokens);
+  `AppShell.css` ging an `Sheet`, `BottomTabs` und `InfoBar`. Geprüft mit
+  Pixelvergleich von 20 Zuständen vor/nach — gleich bis auf bekanntes Rauschen.
+  Tote Regeln aus dem Umbau (`.panel`, `.scale-title .key-picker`) sind weg;
+  schon vorher tote (`hint--warn`, `panel-title`, `note-label--stacked`,
+  `builder-diatonic*`) blieben unangetastet.
 
 ## Prüfen
 

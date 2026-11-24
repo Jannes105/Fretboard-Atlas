@@ -1,0 +1,97 @@
+/* ---------- Info bar ----------
+ *
+ * Floats above the bottom bar instead of taking a line on the page, so nothing
+ * moves when it appears. The slot spans the width and lets taps through; only
+ * the pill itself catches them.
+ */
+.info-bar-slot {
+  position: fixed;
+  right: 0;
+  bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom) + 0.6rem);
+  left: 0;
+  z-index: var(--z-bar);
+  display: flex;
+  justify-content: center;
+  padding: 0 1rem;
+  pointer-events: none;
+}
+
+.info-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 100%;
+  min-height: var(--tap);
+  padding: 0.25rem 0.25rem 0.25rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-round);
+  background: var(--panel);
+  box-shadow: var(--shadow-popover);
+  font-size: var(--text-sm);
+  pointer-events: auto;
+}
+
+/* Without a button at either end, the padding is even. */
+.info-bar--hint {
+  padding-right: 1rem;
+}
+
+.info-bar--playing {
+  padding-left: 0.25rem;
+  padding-right: 1rem;
+}
+
+.info-bar-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  white-space: nowrap;
+}
+
+.info-bar-roman {
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+}
+
+.info-bar-text {
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+.info-bar-clear,
+.info-bar-stop {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: var(--radius-round);
+  background: var(--panel-sunken);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.info-bar-clear:hover,
+.info-bar-stop:hover {
+  background: color-mix(in srgb, var(--text) 14%, var(--bg));
+}
+
+/* The same filled stop as the transport's own ■. */
+.info-bar-stop,
+.info-bar-stop:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* The same ring the neck draws around the exact pitch. */
+.unison-mark {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-left: 0.15rem;
+  border: 2px solid var(--text);
+  border-radius: 50%;
+  vertical-align: -0.1rem;
+}

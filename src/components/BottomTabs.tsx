@@ -1,3 +1,5 @@
+import './BottomTabs.css';
+
 export type SheetId = 'key' | 'chords' | 'progression' | 'view';
 
 interface BottomTabsProps {

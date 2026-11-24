@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef } from 'react';
+import './Sheet.css';
 
 interface SheetProps {
   /** The tab that opens it points here with aria-controls. */

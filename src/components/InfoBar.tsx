@@ -1,4 +1,5 @@
 import { NoteText } from './NoteText';
+import './InfoBar.css';
 
 /** What the bar has to say — at most one thing at a time. */
 export type Info =

@@ -1,5 +1,6 @@
 import { pitchClassName, Tuning, withAccidentals } from '../theory';
 import { customTuningId, MAX_CAPO } from '../urlState';
+import './SetupPanel.css';
 
 /** The twelve notes offered per string in the custom-tuning editor. */
 const NOTE_OPTIONS: string[] = Array.from({ length: 12 }, (_, pitchClass) =>

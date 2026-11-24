@@ -1,5 +1,6 @@
 import { type Note, type Scale, withAccidentals } from '../theory';
 import { NoteText } from './NoteText';
+import './ScaleTones.css';
 
 interface ScaleTonesProps {
   scale: Scale;

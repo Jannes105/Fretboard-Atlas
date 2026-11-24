@@ -1,6 +1,7 @@
 import type { CagedForm, CagedPlacement } from '../theory';
 import { FRET_COUNTS } from '../urlState';
 import type { LabelMode } from './FretboardView';
+import './NeckViewPanel.css';
 
 interface NeckViewPanelProps {
   fretCount: number;

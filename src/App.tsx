@@ -1,4 +1,6 @@
 import { useState } from 'react';
+// First: the shared base, so every component's own sheet can build on it.
+import './App.css';
 import { LOOSE_ARPEGGIO_GAP } from './audio';
 import { AppFooter } from './components/AppFooter';
 import { AppShell } from './components/AppShell';
@@ -37,7 +39,6 @@ import {
   withAccidentals,
 } from './theory';
 import { customProgId } from './urlState';
-import './App.css';
 
 /** The neck with no key on it — where the app opens. */
 const ALL_NOTES_LABEL = 'Alle Töne';

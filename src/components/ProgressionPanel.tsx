@@ -11,6 +11,7 @@ import { customProgId, type CustomStep, type GripPreference, MAX_BPM, MIN_BPM } 
 import { ProgressionBuilder } from './ProgressionBuilder';
 import { ProgressionChord } from './ProgressionChord';
 import { RhythmControls, type RhythmStyleSettings } from './RhythmControls';
+import './ProgressionPanel.css';
 
 /**
  * The click track. 'Einzähler' counts you in and then leaves you to the guitar;

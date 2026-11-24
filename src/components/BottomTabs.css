@@ -1,0 +1,61 @@
+/* ---------- Bottom bar ---------- */
+
+.bottom-tabs {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: var(--z-bar);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  height: calc(var(--tabs-h) + env(safe-area-inset-bottom));
+  /* As wide as a sheet: four tabs spread over a desktop window are hard to hit. */
+  padding: 0 max(0px, (100% - 44rem) / 2) env(safe-area-inset-bottom);
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.bottom-tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-2xs);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.bottom-tab:hover,
+.bottom-tab[aria-expanded='true'] {
+  color: var(--accent-text);
+}
+
+.bottom-tab[aria-expanded='true'] {
+  font-weight: var(--weight-medium);
+}
+
+.bottom-tab-icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* A progression is running: a dot on its tab, so the way to stop it is findable. */
+.bottom-tab.is-playing::before {
+  content: '';
+  position: absolute;
+  top: 0.6rem;
+  left: calc(50% + 0.65rem);
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-round);
+  background: var(--accent);
+}

@@ -1,0 +1,37 @@
+/* The six per-string note pickers of a custom tuning, low string first. */
+.tuning-strings {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.3rem;
+  margin-top: -0.35rem;
+}
+
+.tuning-strings select {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.35rem 0.15rem;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--panel-sunken);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: center;
+  appearance: none;
+  cursor: pointer;
+}
+
+.tuning-strings select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+@media (max-width: 700px) {
+  /* Let the string pickers shrink to share the width instead of overflowing. */
+  .tuning-strings select {
+    min-width: 0;
+    padding-inline: 0.1rem;
+    font-size: var(--text-xs);
+  }
+}

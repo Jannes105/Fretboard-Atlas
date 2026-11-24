@@ -9,6 +9,7 @@ import {
 } from '../theory';
 import { ChordDiagram } from './ChordDiagram';
 import { NoteText } from './NoteText';
+import './ChordRow.css';
 
 const SIZES: readonly { value: ChordSize; label: string }[] = [
   { value: 3, label: 'Drei' },

@@ -313,43 +313,6 @@ body {
 }
 
 /*
- * Bass, Mitten, Höhen in one row. Side by side rather than stacked because the
- * three of them are read as a shape — a scoop or a smile — and that only works
- * if they are next to each other.
- */
-.tone-stack {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.6rem;
-}
-
-.tone-knob {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  min-width: 0;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-medium);
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-}
-
-.tone-knob output {
-  font-weight: var(--weight-bold);
-  color: var(--text);
-  /* Tabular, so nudging a control does not shuffle the two beside it. */
-  font-variant-numeric: tabular-nums;
-}
-
-.tone-knob input[type='range'] {
-  width: 100%;
-  min-width: 0;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-/*
  * Named starting points — sound presets, rhythm styles. Two to a row: the labels
  * are words, and a word needs more room than an icon. Same pressed-state language
  * as the segmented control, filled with the accent so the choice is unmistakable.
@@ -415,35 +378,6 @@ body {
 
 .fine-tuning > :not(summary) + :not(summary) {
   margin-top: 0.75rem;
-}
-
-/* The six per-string note pickers of a custom tuning, low string first. */
-.tuning-strings {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 0.3rem;
-  margin-top: -0.35rem;
-}
-
-.tuning-strings select {
-  width: 100%;
-  min-height: var(--tap);
-  padding: 0.35rem 0.15rem;
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-sm);
-  background: var(--panel-sunken);
-  color: var(--text);
-  font: inherit;
-  font-size: var(--text-sm);
-  text-align: center;
-  appearance: none;
-  cursor: pointer;
-}
-
-.tuning-strings select:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: var(--focus-ring);
 }
 
 .field {
@@ -558,8 +492,7 @@ button:focus-visible {
   gap: 0.2rem 0.55rem;
 }
 
-.scale-title button,
-.scale-title .key-picker {
+.scale-title button {
   align-self: center;
 }
 
@@ -702,43 +635,6 @@ button:focus-visible {
   color: var(--bg);
 }
 
-/* ---------- Transport ---------- */
-
-.transport {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.9rem 1.25rem;
-  margin-bottom: 1rem;
-  padding: 0.7rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--panel-sunken);
-}
-
-.tempo {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
-.tempo output {
-  font-weight: var(--weight-bold);
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Wide enough that a single BPM is actually reachable by dragging — at 10rem one
-   step was barely a pixel. Arrow keys stay the exact way in either case. */
-.tempo input[type='range'] {
-  width: 13rem;
-  max-width: 100%;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
 .toggle {
   display: flex;
   align-items: center;
@@ -756,91 +652,10 @@ button:focus-visible {
   cursor: pointer;
 }
 
-/*
- * The slider and the checkbox are the only two elements on the page the browser
- * was still sizing for us, at its own 13.333 px. They carry no text, so nothing
- * looked wrong — but they were the last two values outside the scale.
- */
-.tempo input[type='range'],
-.tone-knob input[type='range'],
-.toggle input {
-  font-size: var(--text-sm);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .play-button:active {
     transform: none;
   }
-}
-
-/* ---------- The key's tones, at the top of the „Tonart" sheet ---------- */
-
-.scale-tones {
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.degree-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-/* These looked like buttons and did nothing. Now they are buttons: clicking a
-   degree picks it out on the neck. */
-.degree-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.1rem;
-  justify-content: center;
-  min-width: 2.6rem;
-  min-height: var(--tap);
-  padding: 0.3rem 0.45rem;
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-md);
-  background: var(--panel);
-  color: inherit;
-  font: inherit;
-  line-height: 1.15;
-  cursor: pointer;
-  transition:
-    border-color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.degree-chip:hover {
-  border-color: var(--accent);
-}
-
-.degree-chip.is-active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-}
-
-.degree-chip .note-name {
-  font-weight: var(--weight-bold);
-  font-size: var(--text-md);
-}
-
-.degree-chip .note-degree {
-  font-size: var(--text-2xs);
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.degree-chip.is-root .note-name {
-  color: var(--accent-text);
-}
-
-/* ---------- Panels ---------- */
-
-.panel {
-  margin-top: 2.25rem;
 }
 
 /*
@@ -857,22 +672,6 @@ button:focus-visible {
   flex-wrap: wrap;
   gap: 0.5rem 0.9rem;
   margin-bottom: 0.35rem;
-}
-
-.panel h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-medium);
-}
-
-/* Names the key a pentatonic borrowed its chords from, without competing with
-   the heading it qualifies. */
-.panel-source {
-  margin-left: 0.5rem;
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--text-muted);
 }
 
 /* A select sitting next to a heading should be only as wide as its content,
@@ -905,31 +704,6 @@ button:focus-visible {
   font-size: var(--text-md);
 }
 
-/* ---------- On this device ----------
- *
- * The settings about the reader rather than the music, at the end of the
- * „Ansicht" sheet: set once per device.
- */
-.app-footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1.5rem;
-}
-
-.app-footer .field--inline > span {
-  font-size: var(--text-2xs);
-}
-
-.app-footer select {
-  font-size: var(--text-xs);
-}
-
-.footer-toggle {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
 .link-button {
   display: inline-flex;
   align-items: center;
@@ -943,96 +717,6 @@ button:focus-visible {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-/* ---------- Chords ---------- */
-
-.progression {
-  display: flex;
-  flex-wrap: wrap;
-  /* Otherwise every card stretches to the height of an expanded picker. */
-  align-items: flex-start;
-  gap: 0.85rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-/* Above a sheet's content: what it is drawn from, and the one setting for it. */
-.sheet-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-/* Four to a row: every card a whole fingertip, and seven chords in two rows. */
-.chord-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.chord-grid .chord-card {
-  width: 100%;
-  min-width: 0;
-  min-height: 4.75rem;
-  padding: 0.5rem 0.25rem;
-}
-
-/* The picked chord: its grip, a step to the next one, and the way into the progression. */
-.chord-detail {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem 1.25rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-}
-
-.chord-detail-grip {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.grip-step {
-  width: var(--tap);
-  height: var(--tap);
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-round);
-  background: var(--panel);
-  color: var(--text);
-  font: inherit;
-  font-size: var(--text-lg);
-  cursor: pointer;
-}
-
-.grip-step:hover {
-  border-color: var(--text-muted);
-}
-
-.chord-append {
-  min-height: var(--tap);
-  padding: 0 1.1rem;
-  border: 1px solid var(--accent-text);
-  border-radius: var(--radius-round);
-  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
-  color: var(--accent-text);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-}
-
-.chord-append:hover {
-  background: color-mix(in srgb, var(--accent) 22%, var(--panel));
 }
 
 .chord-card {
@@ -1130,141 +814,11 @@ button:focus-visible {
   line-height: 1;
 }
 
-/* The same ring the neck draws around the exact pitch. */
-.unison-mark {
-  display: inline-block;
-  width: 0.85rem;
-  height: 0.85rem;
-  margin-left: 0.15rem;
-  border: 2px solid var(--text);
-  border-radius: 50%;
-  vertical-align: -0.1rem;
-}
-
-/* ---------- The characteristic tone ---------- */
-
-.degree-chip.is-characteristic {
-  border-style: dashed;
-  border-color: var(--root-stroke);
-}
-
-.characteristic-hint {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 0.3rem;
-  margin: 0.6rem 0 0;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-}
-
-.characteristic-hint strong {
-  color: var(--text);
-}
-
-/* The same dashed ring the neck draws around that tone. */
-.characteristic-mark {
-  display: inline-block;
-  width: 0.9rem;
-  height: 0.9rem;
-  margin-right: 0.2rem;
-  border: 2px dashed var(--root-stroke);
-  border-radius: 50%;
-}
-
-/* ---------- Progression extras ---------- */
-
-.progression-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem 1.25rem;
-  margin: -0.25rem 0 1rem;
-}
-
-.progression-tools .segmented button {
-  font-size: var(--text-xs);
-}
-
-.transpose {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
-.transpose span {
-  margin-right: 0.2rem;
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-medium);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-}
-
-.transpose button {
-  min-width: var(--tap);
-  min-height: var(--tap);
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-md);
-  background: var(--panel);
-  color: var(--text);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.transpose button:hover {
-  border-color: var(--accent);
-}
-
-/* The roman numerals, now a footnote to the chord names in the dropdown. */
-.roman-hint {
-  font-family: var(--font-display);
-  color: var(--accent-text);
-}
-
-/* ---------- How the neck is drawn ---------- */
-
-.view-hint {
-  margin: 0;
-  font-size: var(--text-xs);
-}
-
 /* ---------- Phone ---------- */
 
 @media (max-width: 700px) {
-  /* Let the string pickers shrink to share the width instead of overflowing. */
-  .tuning-strings select {
-    min-width: 0;
-    padding-inline: 0.1rem;
-    font-size: var(--text-xs);
-  }
-
-  /* Five controls in one row is one too many for a phone. The slider takes
-     whatever is left beside ▶ rather than a full line of its own — forcing the
-     break left ▶ alone on a line with 270px of nothing next to it. */
-  .transport {
-    gap: 0.7rem 0.9rem;
-  }
-
-  .tempo {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .panel {
-    margin-top: 1.75rem;
-  }
 
   .panel-head {
     flex-wrap: wrap;
-  }
-
-
-  /* Anchored left it would hang off the screen edge. */
-  .voicing-picker {
-    left: auto;
-    right: 0;
   }
 }

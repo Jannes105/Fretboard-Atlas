@@ -384,6 +384,15 @@
   pointer-events: none;
 }
 
+/*
+ * The board takes the focus so the arrow keys can walk it — and a tap focuses it
+ * too. Chrome then drew its own ring round the whole neck after every note found
+ * by finger, a frame nobody asked for. The ring is for the keyboard only.
+ */
+.fretboard:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .fretboard:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
