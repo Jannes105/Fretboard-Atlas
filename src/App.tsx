@@ -5,14 +5,14 @@ import { AppShell } from './components/AppShell';
 import { BottomTabs, type SheetId } from './components/BottomTabs';
 import { ChordRow } from './components/ChordRow';
 import { FretboardView } from './components/FretboardView';
-import { KeyButton, KeyPicker, type KeyPickerTab } from './components/KeyPicker';
-import { NeckLegend } from './components/NeckLegend';
+import { type Info, InfoBar } from './components/InfoBar';
+import { KeyButton, KeyPicker } from './components/KeyPicker';
 import { NeckViewPanel } from './components/NeckViewPanel';
 import { ProgressionPanel } from './components/ProgressionPanel';
+import { ScaleTones } from './components/ScaleTones';
 import { SetupPanel } from './components/SetupPanel';
 import { Sheet } from './components/Sheet';
 import { SoundPanel } from './components/SoundPanel';
-import { StartScreen } from './components/StartScreen';
 import { useAppState } from './hooks/useAppState';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useHighlight } from './hooks/useHighlight';
@@ -33,6 +33,7 @@ import {
   transposeSymbol,
   type Voicing,
   voicingMidi,
+  withAccidentals,
 } from './theory';
 import { customProgId } from './urlState';
 import './App.css';
@@ -135,13 +136,6 @@ export default function App() {
 
   /** Which sheet is up. Page state, not the link: a link carries the music. */
   const [sheet, setSheet] = useState<SheetId | null>(null);
-  /** The tab the key sheet opens on — a start card can ask for the lookup. */
-  const [keyTab, setKeyTab] = useState<KeyPickerTab>('choose');
-
-  const openKeySheet = (tab: KeyPickerTab) => {
-    setKeyTab(tab);
-    setSheet('key');
-  };
 
   /**
    * A tab opens its sheet, or shuts it when it is already up. Chords and the
@@ -152,11 +146,8 @@ export default function App() {
       setSheet(null);
       return;
     }
-    if (id === 'key' || ((id === 'chords' || id === 'progression') && scale === null)) {
-      openKeySheet('choose');
-      return;
-    }
-    setSheet(id);
+    const needsKey = (id === 'chords' || id === 'progression') && scale === null;
+    setSheet(needsKey ? 'key' : id);
   };
 
   const closeSheet = () => setSheet(null);
@@ -182,17 +173,45 @@ export default function App() {
     }));
   };
 
-  /** What a note touched on the neck (or a chip) picked out, for the legend. */
-  const pickedNote =
-    highlight && highlight.kind !== 'chord' && picked
-      ? {
-          label: picked.noteName ?? picked.label,
-          places: fretboard
-            .allPositions()
-            .filter((p) => p.pitchClass === picked.pitchClasses[0]).length,
-          hasUnison: picked.unisonMidi !== null,
-        }
-      : null;
+  /**
+   * What the info bar says, if anything. Hidden under a sheet: the sheet already
+   * shows what is picked or playing, and the bar would float over it.
+   */
+  const info = ((): Info | null => {
+    if (sheet !== null) return null;
+    if (transport.isPlaying && transport.playingStep !== null) {
+      const step = steps[transport.playingStep];
+      if (step) {
+        return {
+          kind: 'playing',
+          chord: step.chord.name(),
+          step: transport.playingStep,
+          steps: steps.length,
+        };
+      }
+    }
+    if (highlight?.kind === 'chord') {
+      const chord = chords[highlight.index];
+      if (chord) {
+        return {
+          kind: 'chord',
+          roman: chord.romanNumeral(highlight.index),
+          name: chord.name(),
+          notes: chord.notes.map((note) => withAccidentals(note.name())).join(' '),
+        };
+      }
+    }
+    if (highlight && picked) {
+      return {
+        kind: 'note',
+        label: picked.noteName ?? picked.label,
+        places: fretboard.allPositions().filter((p) => p.pitchClass === picked.pitchClasses[0])
+          .length,
+        hasUnison: picked.unisonMidi !== null,
+      };
+    }
+    return scale === null ? { kind: 'hint' } : null;
+  })();
 
   const top = (
     <>
@@ -277,9 +296,15 @@ export default function App() {
   const sheets = (
     <>
       <Sheet id="sheet-key" title={SHEET_TITLES.key} open={sheet === 'key'} onClose={closeSheet}>
+        {scale ? (
+          <ScaleTones
+            scale={scale}
+            characteristic={neck.characteristic}
+            isDegreeActive={isDegreeActive}
+            onPickDegree={pickDegree}
+          />
+        ) : null}
         <KeyPicker
-          // A start card asking for the other tab opens it afresh.
-          key={keyTab}
           scale={scale}
           root={root}
           onRootChange={(next) => update('root', next)}
@@ -299,7 +324,6 @@ export default function App() {
             // somewhere.
             setSheet('progression');
           }}
-          initialTab={keyTab}
           // A plain match is a finished answer: close and show the neck.
           onDone={closeSheet}
         />
@@ -314,7 +338,6 @@ export default function App() {
         {chords.length > 0 ? (
           <ChordRow
             chords={chords}
-            scale={scale}
             borrowedFrom={neck.isBorrowedHarmony ? chordScale : null}
             chordSize={state.chordSize}
             onChordSizeChange={(next) => update('chordSize', next)}
@@ -330,8 +353,6 @@ export default function App() {
                 ]),
               )
             }
-            showClear={highlight?.kind === 'chord'}
-            onClear={clear}
           />
         ) : scale ? (
           /*
@@ -491,23 +512,7 @@ export default function App() {
         onPickNote={pickNote}
       />
 
-      <NeckLegend
-        scale={scale}
-        characteristic={neck.characteristic}
-        isDegreeActive={isDegreeActive}
-        onPickDegree={pickDegree}
-        pickedNote={pickedNote}
-        onClear={clear}
-      />
-
-      {scale === null ? (
-        <StartScreen
-          onOpenKeyPicker={openKeySheet}
-          onQuickStart={(quickRoot, scaleTypeId) =>
-            patch((previous) => ({ ...previous, root: quickRoot, scaleTypeId }))
-          }
-        />
-      ) : null}
+      <InfoBar info={info} onClear={clear} onStop={transport.toggle} />
     </AppShell>
   );
 }

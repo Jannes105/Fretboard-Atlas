@@ -701,16 +701,6 @@ button:focus-visible {
   padding: 0 0.7rem;
 }
 
-/*
- * The way out of a highlight. Two places in the markup, but never two on screen:
- * whichever one sits where the click happened is the one that renders. Same rule,
- * so they cannot drift into looking like two different actions.
- */
-.picked-actions,
-.chord-row-actions {
-  margin: 0.5rem 0 0;
-}
-
 /* The play affordance: a warm round button, the app's accent. */
 .play-button {
   display: inline-flex;
@@ -819,13 +809,12 @@ button:focus-visible {
   }
 }
 
-/* ---------- The neck's legend ----------
- *
- * Under the board, because that is what it explains. See App.tsx for why it left
- * the key line.
- */
-.neck-legend {
-  margin-bottom: 2rem;
+/* ---------- The key's tones, at the top of the „Tonart" sheet ---------- */
+
+.scale-tones {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .degree-chips {
@@ -1142,93 +1131,7 @@ button:focus-visible {
   color: var(--text-muted);
 }
 
-/* ---------- The way in ----------
- *
- * The opening screen: three things someone might have come to do, and a row of
- * keys one tap away.
- */
-.start {
-  border-style: solid;
-  color: var(--text);
-}
-
-.start h2 {
-  margin: 0 0 0.75rem;
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-medium);
-}
-
-.start-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 0.6rem;
-}
-
-.start-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-md);
-  background: var(--panel);
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-button.start-card:hover {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
-}
-
-.start-card strong {
-  font-size: var(--text-md);
-}
-
-.start-card span {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-}
-
-/* Not a button: it explains what is already on screen. */
-.start-card--note {
-  border-style: dashed;
-  cursor: default;
-}
-
-.quick-starts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0.9rem 0 0;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
-.quick-start {
-  min-height: 2.25rem;
-  padding: 0.2rem 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  border-radius: var(--radius-round);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent-text);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.quick-start:hover {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-}
-
-/* ---------- A note found on the neck ---------- */
+/* ---------- Spelling on the keyless map ---------- */
 
 /* ♯ or ♭ on the keyless map: two glyphs, so the buttons can stay square. */
 .scale-title .spelling {
@@ -1244,23 +1147,6 @@ button.start-card:hover {
   font-family: 'Segoe UI Symbol', 'Apple Symbols', 'Noto Music', 'Noto Sans Symbols 2', sans-serif;
   font-size: 1.35rem;
   line-height: 1;
-}
-
-.picked-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 0.5rem;
-}
-
-.picked-note {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-}
-
-.picked-note strong {
-  color: var(--text);
-  font-size: var(--text-md);
 }
 
 /* The same ring the neck draws around the exact pitch. */

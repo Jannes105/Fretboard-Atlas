@@ -3,7 +3,6 @@ import { NoteText } from './NoteText';
 
 interface ChordRowProps {
   chords: readonly Chord[];
-  scale: Scale | null;
   /** The key the chords come from, when it is not the scale itself. */
   borrowedFrom: Scale | null;
   chordSize: ChordSize;
@@ -11,9 +10,6 @@ interface ChordRowProps {
   isChordActive: (index: number) => boolean;
   onPickChord: (index: number) => void;
   onAppend: (chord: Chord) => void;
-  /** Whether the current highlight is a chord — its way out sits here. */
-  showClear: boolean;
-  onClear: () => void;
 }
 
 /**
@@ -22,15 +18,12 @@ interface ChordRowProps {
  */
 export function ChordRow({
   chords,
-  scale,
   borrowedFrom,
   chordSize,
   onChordSizeChange,
   isChordActive,
   onPickChord,
   onAppend,
-  showClear,
-  onClear,
 }: ChordRowProps) {
   return (
     <section className="panel">
@@ -52,12 +45,6 @@ export function ChordRow({
           <option value={5}>Nonakkorde</option>
         </select>
       </div>
-
-      <p className="hint">
-        {borrowedFrom
-          ? `${scale?.type.name} hat keine eigenen Stufenakkorde — diese kommen aus ${borrowedFrom.name()}, der Tonart dahinter. Anklicken: du hörst den Akkord und siehst ihn im Hals; Töne außerhalb der Skala sind hohl gezeichnet.`
-          : 'Anklicken: du hörst den Akkord und siehst seine Töne im Hals. „+" hängt ihn an die Akkordfolge an.'}
-      </p>
 
       <ol className="chord-row">
         {chords.map((chord, i) => (
@@ -90,13 +77,6 @@ export function ChordRow({
         ))}
       </ol>
 
-      {showClear ? (
-        <p className="chord-row-actions">
-          <button type="button" className="link-button" onClick={onClear}>
-            Hervorhebung aufheben
-          </button>
-        </p>
-      ) : null}
     </section>
   );
 }

@@ -65,10 +65,6 @@
   scroll-margin-top: calc(var(--shell-top-h, 0px) + 2.25rem);
 }
 
-.fretboard-hint {
-  margin-top: 0.35rem;
-}
-
 /* The browser's default scrollbar is a slab; this one belongs to the design. */
 .fretboard-scroll {
   scrollbar-width: thin;

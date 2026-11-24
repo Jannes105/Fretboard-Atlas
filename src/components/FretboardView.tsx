@@ -870,17 +870,6 @@ export function FretboardView({
         {focused ? announce : ''}
       </p>
 
-      {onHoldNote ? (
-        <p className="hint fretboard-hint">
-          Antippen: Ton hören und jede Stelle mit diesem Ton finden — nochmal antippen
-          hebt das wieder auf. Gedrückt halten lässt ihn klingen.
-          {overflows
-            ? lefty
-              ? ' Der Hals geht links weiter — seitlich wischen.'
-              : ' Der Hals geht rechts weiter — seitlich wischen.'
-            : ''}
-        </p>
-      ) : null}
     </>
   );
 }

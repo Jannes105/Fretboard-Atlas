@@ -83,6 +83,10 @@ function openSheet(container: HTMLElement, name: SheetName) {
   if (tab.getAttribute('aria-expanded') !== 'true') fireEvent.click(tab);
 }
 
+/** The ✕ in the info bar: the one way back from a highlight. */
+const clearButton = (container: HTMLElement) =>
+  container.querySelector<HTMLButtonElement>('.info-bar-clear');
+
 /** The instrument's own selects in the „Ansicht" sheet: tuning and capo. */
 const instrumentSelects = (container: HTMLElement) =>
   [...container.querySelectorAll<HTMLSelectElement>('section[aria-label="Instrument"] select')];
@@ -133,7 +137,16 @@ describe('App — Alle Töne', () => {
     expect(container.querySelector('[aria-label="Lage"]')).toBeNull();
     expect(container.querySelectorAll('.chord-card')).toHaveLength(0);
     expect(container.querySelectorAll('.play-button')).toHaveLength(0);
-    expect(container.querySelector('.empty')).not.toBeNull();
+  });
+
+  it('beginnt mit dem Hals und einem einzigen Satz, statt mit Startkarten', () => {
+    const { container } = openApp();
+
+    // Der Start ist der Hals: ein Ton ist ein Tipp entfernt, und genau das sagt
+    // die Info-Leiste — einmal, ohne ✕, weil es nichts aufzuheben gibt.
+    expect(container.querySelector('.start-card')).toBeNull();
+    expect(container.querySelector('.info-bar')?.textContent).toContain('Tippe einen Ton an');
+    expect(clearButton(container)).toBeNull();
   });
 
   it('sagt auf dem Knopf, was er tut: „Tonart wählen"', () => {
@@ -188,35 +201,19 @@ describe('App — Alle Töne', () => {
     expect(window.location.search).not.toContain('scale=');
   });
 
-  it('öffnet den Wähler auch von den Startkarten aus', async () => {
+  it('führt über den Reiter im Tonart-Blatt zum Erkennen aus Akkorden', async () => {
     const user = userEvent.setup();
     const { container } = openApp();
 
-    const cards = [...container.querySelectorAll<HTMLButtonElement>('button.start-card')];
-    await user.click(cards.find((card) => card.textContent?.includes('Song'))!);
-
-    // Gleich auf dem Reiter, der zu der Karte gehört.
+    await openFinder(user, container);
     expect(container.querySelector('.keyfinder-field input')).not.toBeNull();
   });
-
   it('führt von „Akkorde" ohne Tonart dorthin, wo man eine wählt', () => {
     const { container } = openApp();
 
     // Ohne Tonart gibt es keine Stufenakkorde — ein leeres Blatt wäre eine Sackgasse.
     openSheet(container, 'Akkorde');
     expect(container.querySelector('.sheet')?.getAttribute('aria-label')).toBe('Tonart');
-  });
-
-  it('stellt per Schnellstart eine Tonart mit einem Tipp ein', async () => {
-    const user = userEvent.setup();
-    const { container } = openApp();
-
-    await user.click(
-      [...container.querySelectorAll<HTMLButtonElement>('.quick-start')].find(
-        (b) => b.textContent === 'E-Moll-Pentatonik',
-      )!,
-    );
-    expect(container.querySelector('.scale-title h2')?.textContent).toBe('E-Moll-Pentatonik');
   });
 });
 
@@ -792,6 +789,7 @@ describe('App — Hervorhebung', () => {
   it('hebt beim Klick auf einen Stufen-Chip genau diese Tonklasse hervor', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
+    openSheet(container, 'Tonart');
 
     // 3. Chip = Terz von A-Dur = C#. Auf dem Hals steht sie als C♯ — die ASCII-
     // Schreibweise bleibt der URL vorbehalten, siehe theory/format.ts.
@@ -803,20 +801,16 @@ describe('App — Hervorhebung', () => {
     expect(labels.length).toBeGreaterThan(0);
     expect(new Set(labels)).toEqual(new Set(['C♯']));
   });
-
   it('löst beim Klick auf eine Akkordkarte die Stufen-Hervorhebung ab', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
+
+    openSheet(container, 'Tonart');
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.degree-chip')[2]); // C# als Stufe
+
     openSheet(container, 'Akkorde');
-
-    const chips = container.querySelectorAll<HTMLButtonElement>('.degree-chip');
-    await user.click(chips[2]); // C# als Stufe
-
     const cards = container.querySelectorAll<HTMLButtonElement>('.chord-card');
     await user.click(cards[0]); // I = A-Dur (A C# E)
-
-    // Die Stufe ist nicht mehr aktiv, der Akkord schon — sie schließen sich aus.
-    expect(chips[2].getAttribute('aria-pressed')).toBe('false');
     expect(cards[0].getAttribute('aria-pressed')).toBe('true');
 
     // Der ganze Akkord in einer Farbe — auch das A, obwohl es der Skalengrundton
@@ -826,19 +820,26 @@ describe('App — Hervorhebung', () => {
     expect(container.querySelectorAll('.note-dot--chord-root').length).toBeGreaterThan(0);
     // Das A gehört hier zum Akkord, also steht kein Punkt mehr in Tonart-Orange.
     expect(container.querySelectorAll('.note-dot--root')).toHaveLength(0);
-  });
 
-  it('löscht die Hervorhebung über „aufheben“', async () => {
+    // Die Stufe ist nicht mehr aktiv, der Akkord schon — sie schließen sich aus.
+    openSheet(container, 'Tonart');
+    expect(container.querySelectorAll('.degree-chip')[2].getAttribute('aria-pressed')).toBe('false');
+  });
+  it('löscht die Hervorhebung über das ✕ der Info-Leiste', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
+    openSheet(container, 'Tonart');
     await user.click(container.querySelectorAll<HTMLButtonElement>('.degree-chip')[2]);
+    // Unter einem Blatt schweigt die Leiste: das Blatt zeigt selbst, was gewählt ist.
+    expect(container.querySelector('.info-bar')).toBeNull();
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.sheet-done')!);
     expect(container.querySelectorAll('.note-dot--picked').length).toBeGreaterThan(0);
 
-    await user.click(container.querySelector<HTMLButtonElement>('.picked-actions .link-button')!);
+    await user.click(clearButton(container)!);
     expect(container.querySelectorAll('.note-dot--picked')).toHaveLength(0);
   });
-
   it('bleibt beim zweiten Klick hervorgehoben, statt sich wegzuschalten', async () => {
     // Unter „Klick = hören“ klickt man denselben Akkord mehrfach, um ihn mehrfach
     // zu hören — die Hervorhebung dabei zu verlieren wäre überraschend.
@@ -871,59 +872,57 @@ describe('App — Hervorhebung', () => {
     await user.keyboard('{Escape}');
     expect(container.querySelectorAll('.note-dot--picked')).toHaveLength(0);
   });
-  it('bietet das Aufheben auch unten bei den Akkordkarten an, nicht nur über dem Hals', async () => {
-    // Der Link über dem Hals ist vom Klick auf eine Karte weit weg — auf dem
-    // Handy steht er außerhalb des Bildes.
+  it('nennt einen gewählten Akkord in der Info-Leiste — Stufe, Name, Töne', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
     openSheet(container, 'Akkorde');
 
-    expect(container.querySelector('.chord-row-actions')).toBeNull();
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[3]); // IV = D
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.sheet-done')!);
 
-    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[3]);
-    await user.click(container.querySelector<HTMLButtonElement>('.chord-row-actions .link-button')!);
+    const bar = container.querySelector('.info-bar')!;
+    expect(bar.querySelector('.info-bar-roman')?.textContent).toBe('IV');
+    expect(bar.textContent).toContain('D');
+    expect(bar.querySelector('.info-bar-text')?.textContent).toBe('D F♯ A');
 
+    await user.click(clearButton(container)!);
     expect(container.querySelectorAll('.note-dot--picked')).toHaveLength(0);
   });
-
-  it('zeigt genau einen Weg zurück, und zwar dort, wo geklickt wurde', async () => {
+  it('zeigt genau einen Weg zurück: das ✕ in der Info-Leiste', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
-    openSheet(container, 'Akkorde');
 
-    const undos = () => container.querySelectorAll('.link-button');
-
+    // Kein Link „Hervorhebung aufheben" mehr, an keiner Stelle — zwei davon für
+    // einen Zustand lasen sich wie zwei verschiedene Aktionen.
+    const undos = () =>
+      [...container.querySelectorAll('button')].filter(
+        (button) =>
+          button.textContent?.includes('aufheben') ||
+          button.getAttribute('aria-label') === 'Hervorhebung aufheben',
+      );
     expect(undos()).toHaveLength(0);
 
-    // Eine Stufe wird an der Legende unter dem Hals aufgehoben …
-    await user.click(container.querySelectorAll<HTMLButtonElement>('.degree-chip')[2]);
-    expect(undos()).toHaveLength(1);
-    expect(container.querySelector('.neck-legend .link-button')).not.toBeNull();
-
-    // … ein Akkord bei den Karten, die ihn ausgelöst haben. Nie beide zugleich:
-    // zwei Links für einen Zustand lasen sich wie zwei verschiedene Aktionen.
+    openSheet(container, 'Akkorde');
     await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[2]);
-    expect(undos()).toHaveLength(1);
-    expect(container.querySelector('.chord-row-actions .link-button')).not.toBeNull();
-    expect(container.querySelector('.neck-legend .link-button')).toBeNull();
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.sheet-done')!);
+    expect(undos()).toEqual([clearButton(container)]);
   });
-
-  it('stellt die Stufen-Chips unter den Hals, nicht darüber', async () => {
+  it('stellt die Stufen-Chips ins Tonart-Blatt, über den Wähler', () => {
     const { container } = render(<App />);
 
-    // Die Chips sind die Legende des Halses: gleiche Töne, gleiche Rollen, und
-    // ein Klick greift oben ins Bild. Eine Legende steht bei ihrem Bild.
-    const neck = container.querySelector('.fretboard-scroll')!;
-    const chips = container.querySelector('.degree-chips')!;
-
-    expect(container.querySelector('.scale-strip .degree-chips')).toBeNull();
-    expect(neck.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Unter einem aufrechten 24-Bund-Hals lagen sie zwei Bildschirme unter dem
+    // Bild, das sie erklären. Im Blatt liegt der Hals darüber.
+    expect(container.querySelector('.degree-chips')).toBeNull();
+    openSheet(container, 'Tonart');
+    const chips = container.querySelector('.sheet .degree-chips')!;
+    const picker = container.querySelector('.sheet .key-picker')!;
+    expect(chips.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
-
   it('lässt Escape bei offenem Blatt nur das Blatt schließen, die Hervorhebung bleibt', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
 
+    openSheet(container, 'Tonart');
     await user.click(container.querySelectorAll<HTMLButtonElement>('.degree-chip')[2]);
     openSheet(container, 'Ansicht');
 
@@ -971,13 +970,13 @@ describe('App — Klick = hören', () => {
   it('spielt beim Klick auf eine Stufe deren Töne', async () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
+    openSheet(container, 'Tonart');
 
     await user.click(container.querySelectorAll<HTMLButtonElement>('.degree-chip')[2]);
 
     expect(player.play).toHaveBeenCalledTimes(1);
     expect(player.play.mock.calls[0][0].length).toBeGreaterThan(0);
   });
-
   it('kommt insgesamt mit zwei Play-Buttons aus: Skala und Transport', () => {
     const { container } = render(<App />);
     openSheet(container, 'Folge');
@@ -1215,6 +1214,24 @@ describe('App — Transport der Akkordfolge', () => {
 
     // Es darf NICHT aus dem Nichts wieder losspielen.
     expect(player.startProgression).toHaveBeenCalledTimes(1);
+  });
+
+  it('nennt den klingenden Akkord in der Info-Leiste und stoppt von dort', async () => {
+    // Das Blatt zu, der Hals frei — und trotzdem sieht man, was spielt, und
+    // kommt mit einem Tipp wieder heraus.
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    openSheet(container, 'Folge');
+
+    await user.click(transportButton(container));
+    act(() => onChordOf(0)(1)); // V = E in A-Dur
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.sheet-done')!);
+
+    expect(container.querySelector('.info-bar-title')?.textContent).toBe('E');
+    expect(container.querySelector('.info-bar-text')?.textContent).toBe('2 / 4');
+
+    await user.click(container.querySelector<HTMLButtonElement>('.info-bar-stop')!);
+    expect(transport.stop).toHaveBeenCalled();
   });
 
   it('markiert den gerade klingenden Akkord', async () => {
@@ -1462,6 +1479,7 @@ describe('App — Neues aus dem UX-Review', () => {
     const user = userEvent.setup();
     window.history.replaceState(null, '', '/?root=D&scale=dorian');
     const { container } = render(<App />);
+    openSheet(container, 'Tonart');
 
     // D-Dorisch: die große Sexte, B.
     const hint = container.querySelector('.characteristic-hint')!;
@@ -1532,8 +1550,10 @@ describe('App — Noten finden', () => {
     const board = new Fretboard(undefined, 24);
     expect(picked).toHaveLength(board.allPositions().filter((p) => p.pitchClass === 0).length);
     expect(new Set(picked)).toEqual(new Set(['C']));
-    // Und die Legende sagt, wie viele Stellen es sind.
-    expect(container.querySelector('.picked-note')?.textContent).toContain('Stellen');
+    // Und die Info-Leiste sagt, wie viele Stellen es sind.
+    expect(container.querySelector('.info-bar')?.textContent).toContain(
+      `${picked.length} Stellen`,
+    );
   });
 
   it('umrandet nur die Stellen mit genau derselben Tonhöhe', () => {
@@ -1546,7 +1566,7 @@ describe('App — Noten finden', () => {
     expect(rings).toBeGreaterThan(0);
     // Nicht jedes C hat dieselbe Tonhöhe — andere Oktaven bleiben ohne Ring.
     expect(rings).toBeLessThan(pickedLabels(container).length);
-    expect(container.querySelector('.picked-note')?.textContent).toMatch(/C\d/);
+    expect(container.querySelector('.info-bar-title')?.textContent).toMatch(/^C\d$/);
   });
 
   it('wählt unter einer Tonart beim Antippen die passende Stufe', () => {
@@ -1554,6 +1574,7 @@ describe('App — Noten finden', () => {
 
     fireEvent.pointerDown(dotAt(container, 'E'), { pointerId: 1 });
 
+    openSheet(container, 'Tonart');
     const chips = [...container.querySelectorAll<HTMLButtonElement>('.degree-chip')];
     expect(chips[4].getAttribute('aria-pressed')).toBe('true'); // E = 5. Stufe
   });
@@ -1656,7 +1677,8 @@ describe('App — Noten finden, zweiter Durchgang', () => {
     const { container } = render(<App />); // A-Dur
     fireEvent.pointerDown(dotAt(container, 'E'), { pointerId: 1 });
 
-    expect(container.querySelector('.picked-note')?.textContent).toMatch(/E\d — an \d+ Stellen/);
+    expect(container.querySelector('.info-bar-title')?.textContent).toMatch(/^E\d$/);
+    expect(container.querySelector('.info-bar-text')?.textContent).toMatch(/^\d+ Stellen/);
   });
 
   it('zeichnet die schwarzen Tasten der Karte dunkler', () => {

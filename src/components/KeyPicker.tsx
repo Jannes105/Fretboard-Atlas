@@ -4,7 +4,7 @@ import { KeyFinder } from './KeyFinder';
 import { NoteText } from './NoteText';
 import './KeyPicker.css';
 
-export type KeyPickerTab = 'choose' | 'detect';
+type KeyPickerTab = 'choose' | 'detect';
 
 interface KeyPickerProps {
   /** The key on the neck, or null for the plain map of every note. */
@@ -20,8 +20,6 @@ interface KeyPickerProps {
    * sheet goes next is the caller's call — to the progression it just made.
    */
   onAdopt: (symbols: string[], root: string, scaleTypeId: string) => void;
-  /** Which tab it opens on — „Wählen", unless a start card asked for the lookup. */
-  initialTab?: KeyPickerTab;
   /** A match from the lookup is a finished answer: the sheet can close. */
   onDone: () => void;
 }
@@ -86,10 +84,9 @@ export function KeyPicker({
   onScaleTypeChange,
   onPickKey,
   onAdopt,
-  initialTab = 'choose',
   onDone,
 }: KeyPickerProps) {
-  const [tab, setTab] = useState<KeyPickerTab>(initialTab);
+  const [tab, setTab] = useState<KeyPickerTab>('choose');
 
   const scaleId = scale?.type.id ?? null;
 

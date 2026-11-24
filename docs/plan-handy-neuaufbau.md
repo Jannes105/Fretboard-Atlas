@@ -1,6 +1,6 @@
 # Plan: Neuaufbau für das Handy
 
-Stand: 24. November 2026. Phase 1 und 2 umgesetzt.
+Stand: 24. November 2026. Phase 1 bis 3 umgesetzt.
 
 Entwurf zum Durchklicken: [Fretboard Atlas – Handy-Entwurf](https://claude.ai/artifact/VFrzDZeF1yHpjt7zZhWcPw)
 (privat, fünf Bildschirme: Start, Ton gefunden, Tonart wählen, Akkord, Akkordfolge).
@@ -108,6 +108,13 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
   Stufenakkorden, Untertitel). Auf dem leeren Start ein einzeiliger Hinweis in
   der Info-Leiste.
 - Startkarten (`StartScreen`) entfallen; der Start ist der Hals.
+- Umgesetzt (`InfoBar`). Unter einem offenen Blatt ist die Leiste ausgeblendet,
+  wie im Entwurf. Während eine Folge spielt, zeigt sie den Akkord, „2 / 4" und ■.
+  Abweichung: Stufen-Chips und Charakterton-Hinweis (`ScaleTones`, vorher Teil
+  von `NeckLegend`) stehen jetzt oben im Tonart-Blatt — der Plan sagte nichts
+  dazu, und unter dem 24-Bund-Hals fand man sie nicht mehr. Der Wisch-Hinweis für
+  den waagerechten Hals fiel mit dem Antippen-Hinweis weg; der ausgeblendete
+  Rand bleibt.
 
 ### Phase 4 — Tonart und Lage
 - Grundton-Raster folgt der ♯/♭-Einstellung (heute immer ♭).
