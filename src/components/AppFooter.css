@@ -1,0 +1,24 @@
+/* ---------- On this device ----------
+ *
+ * The settings about the reader rather than the music, at the end of the
+ * „Ansicht" sheet: set once per device.
+ */
+.app-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+}
+
+.app-footer .field--inline > span {
+  font-size: var(--text-2xs);
+}
+
+.app-footer select {
+  font-size: var(--text-xs);
+}
+
+.footer-toggle {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}

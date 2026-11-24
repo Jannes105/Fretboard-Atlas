@@ -7,11 +7,11 @@ import type {
   SwingFeel,
   Voicing,
 } from '../theory';
-import { type RefObject, useEffect, useRef, useState } from 'react';
 import { customProgId, type CustomStep, type GripPreference, MAX_BPM, MIN_BPM } from '../urlState';
 import { ProgressionBuilder } from './ProgressionBuilder';
 import { ProgressionChord } from './ProgressionChord';
 import { RhythmControls, type RhythmStyleSettings } from './RhythmControls';
+import './ProgressionPanel.css';
 
 /**
  * The click track. 'Einzähler' counts you in and then leaves you to the guitar;
@@ -71,15 +71,6 @@ interface ProgressionPanelProps {
   onGripsChange: (grips: GripPreference) => void;
   /** Move the key — and the progression with it — by a semitone. */
   onTranspose: (semitones: 1 | -1) => void;
-
-  /** The transport row, watched by the dock that stands in for it off-screen. */
-  transportRef: RefObject<HTMLDivElement | null>;
-  /**
-   * Bumped when a progression has just been adopted from elsewhere — the panel
-   * then scrolls into view, lights up and hands the focus to ▶, so the click that
-   * created it visibly lands somewhere.
-   */
-  revealSerial: number;
 }
 
 /**
@@ -124,35 +115,13 @@ export function ProgressionPanel({
   grips,
   onGripsChange,
   onTranspose,
-  transportRef,
-  revealSerial,
 }: ProgressionPanelProps) {
-  const sectionRef = useRef<HTMLElement>(null);
-  const playRef = useRef<HTMLButtonElement>(null);
-  const [revealed, setRevealed] = useState(false);
-
-  useEffect(() => {
-    if (revealSerial === 0) return;
-    sectionRef.current?.scrollIntoView?.({
-      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-      block: 'start',
-    });
-    playRef.current?.focus({ preventScroll: true });
-    setRevealed(true);
-    const timer = window.setTimeout(() => setRevealed(false), 1600);
-    return () => window.clearTimeout(timer);
-  }, [revealSerial]);
-
   return (
-    <section
-      ref={sectionRef}
-      className={revealed ? 'panel progression-panel is-revealed' : 'panel progression-panel'}
-      aria-label="Akkordfolge"
-    >
+    <section className="progression-panel" aria-label="Akkordfolge">
       <div className="panel-head">
-        <h2>Akkordfolge</h2>
         <select
           className="select"
+          aria-label="Vorlage"
           value={isCustom ? 'custom' : (preset?.id ?? '')}
           onChange={(e) =>
             onProgressionIdChange(
@@ -185,9 +154,8 @@ export function ProgressionPanel({
         </p>
       )}
 
-      <div className="transport" ref={transportRef}>
+      <div className="transport">
         <button
-          ref={playRef}
           type="button"
           className={isPlaying ? 'play-button is-playing' : 'play-button'}
           onClick={onToggleTransport}
@@ -240,20 +208,6 @@ export function ProgressionPanel({
             ))}
           </select>
         </label>
-
-        <RhythmControls
-          beatsPerBar={beatsPerBar}
-          rhythm={rhythm}
-          strum={strum}
-          feel={feel}
-          sustain={sustain}
-          onBeatsPerBarChange={onBeatsPerBarChange}
-          onRhythmChange={onRhythmChange}
-          onStrumChange={onStrumChange}
-          onFeelChange={onFeelChange}
-          onSustainChange={onSustainChange}
-          onApplyStyle={onApplyStyle}
-        />
       </div>
 
       <div className="progression-tools">
@@ -292,6 +246,20 @@ export function ProgressionPanel({
           />
         ))}
       </ol>
+
+      <RhythmControls
+        beatsPerBar={beatsPerBar}
+        rhythm={rhythm}
+        strum={strum}
+        feel={feel}
+        sustain={sustain}
+        onBeatsPerBarChange={onBeatsPerBarChange}
+        onRhythmChange={onRhythmChange}
+        onStrumChange={onStrumChange}
+        onFeelChange={onFeelChange}
+        onSustainChange={onSustainChange}
+        onApplyStyle={onApplyStyle}
+      />
     </section>
   );
 }

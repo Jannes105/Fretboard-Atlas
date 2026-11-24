@@ -1,10 +1,10 @@
 import type { Timbre } from '../audio';
-import { usePopover } from '../hooks/usePopover';
 import type { AmpId } from '../synth/amp';
 import type { DelayId } from '../synth/delay';
 import type { PickupId } from '../synth/pickup';
 import type { ReverbId } from '../synth/reverb';
 import { TONE_MAX_DB, type ToneGains } from '../synth/toneStack';
+import './SoundPanel.css';
 
 /**
  * The four amplifiers, named for what a player would recognise rather than for the
@@ -122,6 +122,31 @@ function matchingPreset(current: SoundSettings): string | null {
   return match?.id ?? null;
 }
 
+/**
+ * The sound in a few words, for the folded line above the panel: a preset by its
+ * name, anything hand-made by what is actually doing something.
+ */
+function soundSummary(current: SoundSettings): string {
+  const preset = matchingPreset(current);
+  return (
+    SOUND_PRESETS.find((entry) => entry.id === preset)?.label ??
+    [
+      current.sound === 'electric'
+        ? AMP_LABELS.find((entry) => entry.value === current.amp)?.label
+        : 'Clean',
+      current.pickup === 'recorded'
+        ? null
+        : PICKUP_LABELS.find((entry) => entry.value === current.pickup)?.label,
+      current.reverb === 'off'
+        ? null
+        : REVERB_LABELS.find((entry) => entry.value === current.reverb)?.label,
+      current.delay === 'off' ? null : 'Delay',
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  );
+}
+
 interface SoundPanelProps extends SoundSettings {
   onSoundChange: (sound: Timbre) => void;
   /** Apply a preset — every setting at once, as one change. */
@@ -157,148 +182,122 @@ export function SoundPanel({
   onReverbChange,
   onDelayChange,
 }: SoundPanelProps) {
-  const { open, toggle, containerRef } = usePopover();
   const preset = matchingPreset({ sound, amp, pickup, tone, reverb, delay });
 
-  // A preset is named as itself. Anything hand-made is summed up from what is
-  // actually doing something — a room or an echo that is off is not worth a word.
-  const summary =
-    SOUND_PRESETS.find((entry) => entry.id === preset)?.label ??
-    [
-      sound === 'electric' ? AMP_LABELS.find((entry) => entry.value === amp)?.label : 'Clean',
-      pickup === 'recorded' ? null : PICKUP_LABELS.find((entry) => entry.value === pickup)?.label,
-      reverb === 'off' ? null : REVERB_LABELS.find((entry) => entry.value === reverb)?.label,
-      delay === 'off' ? null : 'Delay',
-    ]
-      .filter(Boolean)
-      .join(' · ');
-
   return (
-    <div className="setup" ref={containerRef}>
-      <button
-        type="button"
-        className={open ? 'trigger sound-trigger is-open' : 'trigger sound-trigger'}
-        aria-expanded={open}
-        aria-label="Klang"
-        onClick={toggle}
-      >
-        <svg className="trigger-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <path d="M2 9.5v-3h2.2L7.4 4v8L4.2 9.5H2z" />
-          <path d="M10.2 5.6a3.4 3.4 0 0 1 0 4.8M12.4 3.4a6.5 6.5 0 0 1 0 9.2" />
-        </svg>
-        <span className="trigger-label">Klang</span>
-        <span className="trigger-value">{summary}</span>
-        <span className="trigger-caret" aria-hidden="true">
-          ▾
+    // Folded: the four presets are the answer for almost everyone, and the fold
+    // names the one in use.
+    <details className="sheet-fold">
+      <summary>
+        <h3>Klang</h3>
+        <span className="sheet-fold-value">
+          {soundSummary({ sound, amp, pickup, tone, reverb, delay })}
         </span>
-      </button>
+      </summary>
+      <div className="setup-panel sound-panel">
+        <div className="preset-grid" role="group" aria-label="Klang-Voreinstellung">
+          {SOUND_PRESETS.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className="preset-button"
+              aria-pressed={preset === entry.id}
+              onClick={() => onApplyPreset(entry.settings)}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
 
-      {open ? (
-        <div className="popover setup-panel sound-panel">
-          <div className="preset-grid" role="group" aria-label="Klang-Voreinstellung">
-            {SOUND_PRESETS.map((entry) => (
-              <button
-                key={entry.id}
-                type="button"
-                className="preset-button"
-                aria-pressed={preset === entry.id}
-                onClick={() => onApplyPreset(entry.settings)}
-              >
-                {entry.label}
-              </button>
+        {/* Everything the presets combine, for whoever wants to turn the knobs
+            themselves. Shut by default: the four buttons are the answer for
+            almost everyone, and nine controls at once were the problem. */}
+        <details className="fine-tuning">
+          <summary>Feinabstimmung</summary>
+
+          <label className="field">
+            <span>Verzerrung</span>
+            <select value={sound} onChange={(e) => onSoundChange(e.target.value as Timbre)}>
+              <option value="clean">Clean</option>
+              <option value="electric">Overdrive</option>
+            </select>
+          </label>
+
+          {/* Clean never reaches the amplifier, so choosing one there would be a
+              control that does nothing. */}
+          {sound === 'electric' ? (
+            <label className="field">
+              <span>Verstärker</span>
+              <select value={amp} onChange={(e) => onAmpChange(e.target.value as AmpId)}>
+                {AMP_LABELS.map((entry) => (
+                  <option key={entry.value} value={entry.value}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          <label className="field">
+            <span>Tonabnehmer</span>
+            <select value={pickup} onChange={(e) => onPickupChange(e.target.value as PickupId)}>
+              {PICKUP_LABELS.map((entry) => (
+                <option key={entry.value} value={entry.value}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/* Sliders and not dropdowns: a tone control is turned, and a decibel is
+              small enough that thirteen positions is a gesture rather than a list.
+              Shown for both voices, because the stack sits on the finished sum —
+              see src/synth/toneStack.ts. */}
+          <div className="tone-stack" role="group" aria-label="Klangregelung">
+            {TONE_LABELS.map((entry) => (
+              <label className="tone-knob" key={entry.key}>
+                <span>
+                  {entry.label}{' '}
+                  <output>{tone[entry.key] > 0 ? `+${tone[entry.key]}` : tone[entry.key]}</output> dB
+                </span>
+                <input
+                  type="range"
+                  min={-TONE_MAX_DB}
+                  max={TONE_MAX_DB}
+                  step={1}
+                  value={tone[entry.key]}
+                  onChange={(e) => onToneChange({ ...tone, [entry.key]: Number(e.target.value) })}
+                />
+              </label>
             ))}
           </div>
 
-          {/* Everything the presets combine, for whoever wants to turn the knobs
-              themselves. Shut by default: the four buttons are the answer for
-              almost everyone, and nine controls at once were the problem. */}
-          <details className="fine-tuning">
-            <summary>Feinabstimmung</summary>
-
-            <label className="field">
-              <span>Verzerrung</span>
-              <select value={sound} onChange={(e) => onSoundChange(e.target.value as Timbre)}>
-                <option value="clean">Clean</option>
-                <option value="electric">Overdrive</option>
-              </select>
-            </label>
-
-            {/* Clean never reaches the amplifier, so choosing one there would be a
-                control that does nothing. */}
-            {sound === 'electric' ? (
-              <label className="field">
-                <span>Verstärker</span>
-                <select value={amp} onChange={(e) => onAmpChange(e.target.value as AmpId)}>
-                  {AMP_LABELS.map((entry) => (
-                    <option key={entry.value} value={entry.value}>
-                      {entry.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-
-            <label className="field">
-              <span>Tonabnehmer</span>
-              <select value={pickup} onChange={(e) => onPickupChange(e.target.value as PickupId)}>
-                {PICKUP_LABELS.map((entry) => (
-                  <option key={entry.value} value={entry.value}>
-                    {entry.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {/* Sliders and not dropdowns: a tone control is turned, and a decibel is
-                small enough that thirteen positions is a gesture rather than a list.
-                Shown for both voices, because the stack sits on the finished sum —
-                see src/synth/toneStack.ts. */}
-            <div className="tone-stack" role="group" aria-label="Klangregelung">
-              {TONE_LABELS.map((entry) => (
-                <label className="tone-knob" key={entry.key}>
-                  <span>
-                    {entry.label}{' '}
-                    <output>{tone[entry.key] > 0 ? `+${tone[entry.key]}` : tone[entry.key]}</output> dB
-                  </span>
-                  <input
-                    type="range"
-                    min={-TONE_MAX_DB}
-                    max={TONE_MAX_DB}
-                    step={1}
-                    value={tone[entry.key]}
-                    onChange={(e) => onToneChange({ ...tone, [entry.key]: Number(e.target.value) })}
-                  />
-                </label>
+          <label className="field">
+            <span>Hall</span>
+            <select value={reverb} onChange={(e) => onReverbChange(e.target.value as ReverbId)}>
+              {REVERB_LABELS.map((entry) => (
+                <option key={entry.value} value={entry.value}>
+                  {entry.label}
+                </option>
               ))}
-            </div>
+            </select>
+          </label>
 
-            <label className="field">
-              <span>Hall</span>
-              <select value={reverb} onChange={(e) => onReverbChange(e.target.value as ReverbId)}>
-                {REVERB_LABELS.map((entry) => (
-                  <option key={entry.value} value={entry.value}>
-                    {entry.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field">
-              <span>Delay</span>
-              <select value={delay} onChange={(e) => onDelayChange(e.target.value as DelayId)}>
-                {DELAY_LABELS.map((entry) => (
-                  <option key={entry.value} value={entry.value}>
-                    {entry.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {/* The echo follows the transport rather than a millisecond setting, so
-                moving the tempo slider moves it too. */}
-            {delay === 'off' ? null : <p className="hint">Folgt dem Tempo der Akkordfolge.</p>}
-          </details>
-        </div>
-      ) : null}
-    </div>
+          <label className="field">
+            <span>Delay</span>
+            <select value={delay} onChange={(e) => onDelayChange(e.target.value as DelayId)}>
+              {DELAY_LABELS.map((entry) => (
+                <option key={entry.value} value={entry.value}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {/* The echo follows the transport rather than a millisecond setting, so
+              moving the tempo slider moves it too. */}
+          {delay === 'off' ? null : <p className="hint">Folgt dem Tempo der Akkordfolge.</p>}
+        </details>
+      </div>
+    </details>
   );
 }

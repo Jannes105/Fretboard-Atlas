@@ -1,5 +1,6 @@
 import type { ThemeChoice } from '../hooks/useTheme';
 import type { NeckOrientation, ViewPrefs } from '../hooks/useViewPrefs';
+import './AppFooter.css';
 
 interface AppFooterProps {
   theme: ThemeChoice;

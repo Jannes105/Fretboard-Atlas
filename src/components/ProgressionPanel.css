@@ -1,0 +1,127 @@
+/* ---------- Transport ---------- */
+
+.transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem 1.25rem;
+  margin-bottom: 1rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-sunken);
+}
+
+.tempo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.tempo output {
+  font-weight: var(--weight-bold);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Wide enough that a single BPM is actually reachable by dragging — at 10rem one
+   step was barely a pixel. Arrow keys stay the exact way in either case. */
+.tempo input[type='range'] {
+  width: 13rem;
+  max-width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/*
+ * The slider and the checkbox are the only two elements on the page the browser
+ * was still sizing for us, at its own 13.333 px. They carry no text, so nothing
+ * looked wrong — but they were the last two values outside the scale.
+ */
+.tempo input[type='range'],
+.tone-knob input[type='range'],
+.toggle input {
+  font-size: var(--text-sm);
+}
+
+/* ---------- Chords ---------- */
+
+.progression {
+  display: flex;
+  flex-wrap: wrap;
+  /* Otherwise every card stretches to the height of an expanded picker. */
+  align-items: flex-start;
+  gap: 0.85rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------- Progression extras ---------- */
+
+.progression-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1.25rem;
+  margin: -0.25rem 0 1rem;
+}
+
+.progression-tools .segmented button {
+  font-size: var(--text-xs);
+}
+
+.transpose {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.transpose span {
+  margin-right: 0.2rem;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.transpose button {
+  min-width: var(--tap);
+  min-height: var(--tap);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.transpose button:hover {
+  border-color: var(--accent);
+}
+
+/* The roman numerals, now a footnote to the chord names in the dropdown. */
+.roman-hint {
+  font-family: var(--font-display);
+  color: var(--accent-text);
+}
+
+@media (max-width: 700px) {
+
+  /* Five controls in one row is one too many for a phone. The slider takes
+     whatever is left beside ▶ rather than a full line of its own — forcing the
+     break left ▶ alone on a line with 270px of nothing next to it. */
+  .transport {
+    gap: 0.7rem 0.9rem;
+  }
+
+  .tempo {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}

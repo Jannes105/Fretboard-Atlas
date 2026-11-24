@@ -1,6 +1,6 @@
 import type { Chord } from './Chord';
 import { Note } from './Note';
-import { ROOT_CHOICES, Scale } from './Scale';
+import { Scale, spellRoot } from './Scale';
 import { MAJOR, NATURAL_MINOR } from './ScaleType';
 
 /**
@@ -107,8 +107,11 @@ export function matchKeys(chords: readonly Chord[]): KeyMatch[] {
 
   const candidates: { match: KeyMatch; score: number; isMinor: boolean }[] = [];
 
-  for (const rootName of ROOT_CHOICES) {
+  for (let pitchClass = 0; pitchClass < 12; pitchClass++) {
     for (const mode of MODES) {
+      // Spelled the way the key is written — C♯ minor, not D♭ minor with its
+      // double flat. A tie keeps the flat, as the lead-sheet convention does.
+      const rootName = spellRoot(pitchClass, mode.type.id, false);
       const scale = new Scale(Note.parse(rootName), mode.type);
       const match = matchOneKey(chords, scale, mode.isMinor);
       candidates.push({ match, score: score(match, chords), isMinor: mode.isMinor });
@@ -119,7 +122,7 @@ export function matchKeys(chords: readonly Chord[]): KeyMatch[] {
     if (a.score !== b.score) return b.score - a.score;
     if (a.match.tonicEvidence !== b.match.tonicEvidence) return a.match.tonicEvidence ? -1 : 1;
     if (a.isMinor !== b.isMinor) return a.isMinor ? 1 : -1;
-    return 0; // stable sort keeps ROOT_CHOICES order for the rest
+    return 0; // stable sort keeps chromatic order for the rest
   });
 
   const best = candidates[0].score;

@@ -297,7 +297,7 @@ describe('Gerätebreite', () => {
   it('ändert nichts am Zustand — ein Handy liest denselben Link wie ein Desktop', () => {
     // Früher setzte ein schmaler Bildschirm still zwölf Bünde und schrieb sie in
     // den Link. Der Zustand ist jetzt allein die URL.
-    expect(readState('').fretCount).toBe(15);
+    expect(readState('').fretCount).toBe(24);
     expect(writeState(readState(''))).toBe('');
   });
 });

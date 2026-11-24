@@ -129,3 +129,13 @@
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
+
+@media (max-width: 700px) {
+
+
+  /* Anchored left it would hang off the screen edge. */
+  .voicing-picker {
+    left: auto;
+    right: 0;
+  }
+}

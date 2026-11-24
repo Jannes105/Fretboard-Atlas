@@ -28,6 +28,19 @@ export const TOP_Y = 44;
 /** Wide enough that a two-character label with an accidental is not up against the rim. */
 export const DOT_RADIUS = 14;
 export const ROOT_RADIUS = 16;
+/**
+ * Upright on a phone the drawing is cropped to the board and stretched to the
+ * screen's width, about 1.2 px to the unit at 375 px. At 17 units a dot lands at
+ * 40 px — a fingertip — and still leaves a clear gap to the next string.
+ */
+export const UPRIGHT_DOT_RADIUS = 17;
+export const UPRIGHT_ROOT_RADIUS = 19;
+/** Fret numbers beside an upright neck sit close in, so the board gets the width. */
+export const UPRIGHT_NUMBER_GAP = 14;
+/** What an upright view keeps across the neck beyond the board: halos, numbers. */
+export const UPRIGHT_RIM = 8;
+export const UPRIGHT_GUTTER = 30;
+
 /** A real neck is wider than the span of its strings. */
 export const BOARD_MARGIN = 18;
 /**

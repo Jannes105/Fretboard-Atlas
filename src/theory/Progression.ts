@@ -58,7 +58,9 @@ export const PROGRESSIONS: readonly Progression[] = [
     name: 'i – VI – III – VII',
     degrees: [0, 5, 2, 6],
     fits: 'minor',
-    hint: 'Häufige Moll-Progression (Andalusisch verwandt).',
+    // Am – F – C – G is vi – IV – I – V of C major. The Andalusian cadence it was
+    // once filed under is i – VII – VI – V, a different line altogether.
+    hint: 'Häufige Moll-Progression — die Akkorde des „Vier-Akkorde-Songs“, von Moll aus gedacht.',
   },
   {
     id: 'i-iv-v',

@@ -8,10 +8,10 @@ man etwas ändert.
 
 Die Oberfläche ist nach Häufigkeit geordnet, nicht nach Vollständigkeit:
 
-1. **Immer sichtbar:** Tonart-Knopf, Hals, Lagen (1 Tipp je Lage), Stufen-Chips,
-   Stufenakkorde, Akkordfolge, ▶.
-2. **Ein Klick:** „Ansicht" (Notennamen/Stufen, Lagen-Ausschnitt, CAGED),
-   Griffwahl je Akkord, Rhythmus-Stile, Klang-Voreinstellungen.
+1. **Immer sichtbar:** Tonart-Knopf, Hals, Lagen (1 Tipp je Lage), Stufen-Chips, ▶.
+2. **Ein Tipp:** die vier Blätter der Unterleiste — Tonart, Akkorde (Stufenakkorde),
+   Folge (Akkordfolge, Griffwahl je Akkord, Rhythmus-Stile), Ansicht
+   (Notennamen/Stufen, Lagen-Ausschnitt, CAGED, Klang-Voreinstellungen).
 3. **Für Fortgeschrittene, eingeklappt:** Stimmung, Kapo, Bünde, Verstärker,
    Tonabnehmer, EQ, Hall, Delay, Taktart, Schlagmuster, Groove.
 
@@ -24,6 +24,16 @@ schöner? Ebene 3.*
 `useNeckModel` (Tonart, Hals, Lagen, CAGED), `useProgression` (Folge und Griffe),
 `useHighlight` (was hervorgehoben ist), `useAudioPlayer`, `useScaleRun` und
 `useTransport`.
+
+Die Oberfläche ist vom Handy her gebaut: `AppShell` (Kopfleiste, Hals, Unterleiste),
+vier `Sheet`s von unten und die schwebende `InfoBar`. Der Plan dazu und seine
+Abweichungen stehen in [plan-handy-neuaufbau.md](plan-handy-neuaufbau.md).
+
+**CSS:** `App.css` hält die Tokens (Farben, Größen) und die geteilten Bausteine
+(`.trigger`, `.segmented`, `.field`, `.play-button`, Akkordkarte …) und wird in
+`App.tsx` **zuerst** geladen. Jede Komponente bringt danach ihre eigene `.css` mit.
+Die Reihenfolge trägt: bei gleicher Spezifität gewinnt die Komponente über die
+Basis (`.app-footer select` über `.field--inline select`).
 
 Die Musiktheorie steckt vollständig in `src/theory/` und kennt weder React noch
 das DOM:

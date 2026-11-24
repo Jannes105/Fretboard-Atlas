@@ -1,0 +1,36 @@
+/*
+ * Bass, Mitten, Höhen in one row. Side by side rather than stacked because the
+ * three of them are read as a shape — a scoop or a smile — and that only works
+ * if they are next to each other.
+ */
+.tone-stack {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+
+.tone-knob {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.tone-knob output {
+  font-weight: var(--weight-bold);
+  color: var(--text);
+  /* Tabular, so nudging a control does not shuffle the two beside it. */
+  font-variant-numeric: tabular-nums;
+}
+
+.tone-knob input[type='range'] {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}

@@ -114,15 +114,15 @@ export function useHighlight(chords: readonly Chord[], scale: Scale | null, spel
 
   /**
    * Escape clears the highlight — the way out that does not depend on scrolling
-   * back to a link. An open panel owns Escape first: closing a drawer must not
-   * also wipe the neck. Every panel shares the `.popover` class.
+   * back to a link. An open sheet owns Escape first: closing it must not also
+   * wipe the neck.
    */
   useEffect(() => {
     if (highlight === null) return;
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (document.querySelector('.popover')) return;
+      if (document.querySelector('.sheet')) return;
       setHighlight(null);
     };
 

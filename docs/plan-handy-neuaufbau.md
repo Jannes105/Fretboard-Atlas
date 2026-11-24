@@ -1,6 +1,6 @@
 # Plan: Neuaufbau für das Handy
 
-Stand: 21. November 2026. Noch nicht begonnen.
+Stand: 24. November 2026. Alle sechs Phasen umgesetzt.
 
 Entwurf zum Durchklicken: [Fretboard Atlas – Handy-Entwurf](https://claude.ai/artifact/VFrzDZeF1yHpjt7zZhWcPw)
 (privat, fünf Bildschirme: Start, Ton gefunden, Tonart wählen, Akkord, Akkordfolge).
@@ -79,6 +79,11 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
 - Offenes Blatt: im Zustand der Seite, nicht in der URL.
 - `TransportDock` entfällt — die Folge spielt aus dem Blatt, der aktuelle Akkord
   steht in der Info-Leiste.
+- Umgesetzt. Abweichungen: Die Popover-Hüllen von `KeyPicker`, `NeckViewPanel`,
+  `SetupPanel` und `SoundPanel` sind weg (nur der Inhalt zog um); ein Tipp auf den
+  Hals schließt ein Blatt **nicht**, damit der Hals bedienbar bleibt — Escape,
+  „Fertig" und der Reiter schließen es. Bis zur Info-Leiste (Phase 3) zeigt ein
+  Punkt am Reiter „Folge", dass eine Folge läuft.
 
 ### Phase 2 — Hals
 - Senkrechter Hals über die volle Breite, Punkte 40 px, Saitennamen sticky.
@@ -87,6 +92,13 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
   danach 24.
 - Bündezahl aus `SetupPanel` nach „Ansicht" holen.
 - Lage antippen scrollt den Hals zur Lage.
+- Umgesetzt. Der aufrechte Hals ist quer auf das Brett beschnitten und füllt die
+  Breite (bis 26rem); Punkte 40 px bei 375 px. Die Saitennamen sind eine eigene
+  HTML-Zeile über der Zeichnung, die unter der Kopfleiste kleben bleibt
+  (`--shell-top-h` misst `AppShell`). Die Bündezahl ist ein 12 · 15 · 24-Schalter
+  im Abschnitt „Hals" und steht auch ohne Tonart. Gescrollt wird nur beim ganzen
+  Hals; mit „Nur die gewählte Lage zeigen" (Vorgabe) ist der Hals ohnehin
+  beschnitten.
 
 ### Phase 3 — Info-Leiste und Ruhe
 - `NeckLegend` wird eine schwebende Leiste über der Unterleiste: Ton
@@ -96,12 +108,28 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
   Stufenakkorden, Untertitel). Auf dem leeren Start ein einzeiliger Hinweis in
   der Info-Leiste.
 - Startkarten (`StartScreen`) entfallen; der Start ist der Hals.
+- Umgesetzt (`InfoBar`). Unter einem offenen Blatt ist die Leiste ausgeblendet,
+  wie im Entwurf. Während eine Folge spielt, zeigt sie den Akkord, „2 / 4" und ■.
+  Abweichung: Stufen-Chips und Charakterton-Hinweis (`ScaleTones`, vorher Teil
+  von `NeckLegend`) stehen jetzt oben im Tonart-Blatt — der Plan sagte nichts
+  dazu, und unter dem 24-Bund-Hals fand man sie nicht mehr. Der Wisch-Hinweis für
+  den waagerechten Hals fiel mit dem Antippen-Hinweis weg; der ausgeblendete
+  Rand bleibt.
 
 ### Phase 4 — Tonart und Lage
 - Grundton-Raster folgt der ♯/♭-Einstellung (heute immer ♭).
 - Lage-Leiste kompakt in der Kopfleiste (eine Zeile, 44 px hoch).
-- ♯/♭ bleibt in der Kopfleiste, auch mit Tonart (wirkt dann nur, wo die Tonart
-  nichts vorgibt — oder ausblenden; siehe offene Fragen).
+- ♯/♭ steht in der Kopfleiste nur ohne Tonart; mit Tonart nimmt ▶ „Skala
+  abspielen" seinen Platz ein (wie heute).
+- Umgesetzt, mit einer Änderung am ersten Punkt (entschieden am 24. November):
+  Schwarze Tasten zeigen **beide** Namen, der aus der ♯/♭-Einstellung groß. Wörtlich
+  der Einstellung zu folgen hätte bei der Vorgabe ♯ Dur-Tonarten mit Doppelkreuzen
+  ergeben (G♯-Dur statt A♭-Dur). Geschrieben wird die Tonart mit dem Namen, der in
+  ihrer Skala weniger Vorzeichen braucht (`spellRoot`); bei Gleichstand entscheidet
+  die Einstellung. Das gilt auch beim Skalenwechsel, beim Transponieren und für die
+  Treffer aus „Aus Akkorden erkennen". Links nehmen jetzt auch `root=C%23` usw. an.
+  Die Lage-Leiste ist eine Zeile („Ganz" statt „Ganzer Hals"); die Kopfleiste ist
+  mit Tonart 117 px hoch statt bis zu ~190.
 
 ### Phase 5 — Akkorde, Folge, Ansicht
 - Akkord-Raster mit großen Trefferflächen; „+" nicht mehr halb auf dem Rand,
@@ -109,6 +137,15 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
 - Griffbilder: ausgewählter Akkord zeigt seinen Griff im Blatt.
 - Folge: Rhythmus, Schlagmuster, Groove eingeklappt unter „Mehr".
 - Ansicht: Klang-Feinabstimmung ganz unten, eingeklappt.
+- Umgesetzt. Akkorde: Viererraster ohne „+" an den Karten; der gewählte Akkord
+  zeigt darunter seinen Griff (‹ › wechselt und spielt ihn, erster Griff nach
+  „Offene Griffe zuerst" wie in der Folge) und einen Knopf „+ Am zur Folge".
+  Akkordgröße als Schalter Drei · Sept · Non. Folge: Überschrift entfällt (der
+  Blatttitel sagt es), Rhythmus ist ein Fach am Ende des Blatts statt eines
+  Popovers — der Name „Mehr" wurde „Rhythmus · 4/4 · Einfach (Viertel)", weil er
+  sagt, was drin ist. Ansicht: Hals, Gerät, dann Instrument und Klang eingeklappt,
+  mit dem aktuellen Wert auf der Zeile. Damit gibt es keine Popover mehr
+  (`usePopover` entfernt).
 
 ### Phase 6 — Aufräumen
 - Instrument-Symbol (Sonne) entfällt mit dem Umzug nach „Ansicht".
@@ -117,6 +154,16 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
 - `App.css` (~1700 Zeilen) auf die neuen Komponenten verteilen.
 - Inhaltlich: i–VI–III–VII ist nicht „andalusisch verwandt" (andalusisch =
   i–VII–VI–V).
+- Umgesetzt. Das Instrument-Symbol war schon mit Phase 1 weg. Der Rahmen kam
+  nicht aus einer `:focus`-Regel, sondern aus Chromes eigenem Ring für das
+  fokussierbare SVG; `.fretboard:focus:not(:focus-visible)` nimmt ihn für Zeiger
+  weg, die Tastatur behält ihren. `App.css` (1270 Zeilen nach Phase 5) ist auf
+  Basis plus Komponenten-Dateien verteilt (`App.css` 824, davon ~240 Tokens);
+  `AppShell.css` ging an `Sheet`, `BottomTabs` und `InfoBar`. Geprüft mit
+  Pixelvergleich von 20 Zuständen vor/nach — gleich bis auf bekanntes Rauschen.
+  Tote Regeln aus dem Umbau (`.panel`, `.scale-title .key-picker`) sind weg;
+  schon vorher tote (`hint--warn`, `panel-title`, `note-label--stacked`,
+  `builder-diatonic*`) blieben unangetastet.
 
 ## Prüfen
 
@@ -126,12 +173,12 @@ Jede Phase ist für sich auslieferbar und lässt die App benutzbar.
   nicht am Ende auf einmal.
 - `npm test`, `npm run build`, `npm run lint` grün.
 
-## Offene Fragen
+## Entscheidungen (24. November 2026)
 
-- Klang-Einstellungen (Verstärker, Tonabnehmer, EQ, Hall, Delay) und
-  Rhythmus-Editor: nur eingeklappt nach hinten schieben, oder ganz entfernen?
-  Der Plan geht vom Einklappen aus.
-- ♯/♭-Schalter unter einer Tonart: ausblenden oder als Vorrang für Töne außerhalb
-  der Tonart behalten?
-- Desktop: gleiches Layout breiter, oder Blätter dort als Seitenleiste neben dem
-  waagerechten Hals?
+- **Klang und Rhythmus-Editor bleiben, eingeklappt:** Klang ganz unten unter
+  „Ansicht", Rhythmus/Schlagmuster/Groove unter „Folge → Mehr". Nichts wird entfernt.
+- **♯/♭ nur ohne Tonart:** mit Tonart benennt die Tonart jeden Ton; an der Stelle
+  steht dann ▶ „Skala abspielen" — wie heute.
+- **Desktop später:** jetzt nur sicherstellen, dass der Desktop nicht kaputtgeht
+  (gleiches Layout, breiter). Ob es eine eigene Desktop-Variante gibt (z. B.
+  Seitenleiste neben waagerechtem Hals), wird nach dem Handy-Umbau entschieden.

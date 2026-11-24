@@ -1,0 +1,94 @@
+/* ---------- The key's tones, at the top of the „Tonart" sheet ---------- */
+
+.scale-tones {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.degree-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* These looked like buttons and did nothing. Now they are buttons: clicking a
+   degree picks it out on the neck. */
+.degree-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  justify-content: center;
+  min-width: 2.6rem;
+  min-height: var(--tap);
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: inherit;
+  font: inherit;
+  line-height: 1.15;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.degree-chip:hover {
+  border-color: var(--accent);
+}
+
+.degree-chip.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.degree-chip .note-name {
+  font-weight: var(--weight-bold);
+  font-size: var(--text-md);
+}
+
+.degree-chip .note-degree {
+  font-size: var(--text-2xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.degree-chip.is-root .note-name {
+  color: var(--accent-text);
+}
+
+/* ---------- The characteristic tone ---------- */
+
+.degree-chip.is-characteristic {
+  border-style: dashed;
+  border-color: var(--root-stroke);
+}
+
+.characteristic-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.3rem;
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.characteristic-hint strong {
+  color: var(--text);
+}
+
+/* The same dashed ring the neck draws around that tone. */
+.characteristic-mark {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-right: 0.2rem;
+  border: 2px dashed var(--root-stroke);
+  border-radius: 50%;
+}

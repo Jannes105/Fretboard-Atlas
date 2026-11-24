@@ -1,9 +1,24 @@
-import { type Chord, type ChordSize, type Scale, withAccidentals } from '../theory';
+import { useState } from 'react';
+import {
+  type Chord,
+  type ChordSize,
+  type Scale,
+  type Voicing,
+  voicingPath,
+  withAccidentals,
+} from '../theory';
+import { ChordDiagram } from './ChordDiagram';
 import { NoteText } from './NoteText';
+import './ChordRow.css';
+
+const SIZES: readonly { value: ChordSize; label: string }[] = [
+  { value: 3, label: 'Drei' },
+  { value: 4, label: 'Sept' },
+  { value: 5, label: 'Non' },
+];
 
 interface ChordRowProps {
   chords: readonly Chord[];
-  scale: Scale | null;
   /** The key the chords come from, when it is not the scale itself. */
   borrowedFrom: Scale | null;
   chordSize: ChordSize;
@@ -11,57 +26,69 @@ interface ChordRowProps {
   isChordActive: (index: number) => boolean;
   onPickChord: (index: number) => void;
   onAppend: (chord: Chord) => void;
-  /** Whether the current highlight is a chord — its way out sits here. */
-  showClear: boolean;
-  onClear: () => void;
+  /** Every grip there is for a chord in the current tuning. */
+  voicingsOf: (chord: Chord) => readonly Voicing[];
+  onHearVoicing: (voicing: Voicing) => void;
+  /** „Offene Griffe zuerst": the grip shown first is the one the progression would pick. */
+  preferOpen: boolean;
+}
+
+/** "A-Form, 5. Bund" — or just "5. Bund" for a generated grip with no form name. */
+function describe(voicing: Voicing): string {
+  const position = voicing.baseFret === 0 ? 'offen' : `${voicing.baseFret}. Bund`;
+  return voicing.shapeName === '' ? position : `${voicing.shapeName}, ${position}`;
 }
 
 /**
- * The key's own chords as cards. Clicking one sounds it and shows it on the neck;
- * its „+" appends it to the progression — one set of cards, two actions.
+ * The key's own chords in the „Akkorde" sheet: a grid of cards, each a whole
+ * fingertip wide. A tap sounds the chord and shows it on the neck above; below
+ * the grid the picked chord then shows how to grip it, and how to add it to the
+ * progression.
+ *
+ * The „+" used to hang half off the corner of every card — seven small targets
+ * crowding seven big ones, and the cause of every mis-tap between „hear it" and
+ * „add it". Now there is one, for the chord you are looking at.
  */
 export function ChordRow({
   chords,
-  scale,
   borrowedFrom,
   chordSize,
   onChordSizeChange,
   isChordActive,
   onPickChord,
   onAppend,
-  showClear,
-  onClear,
+  voicingsOf,
+  onHearVoicing,
+  preferOpen,
 }: ChordRowProps) {
+  const activeIndex = chords.findIndex((_, i) => isChordActive(i));
+  const active = activeIndex >= 0 ? chords[activeIndex] : null;
+
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <h2>
-          Leitereigene Akkorde
-          {borrowedFrom ? (
-            <span className="panel-source">aus {withAccidentals(borrowedFrom.name())}</span>
-          ) : null}
-        </h2>
-        <select
-          className="select"
-          aria-label="Akkordgröße"
-          value={chordSize}
-          onChange={(e) => onChordSizeChange(Number(e.target.value) as ChordSize)}
-        >
-          <option value={3}>Dreiklänge</option>
-          <option value={4}>Septakkorde</option>
-          <option value={5}>Nonakkorde</option>
-        </select>
+    <section className="chord-sheet" aria-label="Leitereigene Akkorde">
+      <div className="sheet-toolbar">
+        {borrowedFrom ? (
+          <span className="panel-source">aus {withAccidentals(borrowedFrom.name())}</span>
+        ) : (
+          <span />
+        )}
+        <div className="segmented" role="group" aria-label="Akkordgröße">
+          {SIZES.map((size) => (
+            <button
+              key={size.value}
+              type="button"
+              aria-pressed={chordSize === size.value}
+              onClick={() => onChordSizeChange(size.value)}
+            >
+              {size.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <p className="hint">
-        {borrowedFrom
-          ? `${scale?.type.name} hat keine eigenen Stufenakkorde — diese kommen aus ${borrowedFrom.name()}, der Tonart dahinter. Anklicken: du hörst den Akkord und siehst ihn im Hals; Töne außerhalb der Skala sind hohl gezeichnet.`
-          : 'Anklicken: du hörst den Akkord und siehst seine Töne im Hals. „+" hängt ihn an die Akkordfolge an.'}
-      </p>
-
-      <ol className="chord-row">
+      <ol className="chord-grid">
         {chords.map((chord, i) => (
-          <li key={chord.name()} className="chord-slot">
+          <li key={chord.name()}>
             <button
               type="button"
               className={isChordActive(i) ? 'chord-card is-active' : 'chord-card'}
@@ -76,27 +103,85 @@ export function ChordRow({
                 {chord.notes.map((note) => note.name()).map(withAccidentals).join(' ')}
               </span>
             </button>
-
-            <button
-              type="button"
-              className="chord-add tap-target"
-              aria-label={`${chord.name()} an die Folge anhängen`}
-              title="An die Folge anhängen"
-              onClick={() => onAppend(chord)}
-            >
-              +
-            </button>
           </li>
         ))}
       </ol>
 
-      {showClear ? (
-        <p className="chord-row-actions">
-          <button type="button" className="link-button" onClick={onClear}>
-            Hervorhebung aufheben
-          </button>
-        </p>
+      {active ? (
+        <ChordDetail
+          // A different chord starts again at its own best grip.
+          key={active.name()}
+          chord={active}
+          voicings={voicingsOf(active)}
+          preferOpen={preferOpen}
+          onHear={onHearVoicing}
+          onAppend={() => onAppend(active)}
+        />
       ) : null}
     </section>
+  );
+}
+
+interface ChordDetailProps {
+  chord: Chord;
+  voicings: readonly Voicing[];
+  preferOpen: boolean;
+  onHear: (voicing: Voicing) => void;
+  onAppend: () => void;
+}
+
+/** The picked chord: one grip at a time, the others a step away, and „+ zur Folge". */
+function ChordDetail({ chord, voicings, preferOpen, onHear, onAppend }: ChordDetailProps) {
+  // A path of one chord: the same comfort rule the progression walks by.
+  const [index, setIndex] = useState(() => voicingPath([voicings], { preferOpen })[0] ?? 0);
+  const voicing = voicings[index];
+
+  const step = (delta: number) => {
+    const next = (index + delta + voicings.length) % voicings.length;
+    setIndex(next);
+    onHear(voicings[next]);
+  };
+
+  return (
+    <div className="chord-detail">
+      {voicing ? (
+        <div className="chord-detail-grip">
+          {voicings.length > 1 ? (
+            <button
+              type="button"
+              className="grip-step"
+              aria-label="Vorheriger Griff"
+              onClick={() => step(-1)}
+            >
+              ‹
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="voicing-button"
+            onClick={() => onHear(voicing)}
+            aria-label={`${chord.name()} anhören (${describe(voicing)})`}
+          >
+            <ChordDiagram chord={chord} voicing={voicing} caption={describe(voicing)} />
+          </button>
+          {voicings.length > 1 ? (
+            <button
+              type="button"
+              className="grip-step"
+              aria-label="Nächster Griff"
+              onClick={() => step(1)}
+            >
+              ›
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <p className="no-shape">Für diesen Akkord ist in dieser Stimmung kein Griff hinterlegt.</p>
+      )}
+
+      <button type="button" className="chord-append" onClick={onAppend}>
+        + <NoteText name={chord.name()} /> zur Folge
+      </button>
+    </div>
   );
 }

@@ -22,6 +22,11 @@ import {
   ROOT_RADIUS,
   STRING_GAP,
   stringY,
+  UPRIGHT_DOT_RADIUS,
+  UPRIGHT_GUTTER,
+  UPRIGHT_NUMBER_GAP,
+  UPRIGHT_RIM,
+  UPRIGHT_ROOT_RADIUS,
 } from './neckGeometry';
 import { NoteTspans } from './NoteText';
 import './FretboardView.css';
@@ -259,9 +264,28 @@ export function FretboardView({
   };
 
   const [vx, , vw] = layout.viewBox.split(' ').map(Number);
+
+  /*
+   * Upright, the view is cropped to the board across and starts at the board
+   * along: the string names left the drawing for a row of their own that stays
+   * in sight while the page scrolls down the neck, and the fret numbers sit close
+   * in. That is what lets the board take the screen's whole width.
+   */
+  const acrossFrom = boardTop - UPRIGHT_RIM;
+  const acrossTo = boardFoot + UPRIGHT_GUTTER;
+  const uprightX = lefty ? acrossFrom : height - acrossTo;
+  const uprightW = acrossTo - acrossFrom;
+  const alongFrom = boardLeft - 4;
+  const alongLength = vx + vw - alongFrom;
   const viewBox = vertical
-    ? `0 ${vx} ${height} ${vw}`
+    ? `${uprightX} ${alongFrom} ${uprightW} ${alongLength}`
     : `${lefty ? width - vx - vw : vx} 0 ${vw} ${height}`;
+
+  /** Where across the upright view a string runs, as a share of its width. */
+  const uprightShare = (stringIndex: number) =>
+    ((P(0, stringY(stringIndex, stringCount))[0] - uprightX) / uprightW) * 100;
+
+  const numberGap = vertical ? UPRIGHT_NUMBER_GAP : 24;
 
   // The capo acts as a movable nut: notes at the capo fret are the new open strings.
   const capoX = NUT_X + capo * FRET_WIDTH;
@@ -329,6 +353,29 @@ export function FretboardView({
     // every render, which would re-scroll and fight the user mid-drag.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [positionNumber, cropped, width, lefty, vertical]);
+
+  /**
+   * Upright, the page scrolls down the neck, so a tapped position is brought
+   * into view by the page: an invisible mark half a fret above the box, scrolled
+   * to the top. Its scroll margin keeps it clear of the bars that stick there.
+   */
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const boxAnchor =
+    vertical && position !== null && !cropped
+      ? Math.max(0, ((NUT_X + (position.startFret - 1.5) * FRET_WIDTH - alongFrom) / alongLength) * 100)
+      : null;
+
+  useEffect(() => {
+    const el = anchorRef.current;
+    if (!el || typeof el.scrollIntoView !== 'function') return;
+    el.scrollIntoView({
+      block: 'start',
+      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
+    });
+    // Keyed on the position NUMBER, for the same reason as the effect above.
+  }, [positionNumber, vertical, cropped]);
 
   /**
    * Whether there is neck beyond what is on screen — to the right, or to the left
@@ -500,7 +547,13 @@ export function FretboardView({
     const isCharacteristic =
       characteristic !== null && note.pitchClass === characteristic && !note.isGhost;
     const isUnison = unisonMidi !== null && note.midi === unisonMidi && !dimmed;
-    const radius = big ? ROOT_RADIUS : DOT_RADIUS;
+    const radius = vertical
+      ? big
+        ? UPRIGHT_ROOT_RADIUS
+        : UPRIGHT_DOT_RADIUS
+      : big
+        ? ROOT_RADIUS
+        : DOT_RADIUS;
     const hit = R(noteX(note.fret) - FRET_WIDTH / 2, stringY(note.stringIndex, stringCount) - STRING_GAP / 2, FRET_WIDTH, STRING_GAP);
 
     return (
@@ -591,6 +644,187 @@ export function FretboardView({
         )
       : null;
 
+  const drawing = (
+    <svg
+      className={[
+        'fretboard',
+        onHoldNote ? 'fretboard--playable' : '',
+        vertical ? 'fretboard--vertical' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      viewBox={viewBox}
+      // Lying down, the minimum width keeps the drawing at 1:1 so the names
+      // stay the size they were drawn; upright, the page width IS the neck's
+      // width, and the page scrolls down it instead.
+      style={vertical ? undefined : { minWidth: `${(layout.visibleFrets + 2) * FRET_WIDTH}px` }}
+      role="img"
+      aria-label={`Griffbrett: ${described.join(', ')}. Pfeiltasten wandern über den Hals, Leertaste spielt den Ton.`}
+      tabIndex={onHoldNote ? 0 : undefined}
+      onKeyDown={onHoldNote ? onKeyDown : undefined}
+      onKeyUp={onHoldNote ? onKeyUp : undefined}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false);
+        keyHold.current?.release();
+        keyHold.current = null;
+      }}
+    >
+      <defs>
+        {/* Hints at the curvature of the board, across the strings. */}
+        <linearGradient
+          id="board-face"
+          x1={vertical ? (lefty ? 0 : 1) : 0}
+          y1="0"
+          x2={vertical ? (lefty ? 1 : 0) : 0}
+          y2={vertical ? 0 : 1}
+        >
+          <stop offset="0%" stopColor="var(--board-top)" />
+          <stop offset="45%" stopColor="var(--board)" />
+          <stop offset="100%" stopColor="var(--board-edge)" />
+        </linearGradient>
+
+        {/* Keeps the neck off the string-name gutter of a crop. */}
+        <clipPath id="board-window">
+          <rect {...R(boardLeft, 0, width - boardLeft, height)} />
+        </clipPath>
+      </defs>
+
+      <g clipPath="url(#board-window)">
+        <rect
+          className="board"
+          {...R(boardLeft + 1, boardTop + 1, width - boardLeft - 10, boardFoot - boardTop - 2)}
+          rx={6}
+        />
+
+        {inlays.map(({ fret, double }) =>
+          double ? (
+            <g key={fret}>
+              {[-1, 1].map((side) => {
+                const [cx, cy] = P(fretCenterX(fret), inlayY + side * DOUBLE_INLAY_OFFSET);
+                return <circle key={side} className="inlay" cx={cx} cy={cy} r={INLAY_RADIUS} />;
+              })}
+            </g>
+          ) : (
+            (() => {
+              const [cx, cy] = P(fretCenterX(fret), inlayY);
+              return <circle key={fret} className="inlay" cx={cx} cy={cy} r={INLAY_RADIUS} />;
+            })()
+          ),
+        )}
+
+        {Array.from({ length: fretCount }, (_, i) => i + 1).map((fret) => (
+          <line
+            key={fret}
+            className="fret-wire"
+            {...L(NUT_X + fret * FRET_WIDTH, boardTop + 4, NUT_X + fret * FRET_WIDTH, boardFoot - 4)}
+          />
+        ))}
+
+        <line className="nut" {...L(NUT_X, boardTop + 2, NUT_X, boardFoot - 2)} />
+
+        {/* Strings — the low ones are drawn thicker, as they are. */}
+        {Array.from({ length: stringCount }, (_, stringIndex) => (
+          <line
+            key={stringIndex}
+            className="string"
+            {...L(boardLeft, stringY(stringIndex, stringCount), width - 8, stringY(stringIndex, stringCount))}
+            strokeWidth={3.2 - stringIndex * 0.35}
+          />
+        ))}
+
+        {capo > 0 ? (
+          <>
+            <rect
+              className="capo-dead-zone"
+              {...R(boardLeft, boardTop, capoX - boardLeft, boardFoot - boardTop)}
+              rx={6}
+            />
+            <line className="capo" {...L(capoX, boardTop - 3, capoX, boardFoot + 3)} />
+          </>
+        ) : null}
+
+        {position && !cropped ? (
+          <rect
+            className="box-outline"
+            {...R(
+              NUT_X + (position.startFret - 1) * FRET_WIDTH,
+              boardTop + 3,
+              (position.endFret - position.startFret + 1) * FRET_WIDTH,
+              boardFoot - boardTop - 6,
+            )}
+            rx={7}
+          />
+        ) : null}
+
+        {/*
+         * The CAGED grip as one shape: a soft, rounded area around the notes it
+         * stops. The rings on each note said WHICH notes; they never said that
+         * they belong together as one hand shape, which is the whole lesson.
+         */}
+        {cagedHull ? <polygon className="caged-shape" points={cagedHull} /> : null}
+
+        {Array.from({ length: fretCount + 1 }, (_, fret) => fret).map((fret) => {
+          const [x, y] = P(numberX(fret), boardFoot + numberGap);
+          return (
+            <text
+              key={fret}
+              className={fret < capo ? 'fret-number is-muted' : 'fret-number'}
+              x={x}
+              y={y}
+              textAnchor="middle"
+              dominantBaseline={vertical ? 'central' : undefined}
+            >
+              {fret}
+            </text>
+          );
+        })}
+
+        {ghosts.map(renderNote)}
+        {notes.map(renderNote)}
+
+        {cursorRect ? <rect className="neck-cursor" {...cursorRect} rx={8} /> : null}
+      </g>
+
+      {capo > 0
+        ? (() => {
+            const [x, y] = vertical
+              ? P(capoX, boardFoot + numberGap)
+              : P(capoX, boardTop - 10);
+            return (
+              <text
+                className="capo-label"
+                x={vertical ? x : lefty ? Math.min(x, width - layout.labelX - 26) : Math.max(x, layout.labelX + 26)}
+                y={y}
+                textAnchor="middle"
+                dominantBaseline={vertical ? 'central' : undefined}
+              >
+                {vertical ? `K${capo}` : `Kapo ${capo}`}
+              </text>
+            );
+          })()
+        : null}
+
+      {/* Outside the clip: the names live in the margin, not on the wood. Upright
+          they are a row of their own above the drawing. */}
+      {vertical ? null : Array.from({ length: stringCount }, (_, stringIndex) => {
+        const [x, y] = P(layout.labelX, stringY(stringIndex, stringCount));
+        return (
+          <text
+            key={stringIndex}
+            className="string-label"
+            x={x}
+            y={y}
+            textAnchor={textAnchorAcross}
+            dominantBaseline="central"
+          >
+            {labels[stringIndex]}
+          </text>
+        );
+      })}
+    </svg>
+  );
+
   return (
     <>
       <div
@@ -603,183 +837,32 @@ export function FretboardView({
           .filter(Boolean)
           .join(' ')}
       >
-        <svg
-          className={[
-            'fretboard',
-            onHoldNote ? 'fretboard--playable' : '',
-            vertical ? 'fretboard--vertical' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-          viewBox={viewBox}
-          // Lying down, the minimum width keeps the drawing at 1:1 so the names
-          // stay the size they were drawn; upright, the page width IS the neck's
-          // width, and the page scrolls down it instead.
-          style={vertical ? undefined : { minWidth: `${(layout.visibleFrets + 2) * FRET_WIDTH}px` }}
-          role="img"
-          aria-label={`Griffbrett: ${described.join(', ')}. Pfeiltasten wandern über den Hals, Leertaste spielt den Ton.`}
-          tabIndex={onHoldNote ? 0 : undefined}
-          onKeyDown={onHoldNote ? onKeyDown : undefined}
-          onKeyUp={onHoldNote ? onKeyUp : undefined}
-          onFocus={() => setFocused(true)}
-          onBlur={() => {
-            setFocused(false);
-            keyHold.current?.release();
-            keyHold.current = null;
-          }}
-        >
-          <defs>
-            {/* Hints at the curvature of the board, across the strings. */}
-            <linearGradient
-              id="board-face"
-              x1={vertical ? (lefty ? 0 : 1) : 0}
-              y1="0"
-              x2={vertical ? (lefty ? 1 : 0) : 0}
-              y2={vertical ? 0 : 1}
-            >
-              <stop offset="0%" stopColor="var(--board-top)" />
-              <stop offset="45%" stopColor="var(--board)" />
-              <stop offset="100%" stopColor="var(--board-edge)" />
-            </linearGradient>
-
-            {/* Keeps the neck off the string-name gutter of a crop. */}
-            <clipPath id="board-window">
-              <rect {...R(boardLeft, 0, width - boardLeft, height)} />
-            </clipPath>
-          </defs>
-
-          <g clipPath="url(#board-window)">
-            <rect
-              className="board"
-              {...R(boardLeft + 1, boardTop + 1, width - boardLeft - 10, boardFoot - boardTop - 2)}
-              rx={6}
-            />
-
-            {inlays.map(({ fret, double }) =>
-              double ? (
-                <g key={fret}>
-                  {[-1, 1].map((side) => {
-                    const [cx, cy] = P(fretCenterX(fret), inlayY + side * DOUBLE_INLAY_OFFSET);
-                    return <circle key={side} className="inlay" cx={cx} cy={cy} r={INLAY_RADIUS} />;
-                  })}
-                </g>
-              ) : (
-                (() => {
-                  const [cx, cy] = P(fretCenterX(fret), inlayY);
-                  return <circle key={fret} className="inlay" cx={cx} cy={cy} r={INLAY_RADIUS} />;
-                })()
-              ),
-            )}
-
-            {Array.from({ length: fretCount }, (_, i) => i + 1).map((fret) => (
-              <line
-                key={fret}
-                className="fret-wire"
-                {...L(NUT_X + fret * FRET_WIDTH, boardTop + 4, NUT_X + fret * FRET_WIDTH, boardFoot - 4)}
-              />
-            ))}
-
-            <line className="nut" {...L(NUT_X, boardTop + 2, NUT_X, boardFoot - 2)} />
-
-            {/* Strings — the low ones are drawn thicker, as they are. */}
-            {Array.from({ length: stringCount }, (_, stringIndex) => (
-              <line
-                key={stringIndex}
-                className="string"
-                {...L(boardLeft, stringY(stringIndex, stringCount), width - 8, stringY(stringIndex, stringCount))}
-                strokeWidth={3.2 - stringIndex * 0.35}
-              />
-            ))}
-
-            {capo > 0 ? (
-              <>
-                <rect
-                  className="capo-dead-zone"
-                  {...R(boardLeft, boardTop, capoX - boardLeft, boardFoot - boardTop)}
-                  rx={6}
-                />
-                <line className="capo" {...L(capoX, boardTop - 3, capoX, boardFoot + 3)} />
-              </>
-            ) : null}
-
-            {position && !cropped ? (
-              <rect
-                className="box-outline"
-                {...R(
-                  NUT_X + (position.startFret - 1) * FRET_WIDTH,
-                  boardTop + 3,
-                  (position.endFret - position.startFret + 1) * FRET_WIDTH,
-                  boardFoot - boardTop - 6,
-                )}
-                rx={7}
-              />
-            ) : null}
-
-            {/*
-             * The CAGED grip as one shape: a soft, rounded area around the notes it
-             * stops. The rings on each note said WHICH notes; they never said that
-             * they belong together as one hand shape, which is the whole lesson.
-             */}
-            {cagedHull ? <polygon className="caged-shape" points={cagedHull} /> : null}
-
-            {Array.from({ length: fretCount + 1 }, (_, fret) => fret).map((fret) => {
-              const [x, y] = P(numberX(fret), boardFoot + 24);
-              return (
-                <text
-                  key={fret}
-                  className={fret < capo ? 'fret-number is-muted' : 'fret-number'}
-                  x={x}
-                  y={y}
-                  textAnchor="middle"
-                  dominantBaseline={vertical ? 'central' : undefined}
+        {vertical ? (
+          <>
+            {/* The string names stay in sight while the page scrolls down the neck. */}
+            <div className="string-names" aria-hidden="true">
+              {labels.map((label, stringIndex) => (
+                <span
+                  // Strings never reorder, so the index is a stable key.
+                  // eslint-disable-next-line react/no-array-index-key
+                  key={stringIndex}
+                  className="string-name"
+                  style={{ left: `${uprightShare(stringIndex)}%` }}
                 >
-                  {fret}
-                </text>
-              );
-            })}
-
-            {ghosts.map(renderNote)}
-            {notes.map(renderNote)}
-
-            {cursorRect ? <rect className="neck-cursor" {...cursorRect} rx={8} /> : null}
-          </g>
-
-          {capo > 0
-            ? (() => {
-                const [x, y] = vertical
-                  ? P(capoX, boardFoot + 24)
-                  : P(capoX, boardTop - 10);
-                return (
-                  <text
-                    className="capo-label"
-                    x={vertical ? x : lefty ? Math.min(x, width - layout.labelX - 26) : Math.max(x, layout.labelX + 26)}
-                    y={y}
-                    textAnchor="middle"
-                    dominantBaseline={vertical ? 'central' : undefined}
-                  >
-                    {vertical ? `K${capo}` : `Kapo ${capo}`}
-                  </text>
-                );
-              })()
-            : null}
-
-          {/* Outside the clip: the names live in the margin, not on the wood. */}
-          {Array.from({ length: stringCount }, (_, stringIndex) => {
-            const [x, y] = P(layout.labelX, stringY(stringIndex, stringCount));
-            return (
-              <text
-                key={stringIndex}
-                className="string-label"
-                x={x}
-                y={y}
-                textAnchor={textAnchorAcross}
-                dominantBaseline="central"
-              >
-                {labels[stringIndex]}
-              </text>
-            );
-          })}
-        </svg>
+                  {label}
+                </span>
+              ))}
+            </div>
+            <div className="fretboard-frame">
+              {boxAnchor !== null ? (
+                <div ref={anchorRef} className="box-anchor" style={{ top: `${boxAnchor}%` }} />
+              ) : null}
+              {drawing}
+            </div>
+          </>
+        ) : (
+          drawing
+        )}
       </div>
 
       {/* Spoken where the cursor lands, for anyone who cannot see the neck. */}
@@ -787,17 +870,6 @@ export function FretboardView({
         {focused ? announce : ''}
       </p>
 
-      {onHoldNote ? (
-        <p className="hint fretboard-hint">
-          Antippen: Ton hören und jede Stelle mit diesem Ton finden — nochmal antippen
-          hebt das wieder auf. Gedrückt halten lässt ihn klingen.
-          {overflows
-            ? lefty
-              ? ' Der Hals geht links weiter — seitlich wischen.'
-              : ' Der Hals geht rechts weiter — seitlich wischen.'
-            : ''}
-        </p>
-      ) : null}
     </>
   );
 }

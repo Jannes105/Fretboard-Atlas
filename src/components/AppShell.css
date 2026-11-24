@@ -1,0 +1,47 @@
+/*
+ * The frame: a top bar that sticks, the neck, and a bottom bar fixed to the
+ * screen edge. A sheet rises from the bottom bar and stops short of the top, so
+ * the upper part of the neck always stays in view.
+ */
+.app-shell {
+  --tabs-h: 4rem;
+  --sheet-max: 55svh;
+  --z-bar: 30;
+  --z-sheet: 35;
+
+  min-height: 100svh;
+  padding-bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom));
+}
+
+/* ---------- Top bar ---------- */
+
+.shell-top {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-bar);
+  display: grid;
+  gap: 0.4rem;
+  padding: calc(0.5rem + env(safe-area-inset-top)) 1rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.shell-top > * {
+  width: 100%;
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+/* ---------- Stage ---------- */
+
+.shell-stage {
+  max-width: 1180px;
+  margin: 0 auto;
+  /* Room at the end for the info bar, so it never covers the last frets. */
+  padding: 0.75rem 1rem 4.5rem;
+}
+
+/* With a sheet up, the end of the page can still scroll into the part above it. */
+.app-shell:has(.sheet) .shell-stage {
+  padding-bottom: var(--sheet-max);
+}

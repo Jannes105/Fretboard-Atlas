@@ -1,16 +1,20 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
+// First: the shared base, so every component's own sheet can build on it.
+import './App.css';
 import { LOOSE_ARPEGGIO_GAP } from './audio';
 import { AppFooter } from './components/AppFooter';
+import { AppShell } from './components/AppShell';
+import { BottomTabs, type SheetId } from './components/BottomTabs';
 import { ChordRow } from './components/ChordRow';
 import { FretboardView } from './components/FretboardView';
-import { KeyPicker, type KeyPickerRequest, type KeyPickerTab } from './components/KeyPicker';
-import { NeckLegend } from './components/NeckLegend';
+import { type Info, InfoBar } from './components/InfoBar';
+import { KeyButton, KeyPicker } from './components/KeyPicker';
 import { NeckViewPanel } from './components/NeckViewPanel';
 import { ProgressionPanel } from './components/ProgressionPanel';
+import { ScaleTones } from './components/ScaleTones';
 import { SetupPanel } from './components/SetupPanel';
+import { Sheet } from './components/Sheet';
 import { SoundPanel } from './components/SoundPanel';
-import { StartScreen } from './components/StartScreen';
-import { TransportDock } from './components/TransportDock';
 import { useAppState } from './hooks/useAppState';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useHighlight } from './hooks/useHighlight';
@@ -25,23 +29,31 @@ import {
   defaultPattern,
   Note,
   positionsToMidi,
-  ROOT_CHOICES,
   serializePattern,
+  spellRoot,
   STANDARD_STRUM_GAP,
   transposeSymbol,
   type Voicing,
   voicingMidi,
+  voicingsFor,
+  withAccidentals,
 } from './theory';
 import { customProgId } from './urlState';
-import './App.css';
 
 /** The neck with no key on it — where the app opens. */
 const ALL_NOTES_LABEL = 'Alle Töne';
 
+const SHEET_TITLES: Record<SheetId, string> = {
+  key: 'Tonart',
+  chords: 'Akkorde',
+  progression: 'Akkordfolge',
+  view: 'Ansicht',
+};
+
 /**
- * The page, top to bottom: key, neck, what the neck shows, the key's chords, the
- * progression. Everything derived lives in the hooks; this file only says what
- * goes where and what a click does.
+ * The key on top, the neck in the middle, and everything else in four sheets
+ * that rise from the bottom bar. Everything derived lives in the hooks; this
+ * file only says what goes where and what a click does.
  */
 export default function App() {
   const { state, update, patch } = useAppState();
@@ -122,24 +134,40 @@ export default function App() {
     material: [steps, chordTuning, progression.chosenVoicings],
   });
 
-  // ---- Ways in, and ways to land ----
+  // ---- Sheets ----
 
-  /** Opening the key picker from elsewhere — the start cards. */
-  const [keyPickerRequest, setKeyPickerRequest] = useState<KeyPickerRequest | null>(null);
-  const openKeyPicker = (tab: KeyPickerTab) =>
-    setKeyPickerRequest((previous) => ({ tab, serial: (previous?.serial ?? 0) + 1 }));
+  /** Which sheet is up. Page state, not the link: a link carries the music. */
+  const [sheet, setSheet] = useState<SheetId | null>(null);
 
-  /** Bumped when a progression is adopted, so the panel can show where it went. */
-  const [revealSerial, setRevealSerial] = useState(0);
-  const transportRef = useRef<HTMLDivElement>(null);
+  /**
+   * A tab opens its sheet, or shuts it when it is already up. Chords and the
+   * progression need a key; without one, they lead to where a key is chosen.
+   */
+  const toggleSheet = (id: SheetId) => {
+    if (sheet === id) {
+      setSheet(null);
+      return;
+    }
+    const needsKey = (id === 'chords' || id === 'progression') && scale === null;
+    setSheet(needsKey ? 'key' : id);
+  };
+
+  const closeSheet = () => setSheet(null);
+
+  /**
+   * How a key on this pitch is written: the name with fewer accidentals in its
+   * scale, the reader's ♯ or ♭ where both cost the same. A root without a scale
+   * is about to become major — see the root grid.
+   */
+  const spelledRoot = (pitchClass: number, scaleTypeId: string | null) =>
+    spellRoot(((pitchClass % 12) + 12) % 12, scaleTypeId ?? 'major', viewPrefs.spelling === 'sharp');
 
   /**
    * Move the key by a semitone, and a self-built progression with it. A preset
    * needs nothing: it is built from degrees, so it follows the root on its own.
    */
   const transpose = (semitones: 1 | -1) => {
-    const index = ROOT_CHOICES.indexOf(root);
-    const nextRoot = ROOT_CHOICES[(index + semitones + ROOT_CHOICES.length) % ROOT_CHOICES.length];
+    const nextRoot = spelledRoot(Note.parse(root).pitchClass + semitones, state.scaleTypeId);
     patch((previous) => ({
       ...previous,
       root: nextRoot,
@@ -154,134 +182,113 @@ export default function App() {
     }));
   };
 
-  /** What a note touched on the neck (or a chip) picked out, for the legend. */
-  const pickedNote =
-    highlight && highlight.kind !== 'chord' && picked
-      ? {
-          label: picked.noteName ?? picked.label,
-          places: fretboard
-            .allPositions()
-            .filter((p) => p.pitchClass === picked.pitchClasses[0]).length,
-          hasUnison: picked.unisonMidi !== null,
-        }
-      : null;
+  /**
+   * What the info bar says, if anything. Hidden under a sheet: the sheet already
+   * shows what is picked or playing, and the bar would float over it.
+   */
+  const info = ((): Info | null => {
+    if (sheet !== null) return null;
+    if (transport.isPlaying && transport.playingStep !== null) {
+      const step = steps[transport.playingStep];
+      if (step) {
+        return {
+          kind: 'playing',
+          chord: step.chord.name(),
+          step: transport.playingStep,
+          steps: steps.length,
+        };
+      }
+    }
+    if (highlight?.kind === 'chord') {
+      const chord = chords[highlight.index];
+      if (chord) {
+        return {
+          kind: 'chord',
+          roman: chord.romanNumeral(highlight.index),
+          name: chord.name(),
+          notes: chord.notes.map((note) => withAccidentals(note.name())).join(' '),
+        };
+      }
+    }
+    if (highlight && picked) {
+      return {
+        kind: 'note',
+        label: picked.noteName ?? picked.label,
+        places: fretboard.allPositions().filter((p) => p.pitchClass === picked.pitchClasses[0])
+          .length,
+        hasUnison: picked.unisonMidi !== null,
+      };
+    }
+    return scale === null ? { kind: 'hint' } : null;
+  })();
 
-  return (
-    <main className="app">
-      <header className="app-header">
-        <div className="app-title">
-          <h1>Fretboard Atlas</h1>
-          <p className="subtitle">Tonarten und Skalen auf dem Hals sichtbar machen.</p>
-        </div>
+  const top = (
+    <>
+      <h1 className="sr-only">Fretboard Atlas</h1>
+      <div className="scale-title">
+        {/* The button names the key; the heading carries it for screen readers
+            and the document outline. */}
+        <h2 className="sr-only">{scale ? scale.name() : ALL_NOTES_LABEL}</h2>
 
-        <div className="setup-group">
-          <SetupPanel
-            tuning={neck.tuning}
-            tuningId={state.tuningId}
-            isCustomTuning={neck.isCustomTuning}
-            capo={state.capo}
-            fretCount={state.fretCount}
-            onTuningIdChange={(next) => update('tuningId', next)}
-            onCapoChange={(next) => update('capo', next)}
-            onFretCountChange={(next) => update('fretCount', next)}
-          />
+        <KeyButton
+          scale={scale}
+          root={root}
+          expanded={sheet === 'key'}
+          onClick={() => toggleSheet('key')}
+        />
 
-          <SoundPanel
-            sound={state.sound}
-            amp={state.amp}
-            pickup={state.pickup}
-            tone={state.tone}
-            reverb={state.reverb}
-            delay={state.delay}
-            onSoundChange={(next) => update('sound', next)}
-            onApplyPreset={(settings) => patch((previous) => ({ ...previous, ...settings }))}
-            onAmpChange={(next) => update('amp', next)}
-            onPickupChange={(next) => update('pickup', next)}
-            onToneChange={(next) => update('tone', next)}
-            onReverbChange={(next) => update('reverb', next)}
-            onDelayChange={(next) => update('delay', next)}
-          />
-        </div>
-      </header>
-
-      <section className="scale-strip">
-        <div className="scale-title">
-          {/* The picker's button names the key; the heading carries it for screen
-              readers and the document outline. */}
-          <h2 className="sr-only">{scale ? scale.name() : ALL_NOTES_LABEL}</h2>
-
-          <KeyPicker
-            scale={scale}
-            root={root}
-            onRootChange={(next) => update('root', next)}
-            onScaleTypeChange={(next) => update('scaleTypeId', next)}
-            onPickKey={(pickedRoot, pickedScaleTypeId) =>
-              patch((previous) => ({ ...previous, root: pickedRoot, scaleTypeId: pickedScaleTypeId }))
-            }
-            onAdopt={(symbols, pickedRoot, pickedScaleTypeId) => {
-              patch((previous) => ({
-                ...previous,
-                root: pickedRoot,
-                scaleTypeId: pickedScaleTypeId,
-                // Adopted chords start at one bar each.
-                progressionId: customProgId(symbols.map((symbol) => ({ symbol, bars: 1 }))),
-              }));
-              setRevealSerial((serial) => serial + 1);
-            }}
-            request={keyPickerRequest}
-          />
-
-          {scale ? (
+        {scale ? (
+          <button
+            type="button"
+            className="play-button"
+            onClick={playScale}
+            aria-label={`${scale.name()} abspielen`}
+            title="Skala abspielen"
+          >
+            ▶
+          </button>
+        ) : (
+          /*
+           * Only on the keyless map: under a key, the key spells every note, and
+           * a choice here would be overruled on every dot. Right beside the neck
+           * it names — it changes what you read.
+           */
+          <div className="segmented spelling" role="group" aria-label="Schreibweise">
             <button
               type="button"
-              className="play-button"
-              onClick={playScale}
-              aria-label={`${scale.name()} abspielen`}
-              title="Skala abspielen"
+              aria-pressed={viewPrefs.spelling === 'sharp'}
+              aria-label="Mit Kreuz (♯)"
+              onClick={() => setSpelling('sharp')}
             >
-              ▶
+              ♯
             </button>
-          ) : (
-            /*
-             * Only on the keyless map: under a key, the key spells every note, and
-             * a choice here would be overruled on every dot. Right beside the neck
-             * it names, rather than down in the footer — it changes what you read.
-             */
-            <div className="segmented spelling" role="group" aria-label="Schreibweise">
-              <button
-                type="button"
-                aria-pressed={viewPrefs.spelling === 'sharp'}
-                aria-label="Mit Kreuz (♯)"
-                onClick={() => setSpelling('sharp')}
-              >
-                ♯
-              </button>
-              <button
-                type="button"
-                aria-pressed={viewPrefs.spelling === 'flat'}
-                aria-label="Mit B (♭)"
-                onClick={() => setSpelling('flat')}
-              >
-                ♭
-              </button>
-            </div>
-          )}
-        </div>
-      </section>
+            <button
+              type="button"
+              aria-pressed={viewPrefs.spelling === 'flat'}
+              aria-label="Mit B (♭)"
+              onClick={() => setSpelling('flat')}
+            >
+              ♭
+            </button>
+          </div>
+        )}
+      </div>
 
-      {/*
-       * Above the neck: where on it you are, and how it is drawn. The positions stay
-       * out in the open — one tap each; everything that only changes how the same
-       * notes are drawn sits behind „Ansicht". The whole row needs a key.
-       */}
+      {/* Where on the neck you are: one tap per position. Needs a key. */}
       {scale ? (
         <div className="neck-bar">
           <span className="neck-bar-label" aria-hidden="true">
             Lage
           </span>
           <div className="segmented box-picker" role="group" aria-label="Lage">
-            <button type="button" aria-pressed={box === null} onClick={() => update('boxNumber', 0)}>
-              Ganzer Hals
+            <button
+              type="button"
+              className="box-whole"
+              aria-pressed={box === null}
+              aria-label="Ganzer Hals"
+              onClick={() => update('boxNumber', 0)}
+            >
+              Ganz
             </button>
             {boxes.map((option) => (
               <button
@@ -296,55 +303,75 @@ export default function App() {
               </button>
             ))}
           </div>
-
-          <NeckViewPanel
-            labelMode={labelMode}
-            onLabelModeChange={(next) => update('labelMode', next)}
-            hasBox={box !== null}
-            boxZoom={state.boxZoom}
-            onBoxZoomChange={(next) => update('boxZoom', next)}
-            cagedForms={neck.cagedForms}
-            cagedForm={state.cagedForm}
-            onCagedFormChange={(next) => update('cagedForm', next)}
-            minorTonic={neck.isMinorTonic}
-          />
         </div>
       ) : null}
+    </>
+  );
 
-      <FretboardView
-        scale={scale}
-        fretboard={fretboard}
-        labelMode={labelMode}
-        position={box}
-        zoom={state.boxZoom}
-        sounding={soundingKeys}
-        caged={neck.caged}
-        highlight={picked?.pitchClasses ?? null}
-        highlightLabel={picked?.label ?? null}
-        chordTones={picked?.chordTones ?? null}
-        unisonMidi={picked?.unisonMidi ?? null}
-        characteristic={neck.characteristic?.note.pitchClass ?? null}
-        spelling={viewPrefs.spelling}
-        vertical={vertical}
-        lefty={viewPrefs.lefty}
-        onHoldNote={(midi) => player().holdNote(midi)}
-        onPickNote={pickNote}
-      />
+  const sheets = (
+    <>
+      <Sheet id="sheet-key" title={SHEET_TITLES.key} open={sheet === 'key'} onClose={closeSheet}>
+        {scale ? (
+          <ScaleTones
+            scale={scale}
+            characteristic={neck.characteristic}
+            isDegreeActive={isDegreeActive}
+            onPickDegree={pickDegree}
+          />
+        ) : null}
+        <KeyPicker
+          scale={scale}
+          root={root}
+          spelling={viewPrefs.spelling}
+          onRootChange={(pitchClass) =>
+            patch((previous) => {
+              // A root alone shows nothing — it needs a scale to be a key, and
+              // major is the scale everyone starts from.
+              const scaleTypeId = previous.scaleTypeId ?? 'major';
+              return { ...previous, scaleTypeId, root: spelledRoot(pitchClass, scaleTypeId) };
+            })
+          }
+          onScaleTypeChange={(next) =>
+            patch((previous) =>
+              next === null
+                ? { ...previous, scaleTypeId: null }
+                : // A new scale can want the other name — D♭ major, but C♯ minor.
+                  {
+                    ...previous,
+                    scaleTypeId: next,
+                    root: spelledRoot(Note.parse(previous.root).pitchClass, next),
+                  },
+            )
+          }
+          onPickKey={(pickedRoot, pickedScaleTypeId) =>
+            patch((previous) => ({ ...previous, root: pickedRoot, scaleTypeId: pickedScaleTypeId }))
+          }
+          onAdopt={(symbols, pickedRoot, pickedScaleTypeId) => {
+            patch((previous) => ({
+              ...previous,
+              root: pickedRoot,
+              scaleTypeId: pickedScaleTypeId,
+              // Adopted chords start at one bar each.
+              progressionId: customProgId(symbols.map((symbol) => ({ symbol, bars: 1 }))),
+            }));
+            // Land on the progression it just made, so the click visibly goes
+            // somewhere.
+            setSheet('progression');
+          }}
+          // A plain match is a finished answer: close and show the neck.
+          onDone={closeSheet}
+        />
+      </Sheet>
 
-      <NeckLegend
-        scale={scale}
-        characteristic={neck.characteristic}
-        isDegreeActive={isDegreeActive}
-        onPickDegree={pickDegree}
-        pickedNote={pickedNote}
-        onClear={clear}
-      />
-
-      {chords.length > 0 ? (
-        <>
+      <Sheet
+        id="sheet-chords"
+        title={SHEET_TITLES.chords}
+        open={sheet === 'chords'}
+        onClose={closeSheet}
+      >
+        {chords.length > 0 ? (
           <ChordRow
             chords={chords}
-            scale={scale}
             borrowedFrom={neck.isBorrowedHarmony ? chordScale : null}
             chordSize={state.chordSize}
             onChordSizeChange={(next) => update('chordSize', next)}
@@ -360,10 +387,29 @@ export default function App() {
                 ]),
               )
             }
-            showClear={highlight?.kind === 'chord'}
-            onClear={clear}
+            voicingsOf={(chord) => voicingsFor(chord, { tuning: chordTuning })}
+            onHearVoicing={hearVoicing}
+            preferOpen={state.grips === 'open'}
           />
+        ) : scale ? (
+          /*
+           * Unreachable today: every scale on offer either has seven degrees of its
+           * own or names the key it borrows from.
+           */
+          <p className="empty">
+            {scale.type.name} hat {scale.notes.length} Stufen und keine Tonart, aus der sich
+            Stufenakkorde borgen ließen. Wähl eine Dur-, Moll- oder Kirchentonart.
+          </p>
+        ) : null}
+      </Sheet>
 
+      <Sheet
+        id="sheet-progression"
+        title={SHEET_TITLES.progression}
+        open={sheet === 'progression'}
+        onClose={closeSheet}
+      >
+        {chords.length > 0 ? (
           <ProgressionPanel
             progressions={progression.progressions}
             presetChords={progression.presetChords}
@@ -408,44 +454,101 @@ export default function App() {
             grips={state.grips}
             onGripsChange={(next) => update('grips', next)}
             onTranspose={transpose}
-            transportRef={transportRef}
-            revealSerial={revealSerial}
           />
+        ) : null}
+      </Sheet>
 
-          <TransportDock
-            anchor={transportRef}
-            steps={steps}
-            isPlaying={transport.isPlaying}
-            playingStep={transport.playingStep}
-            bpm={bpm}
-            onToggle={transport.toggle}
+      <Sheet id="sheet-view" title={SHEET_TITLES.view} open={sheet === 'view'} onClose={closeSheet}>
+        <section className="sheet-section" aria-label="Hals">
+          <h3>Hals</h3>
+          <NeckViewPanel
+            fretCount={state.fretCount}
+            onFretCountChange={(next) => update('fretCount', next)}
+            hasScale={scale !== null}
+            labelMode={labelMode}
+            onLabelModeChange={(next) => update('labelMode', next)}
+            hasBox={box !== null}
+            boxZoom={state.boxZoom}
+            onBoxZoomChange={(next) => update('boxZoom', next)}
+            cagedForms={neck.cagedForms}
+            cagedForm={state.cagedForm}
+            onCagedFormChange={(next) => update('cagedForm', next)}
+            minorTonic={neck.isMinorTonic}
           />
-        </>
-      ) : scale === null ? (
-        <StartScreen
-          onOpenKeyPicker={openKeyPicker}
-          onQuickStart={(quickRoot, scaleTypeId) =>
-            patch((previous) => ({ ...previous, root: quickRoot, scaleTypeId }))
-          }
-        />
-      ) : (
-        /*
-         * Unreachable today: every scale on offer either has seven degrees of its
-         * own or names the key it borrows from.
-         */
-        <p className="empty">
-          {scale.type.name} hat {scale.notes.length} Stufen und keine Tonart, aus der sich
-          Stufenakkorde borgen ließen. Wähl eine Dur-, Moll- oder Kirchentonart.
-        </p>
-      )}
+        </section>
 
-      <AppFooter
-        theme={theme}
-        onThemeChange={setTheme}
-        prefs={viewPrefs}
-        onOrientationChange={setOrientation}
-        onLeftyChange={setLefty}
+        <section className="sheet-section" aria-label="Auf diesem Gerät">
+          <h3>Auf diesem Gerät</h3>
+          <AppFooter
+            theme={theme}
+            onThemeChange={setTheme}
+            prefs={viewPrefs}
+            onOrientationChange={setOrientation}
+            onLeftyChange={setLefty}
+          />
+        </section>
+
+        {/* Set once and left alone: folded, with the current value on the fold. */}
+        <section className="sheet-section" aria-label="Instrument">
+          <SetupPanel
+            tuning={neck.tuning}
+            tuningId={state.tuningId}
+            isCustomTuning={neck.isCustomTuning}
+            capo={state.capo}
+            fretCount={state.fretCount}
+            onTuningIdChange={(next) => update('tuningId', next)}
+            onCapoChange={(next) => update('capo', next)}
+          />
+        </section>
+
+        <section className="sheet-section" aria-label="Klang">
+          <SoundPanel
+            sound={state.sound}
+            amp={state.amp}
+            pickup={state.pickup}
+            tone={state.tone}
+            reverb={state.reverb}
+            delay={state.delay}
+            onSoundChange={(next) => update('sound', next)}
+            onApplyPreset={(settings) => patch((previous) => ({ ...previous, ...settings }))}
+            onAmpChange={(next) => update('amp', next)}
+            onPickupChange={(next) => update('pickup', next)}
+            onToneChange={(next) => update('tone', next)}
+            onReverbChange={(next) => update('reverb', next)}
+            onDelayChange={(next) => update('delay', next)}
+          />
+        </section>
+      </Sheet>
+    </>
+  );
+
+  return (
+    <AppShell
+      top={top}
+      sheets={sheets}
+      tabs={<BottomTabs open={sheet} onSelect={toggleSheet} playing={transport.isPlaying} />}
+    >
+      <FretboardView
+        scale={scale}
+        fretboard={fretboard}
+        labelMode={labelMode}
+        position={box}
+        zoom={state.boxZoom}
+        sounding={soundingKeys}
+        caged={neck.caged}
+        highlight={picked?.pitchClasses ?? null}
+        highlightLabel={picked?.label ?? null}
+        chordTones={picked?.chordTones ?? null}
+        unisonMidi={picked?.unisonMidi ?? null}
+        characteristic={neck.characteristic?.note.pitchClass ?? null}
+        spelling={viewPrefs.spelling}
+        vertical={vertical}
+        lefty={viewPrefs.lefty}
+        onHoldNote={(midi) => player().holdNote(midi)}
+        onPickNote={pickNote}
       />
-    </main>
+
+      <InfoBar info={info} onClear={clear} onStop={transport.toggle} />
+    </AppShell>
   );
 }

@@ -6,7 +6,7 @@ import { DEFAULT_REVERB, REVERB_IDS, type ReverbId } from './synth/reverb';
 import { TONE_MAX_DB, type ToneGains } from './synth/toneStack';
 import type { LabelMode } from './components/FretboardView';
 import {
-  ROOT_CHOICES,
+  ACCEPTED_ROOTS,
   SCALE_TYPES,
   type ChordSize,
   isDefaultPattern,
@@ -97,13 +97,13 @@ export const DEFAULT_STATE: AppState = {
   tuningId: 'standard',
   capo: 0,
   /*
-   * Fifteen, not twenty-four. A 24-fret neck is 1486 drawing units wide and gets
-   * squeezed to 0.76 of its scale to fit the page, which put the note names — the
-   * thing you came to read — at 9 px. Fifteen frets fit at full size and then
-   * some, and they still hold every box of every scale on offer bar the topmost.
-   * Whoever wants the full two octaves is one click away in the setup panel.
+   * The whole neck. Fifteen frets used to be the default because a lying 24-fret
+   * neck was squeezed to fit the page and its names fell to 9 px; the neck now
+   * keeps its drawing size and scrolls instead, and upright on a phone the page
+   * scrolls down it. So nothing is lost by showing all of it, and the topmost box
+   * of every scale is on it. Shorter is one tap away under „Ansicht".
    */
-  fretCount: 15,
+  fretCount: 24,
   labelMode: 'note',
   chordSize: 3,
   progressionId: 'I-V-vi-IV',
@@ -127,7 +127,7 @@ export const DEFAULT_STATE: AppState = {
   grips: 'open',
 };
 
-const FRET_COUNTS = [12, 15, 24];
+export const FRET_COUNTS = [12, 15, 24] as const;
 /** Exported because SetupPanel builds its chooser from it — one list, not two. */
 export const CHORD_SIZES: readonly ChordSize[] = [3, 4, 5];
 // Read by name and not by index, so adding or retiring a voice leaves every
@@ -274,11 +274,15 @@ export function readState(search: string): AppState {
       : serializePattern(defaultPattern(beatsPerBar));
 
   return {
-    root: pickFrom(params.get('root'), ROOT_CHOICES as readonly string[], DEFAULT_STATE.root),
+    root: pickFrom(params.get('root'), ACCEPTED_ROOTS, DEFAULT_STATE.root),
     scaleTypeId: readScaleType(params.get('scale')),
     tuningId: readTuning(params.get('tuning')),
     capo: pickInt(params.get('capo'), (v) => v >= 0 && v <= MAX_CAPO, DEFAULT_STATE.capo),
-    fretCount: pickInt(params.get('frets'), (v) => FRET_COUNTS.includes(v), DEFAULT_STATE.fretCount),
+    fretCount: pickInt(
+      params.get('frets'),
+      (v) => (FRET_COUNTS as readonly number[]).includes(v),
+      DEFAULT_STATE.fretCount,
+    ),
     labelMode: pickFrom(params.get('labels'), ['note', 'degree'] as const, DEFAULT_STATE.labelMode),
     chordSize: pickInt(
       params.get('chords'),
