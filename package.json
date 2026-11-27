@@ -29,7 +29,7 @@
   "scripts": {
     "dev": "vite",
     "dev:lan": "vite --host",
-    "icons": "node scripts/build-icons.mjs",
+    "icons": "node icons/build-icons.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",

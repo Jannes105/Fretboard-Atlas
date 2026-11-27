@@ -23,7 +23,8 @@
   width: 3rem;
   height: 3rem;
   border: none;
-  background: var(--accent);
+  /* The deeper shade: the page colour on top of it holds 4.5:1 in both themes. */
+  background: var(--accent-text);
   color: var(--bg);
   font-size: var(--text-md);
 }
@@ -102,7 +103,7 @@
 /* The roman numerals, now a footnote to the chord names in the dropdown. */
 .roman-hint {
   font-family: var(--font-display);
-  color: var(--accent-text);
+  color: var(--text);
 }
 
 /* ---------- The grips: four to a row, the whole progression in view ---------- */

@@ -5,7 +5,7 @@
  * (sharp comes from the build toolchain; this is a dev utility, not part of the app.)
  *
  * The motif is the app's own fretboard: a dark rosewood board, light frets and
- * strings, neutral scale tones and the warm amber root — the same palette as
+ * strings, warm-grey scale tones and the amber root — the same palette as
  * src/App.css, so the icon and the app read as one thing.
  */
 import { writeFile } from 'node:fs/promises';
@@ -22,10 +22,13 @@ const BOARD_TOP = '#363029';
 const NUT = '#e9e2d5';
 const FRET = '#9c948a';
 const STRING = '#b4aca1';
-const NOTE = '#8b95a0';
-const NOTE_STROKE = '#aab3bc';
+const NOTE = '#a39d94';
+const NOTE_STROKE = '#bdb7ae';
 const ROOT = '#e0a33f';
 const ROOT_STROKE = '#f4c777';
+// The app's control colour — see --accent in src/App.css.
+const ACCENT = '#6f93b8';
+const ACCENT_STROKE = '#9ab6d4';
 
 // --- Geometry (512 canvas) ---
 const STRINGS = [126, 178, 230, 282, 334, 386]; // high e at top, low E at bottom
@@ -106,8 +109,10 @@ function svg({ rounded, scale }) {
  * into a grey smear with a hint of orange. Detail that cannot survive the size is
  * not detail, it is noise.
  *
- * So this keeps only what identifies the app: a piece of fretboard, and the amber
- * root note you are always looking for. Three strings and two frets, all of them
+ * So this keeps only what identifies the app: a piece of fretboard and one big
+ * note on it — in the app's steel blue. It used to be the root's amber, and a
+ * large amber disc on near-black is a look the app should not share with anyone.
+ * Amber stays where it is small: the root dots of the full icon. Three strings and two frets, all of them
  * thick enough to still be a line at 16 px — under about 32 units on this 512 canvas
  * a stroke is thinner than one device pixel and turns to grey mush.
  */
@@ -129,7 +134,7 @@ function faviconSvg() {
         `<line x1="64" y1="${y}" x2="448" y2="${y}" stroke="${STRING}" stroke-width="${24 + i * 8}" stroke-linecap="round"/>`,
     )
     .join('')}
-  <circle cx="272" cy="256" r="104" fill="${ROOT}" stroke="${ROOT_STROKE}" stroke-width="14"/>
+  <circle cx="272" cy="256" r="104" fill="${ACCENT}" stroke="${ACCENT_STROKE}" stroke-width="14"/>
 </svg>
 `;
 }

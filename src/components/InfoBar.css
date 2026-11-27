@@ -51,7 +51,7 @@
 }
 
 .info-bar-roman {
-  color: var(--accent-text);
+  color: var(--text-muted);
   font-size: var(--text-xs);
 }
 
@@ -82,13 +82,14 @@
 
 /* The same filled stop as the transport's own ■. */
 .info-bar-stop {
-  background: var(--accent);
+  /* The deeper shade: the page colour on top of it holds 4.5:1 in both themes. */
+  background: var(--accent-text);
   color: var(--bg);
 }
 
 @media (hover: hover) {
   .info-bar-stop:hover {
-    background: var(--accent);
+    background: var(--accent-text);
     color: var(--bg);
   }
 }

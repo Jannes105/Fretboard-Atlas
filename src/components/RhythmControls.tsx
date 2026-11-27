@@ -182,21 +182,18 @@ export function RhythmControls({
 
   return (
     <div className="rhythm-controls">
+      {/* A row like every other fold in the sheets: name, value, caret. */}
       <button
         type="button"
-        className={open ? 'trigger rhythm-trigger is-open' : 'trigger rhythm-trigger'}
+        className={open ? 'fold-row rhythm-trigger is-open' : 'fold-row rhythm-trigger'}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        {/* Two strokes, down and up — the same language the pattern grid speaks. */}
-        <svg className="trigger-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <path d="M5 2v10M2.6 9.6 5 12.4l2.4-2.8M11 14V4M8.6 6.4 11 3.6l2.4 2.8" />
-        </svg>
-        Rhythmus
+        <span className="fold-row-name">Rhythmus</span>
         <span className="trigger-value">
           {meter} · {value}
         </span>
-        <span className="trigger-caret" aria-hidden="true">
+        <span className="fold-row-caret" aria-hidden="true">
           ▾
         </span>
       </button>
@@ -217,12 +214,17 @@ export function RhythmControls({
             ))}
           </div>
 
-          <details className="fine-tuning">
-            <summary>Selbst einstellen</summary>
+          <details className="sheet-fold">
+            <summary>
+              <h3>Selbst einstellen</h3>
+            </summary>
 
-            <label className="field field--inline">
-              <span>Takt</span>
+            <div className="option-rows">
+            <label className="option-row">
+              <span className="option-label">Takt</span>
+              <span className="select-box">
               <select
+                className="select"
                 aria-label="Taktart"
                 value={beatsPerBar}
                 onChange={(event) => onBeatsPerBarChange(Number(event.target.value))}
@@ -233,11 +235,14 @@ export function RhythmControls({
                   </option>
                 ))}
               </select>
+              </span>
             </label>
 
-            <label className="field field--inline">
-              <span>Anschlag</span>
+            <label className="option-row">
+              <span className="option-label">Anschlag</span>
+              <span className="select-box">
               <select
+                className="select"
                 aria-label="Spielweise"
                 value={strum}
                 onChange={(event) => onStrumChange(event.target.value as StrumStyle)}
@@ -248,13 +253,16 @@ export function RhythmControls({
                   </option>
                 ))}
               </select>
+              </span>
             </label>
 
             {/* An arpeggio has no slots to shift, so the control would do nothing. */}
             {strum === 'arpeggio' ? null : (
-              <label className="field field--inline">
-                <span>Groove</span>
+              <label className="option-row">
+                <span className="option-label">Groove</span>
+                <span className="select-box">
                 <select
+                  className="select"
                   aria-label="Feel"
                   value={feel}
                   onChange={(event) => onFeelChange(event.target.value as SwingFeel)}
@@ -265,12 +273,15 @@ export function RhythmControls({
                     </option>
                   ))}
                 </select>
+                </span>
               </label>
             )}
 
-            <label className="field field--inline">
-              <span>Töne</span>
+            <label className="option-row">
+              <span className="option-label">Töne</span>
+              <span className="select-box">
               <select
+                className="select"
                 aria-label="Tonlänge"
                 value={sustain}
                 onChange={(event) => onSustainChange(event.target.value as NoteLength)}
@@ -281,6 +292,7 @@ export function RhythmControls({
                   </option>
                 ))}
               </select>
+              </span>
             </label>
 
             {strum === 'arpeggio' ? (
@@ -290,6 +302,7 @@ export function RhythmControls({
             ) : (
               <RhythmEditor rhythm={rhythm} beatsPerBar={beatsPerBar} onChange={onRhythmChange} />
             )}
+            </div>
           </details>
         </div>
       ) : null}

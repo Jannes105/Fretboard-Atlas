@@ -96,6 +96,12 @@ function expandSheet(container: HTMLElement) {
 const clearButton = (container: HTMLElement) =>
   container.querySelector<HTMLButtonElement>('.info-bar-clear');
 
+/** „Overdrive" in the sound fold's two-way distortion switch. */
+const overdriveButton = (container: HTMLElement) =>
+  [...container.querySelectorAll<HTMLButtonElement>('[aria-label="Verzerrung"] button')].find(
+    (button) => button.textContent?.trim() === 'Overdrive',
+  )!;
+
 /** The instrument's own selects in the „Ansicht" sheet: tuning and capo. */
 const instrumentSelects = (container: HTMLElement) =>
   [...container.querySelectorAll<HTMLSelectElement>('section[aria-label="Instrument"] select')];
@@ -605,7 +611,8 @@ describe('App — Ansicht-Blatt', () => {
     );
     expect(sections).toEqual(['Hals', 'Auf diesem Gerät', 'Instrument', 'Klang']);
 
-    const folds = [...container.querySelectorAll<HTMLDetailsElement>('.sheet-fold')];
+    // Die beiden Fächer des Blatts selbst — „Feinabstimmung" liegt in „Klang".
+    const folds = [...container.querySelectorAll<HTMLDetailsElement>('.sheet-section > .sheet-fold')];
     expect(folds).toHaveLength(2);
     expect(folds.every((fold) => !fold.open)).toBe(true);
   });
@@ -741,10 +748,7 @@ describe('App — Klang', () => {
     expect(player.setTimbre).toHaveBeenCalledWith('clean');
 
     openSheet(container, 'Ansicht');
-    const soundSelect = [...container.querySelectorAll<HTMLSelectElement>('.sound-panel select')].find(
-      (select) => [...select.options].some((option) => option.value === 'electric'),
-    )!;
-    await user.selectOptions(soundSelect, 'electric');
+    await user.click(overdriveButton(container));
 
     expect(player.setTimbre).toHaveBeenCalledWith('electric');
     expect(window.location.search).toContain('sound=electric');
@@ -780,10 +784,7 @@ describe('App — Klang', () => {
     expect(ampSelect()).toBeUndefined();
 
     // Die Verzerrung steht im selben Fach, in der Feinabstimmung.
-    const soundSelect = [...container.querySelectorAll<HTMLSelectElement>('.sound-panel select')].find(
-      (select) => [...select.options].some((option) => option.value === 'electric'),
-    )!;
-    await user.selectOptions(soundSelect, 'electric');
+    await user.click(overdriveButton(container));
 
     await user.selectOptions(ampSelect()!, 'modern-high-gain');
 

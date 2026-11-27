@@ -151,50 +151,6 @@
   gap: 0.6rem 1rem;
 }
 
-.builder-diatonic {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.builder-diatonic-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.1rem;
-  min-width: 2.6rem;
-  padding: 0.3rem 0.45rem;
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-md);
-  background: var(--panel-sunken);
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-  transition:
-    border-color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-@media (hover: hover) {
-  .builder-diatonic-btn:hover {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 10%, transparent);
-  }
-}
-
-.builder-roman {
-  font-size: var(--text-2xs);
-  color: var(--text-muted);
-}
-
-.builder-name {
-  font-weight: var(--weight-medium);
-  font-size: var(--text-sm);
-}
-
 .builder-type {
   display: flex;
   gap: 0.4rem;
@@ -238,6 +194,6 @@
 
 .builder-error {
   margin: 0.55rem 0 0;
-  color: var(--accent-text);
+  color: var(--gold-text);
   font-size: var(--text-sm);
 }

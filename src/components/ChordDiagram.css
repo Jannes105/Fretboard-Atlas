@@ -36,11 +36,14 @@
   opacity: 0.55;
 }
 
-/* The fingers, in the app's warm accent — they are what you are meant to read. */
+/*
+ * The fingers, in the chord colour — the same teal the neck lights a chord in.
+ * They were the root's amber, which on the neck means one note, not a grip.
+ */
 .chord-diagram .finger,
 .chord-diagram .barre {
-  fill: var(--root);
-  stroke: var(--root);
+  fill: var(--chord);
+  stroke: var(--chord);
 }
 
 .chord-diagram .barre {

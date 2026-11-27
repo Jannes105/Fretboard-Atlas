@@ -12,10 +12,6 @@
   width: 100%;
 }
 
-.rhythm-trigger .trigger-caret {
-  margin-left: auto;
-}
-
 .rhythm-trigger .trigger-value {
   min-width: 0;
   overflow: hidden;
@@ -53,14 +49,4 @@
   scrollbar-width: thin;
   /* Room for the scrollbar, so it never sits on top of the bottom row of slots. */
   padding-bottom: 0.15rem;
-}
-
-/*
- * A field stretches to the full width of the panel, and the field's caret is drawn at
- * the field's right edge — so in here it hung far off to the right of a narrow
- * select, attached to nothing. Shrinking the field to its content puts the caret
- * back inside the select it belongs to.
- */
-.rhythm-panel .field--inline {
-  width: fit-content;
 }
