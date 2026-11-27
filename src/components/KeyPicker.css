@@ -5,10 +5,11 @@
 .key-title {
   display: inline-flex;
   align-items: baseline;
+  /* Centred on the ▶ or the ♯/♭ beside it, like the buttons it sits with. */
+  align-self: center;
   gap: 0.5rem;
-  min-height: var(--tap);
   margin: 0;
-  padding: 0.3rem 0 0.35rem;
+  line-height: 1.1;
 }
 
 .key-title-root {

@@ -221,6 +221,24 @@
     stroke-width 0.1s ease;
 }
 
+/*
+ * A dot that was not there before — a new key, a chord's tones outside the
+ * scale — grows into place, so the eye catches what changed. Dots that stay
+ * only change colour, through the transition above.
+ */
+.note {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: note-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes note-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
 /* When the dots are tappable, show it: a pointer and a ring on hover. */
 .fretboard--playable .note {
   cursor: pointer;
@@ -446,6 +464,10 @@
   .note-dot,
   .note-label {
     transition: none;
+  }
+
+  .note {
+    animation: none;
   }
 
   /* The ring still marks the note; it just stops swelling into place. */

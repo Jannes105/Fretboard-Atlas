@@ -358,16 +358,56 @@ export function FretboardView({
    * Upright, the page scrolls down the neck, so a tapped position is brought
    * into view by the page: an invisible mark half a fret above the box, scrolled
    * to the top. Its scroll margin keeps it clear of the bars that stick there.
+   *
+   * Cropped to the box, the mark sits at the top of the neck, so a box picked
+   * from far down the page does not open below the fold. And back on the whole
+   * neck, it marks where the box was: you land where you just were, not
+   * wherever the page happened to be scrolled.
    */
+  /*
+   * A new position redraws the neck — cropped to the box, or back to all of it.
+   * A short fade makes that read as one picture changing, not a cut.
+   */
+  const svgRef = useRef<SVGSVGElement>(null);
+  const boxDrawn = useRef(false);
+  useEffect(() => {
+    if (!boxDrawn.current) {
+      boxDrawn.current = true;
+      return;
+    }
+    const el = svgRef.current;
+    if (!el || typeof el.animate !== 'function') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    el.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' });
+  }, [positionNumber, cropped]);
+
   const anchorRef = useRef<HTMLDivElement>(null);
-  const boxAnchor =
-    vertical && position !== null && !cropped
-      ? Math.max(0, ((NUT_X + (position.startFret - 1.5) * FRET_WIDTH - alongFrom) / alongLength) * 100)
-      : null;
+  const [seenBox, setSeenBox] = useState<{
+    number: number | null;
+    start: number | null;
+    from: number | null;
+  }>({ number: positionNumber, start: position?.startFret ?? null, from: null });
+  if (seenBox.number !== positionNumber) {
+    setSeenBox({ number: positionNumber, start: position?.startFret ?? null, from: seenBox.start });
+  }
+  const anchorFret = position !== null ? position.startFret : seenBox.from;
+  const boxAnchor = !vertical
+    ? null
+    : cropped
+      ? 0
+      : anchorFret !== null
+        ? Math.max(0, ((NUT_X + (anchorFret - 1.5) * FRET_WIDTH - alongFrom) / alongLength) * 100)
+        : null;
+
+  // A neck that opens already cropped is already at its box: no scrolling then.
+  const anchorMounted = useRef(false);
 
   useEffect(() => {
+    const first = !anchorMounted.current;
+    anchorMounted.current = true;
     const el = anchorRef.current;
     if (!el || typeof el.scrollIntoView !== 'function') return;
+    if (first && cropped) return;
     el.scrollIntoView({
       block: 'start',
       behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -646,6 +686,7 @@ export function FretboardView({
 
   const drawing = (
     <svg
+      ref={svgRef}
       className={[
         'fretboard',
         onHoldNote ? 'fretboard--playable' : '',
