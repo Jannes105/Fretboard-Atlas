@@ -5,7 +5,7 @@ import { LOOSE_ARPEGGIO_GAP } from './audio';
 import { AppFooter } from './components/AppFooter';
 import { AppShell } from './components/AppShell';
 import { BottomTabs, type SheetId } from './components/BottomTabs';
-import { ChordRow } from './components/ChordRow';
+import { ChordRow, ChordStrip } from './components/ChordRow';
 import { FretboardView } from './components/FretboardView';
 import { type Info, InfoBar } from './components/InfoBar';
 import { KeyPicker, KeyTitle } from './components/KeyPicker';
@@ -86,6 +86,9 @@ export default function App() {
   // At most one voicing picker is open.
   const [openPicker, setOpenPicker] = useState<number | null>(null);
 
+  /** Which sheet a pick shrank to a strip, so the neck above shows the pick. */
+  const [shrunk, setShrunk] = useState<SheetId | null>(null);
+
   // A one-off chord has no bar to spread across: an arpeggio walks the strings at
   // a leisurely pace, and "stopped" means a short, cut note.
   const strumGapNow = strum === 'arpeggio' ? LOOSE_ARPEGGIO_GAP : STANDARD_STRUM_GAP;
@@ -100,12 +103,14 @@ export default function App() {
    */
   const pickChord = (index: number) => {
     setHighlight({ kind: 'chord', index });
+    shrinkSheet();
     const chord = chords[index];
     if (chord) strumOnce(positionsToMidi(neck.chordPositions, chord.pitchClasses));
   };
 
   const pickDegree = (index: number) => {
     setHighlight({ kind: 'degree', index });
+    shrinkSheet();
     const note = scale?.notes[index];
     if (note) strumOnce(positionsToMidi(neck.visiblePositions, [note.pitchClass]));
   };
@@ -156,7 +161,13 @@ export default function App() {
    * A tab opens its own sheet, or shuts it when it is already up. Without a key,
    * chords and the progression still open theirs — and say what they need.
    */
-  const toggleSheet = (id: SheetId) => setSheet((open) => (open === id ? null : id));
+  const toggleSheet = (id: SheetId) => {
+    setShrunk(null);
+    setSheet((open) => (open === id ? null : id));
+  };
+
+  /** A pick in a sheet shrinks it to a strip: the neck above is what to look at now. */
+  const shrinkSheet = () => setShrunk(sheet);
 
   /** A quick key from a sheet waiting for one: set it, and stay in that sheet. */
   const quickKey = (quickRoot: string, scaleTypeId: string) =>
@@ -166,7 +177,10 @@ export default function App() {
     <NeedsKey what={what} onQuickKey={quickKey} onChooseKey={() => setSheet('key')} />
   );
 
-  const closeSheet = () => setSheet(null);
+  const closeSheet = () => {
+    setShrunk(null);
+    setSheet(null);
+  };
 
   /**
    * The sheet whose contents are in the frame: the open one, and after closing
@@ -327,12 +341,28 @@ export default function App() {
     </>
   );
 
+  /** What a shrunk sheet keeps: the row the pick was made in. */
+  const peek =
+    sheet === 'chords' ? (
+      <ChordStrip chords={chords} isChordActive={isChordActive} onPickChord={pickChord} />
+    ) : sheet === 'key' && scale ? (
+      <ScaleTones
+        scale={scale}
+        characteristic={neck.characteristic}
+        isDegreeActive={isDegreeActive}
+        onPickDegree={pickDegree}
+        compact
+      />
+    ) : null;
+
   const sheets = (
     <Sheet
       id={shownSheet}
       title={shownSheet ? SHEET_TITLES[shownSheet] : ''}
       open={sheet !== null}
       onClose={closeSheet}
+      peek={sheet !== null && shrunk === sheet ? peek : null}
+      onExpand={() => setShrunk(null)}
     >
       {shownSheet === 'key' ? (
         <>
