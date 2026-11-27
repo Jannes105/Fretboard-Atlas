@@ -42,6 +42,9 @@ import {
 } from './theory';
 import { customProgId, writeState } from './urlState';
 
+/** Where a position sits: „am Sattel" rather than „ab 0. Bund". */
+const fretPhrase = (fret: number) => (fret === 0 ? 'am Sattel' : `ab ${fret}. Bund`);
+
 /** The neck with no key on it — where the app opens. */
 const ALL_NOTES_LABEL = 'Alle Töne';
 
@@ -166,8 +169,14 @@ export default function App() {
     setSheet((open) => (open === id ? null : id));
   };
 
-  /** A pick in a sheet shrinks it to a strip: the neck above is what to look at now. */
-  const shrinkSheet = () => setShrunk(sheet);
+  /**
+   * A pick in a sheet shrinks it to a strip: the neck above is what to look at
+   * now. Only with the neck upright — lying down, it sits wholly above the
+   * sheet already, and shrinking would only hide the grip.
+   */
+  const shrinkSheet = () => {
+    if (vertical) setShrunk(sheet);
+  };
 
   /** A quick key from a sheet waiting for one: set it, and stay in that sheet. */
   const quickKey = (quickRoot: string, scaleTypeId: string) =>
@@ -328,8 +337,8 @@ export default function App() {
                 key={option.number}
                 type="button"
                 aria-pressed={box?.number === option.number}
-                aria-label={`Lage ${option.number}, ab ${option.anchorFret}. Bund`}
-                title={`Lage ${option.number} (${option.anchorFret}. Bund)`}
+                aria-label={`Lage ${option.number}, ${fretPhrase(option.anchorFret)}`}
+                title={`Lage ${option.number} (${fretPhrase(option.anchorFret)})`}
                 onClick={() => update('boxNumber', option.number)}
               >
                 {option.number}

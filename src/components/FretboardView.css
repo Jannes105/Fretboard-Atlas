@@ -211,6 +211,16 @@
   font-weight: var(--weight-bold);
 }
 
+/*
+ * Lying down, a box cropped to five frets would stretch to the full width and
+ * grow taller than the screen, its lowest strings below the fold. Capped, it
+ * keeps its proportions and sits centred instead.
+ */
+.fretboard:not(.fretboard--vertical) {
+  /* The width itself is capped in the component, from the drawing's proportions. */
+  margin-inline: auto;
+}
+
 /* ---------- Notes ---------- */
 
 .note-dot,

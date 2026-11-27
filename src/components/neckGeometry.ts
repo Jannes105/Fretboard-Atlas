@@ -175,7 +175,9 @@ export function neckLayout(
     viewBox: `${viewLeft} 0 ${viewRight - viewLeft} ${height}`,
     visibleFrets: lastFret - firstFret + 1,
     // The board must not start inside the gutter, or it would cover the names.
-    boardLeft: Math.max(BOARD_LEFT, viewLeft + LABEL_GUTTER),
+    // Except at the nut: there the open strings sit left of it, so the board
+    // starts where the uncropped one does — or their dots are cut in half.
+    boardLeft: firstFret === 0 ? BOARD_LEFT : Math.max(BOARD_LEFT, viewLeft + LABEL_GUTTER),
     labelX: viewLeft + LABEL_X,
   };
 }

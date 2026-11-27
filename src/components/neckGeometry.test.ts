@@ -78,4 +78,12 @@ describe('neckLayout — auf eine Lage beschnitten', () => {
     const openPosition = neckLayout(24, 6, { startFret: 0, endFret: 4 });
     expect(viewBoxOf(openPosition).x).toBeGreaterThanOrEqual(0);
   });
+
+  it('schneidet am Sattel die leeren Saiten nicht ab — das Brett beginnt wie beim ganzen Hals', () => {
+    // Die Punkte der leeren Saiten liegen links vom Sattel. Hochkant beginnt der
+    // Ausschnitt am Brett, und ein nach rechts gerücktes Brett halbierte sie.
+    const full = neckLayout(24, 6);
+    const openPosition = neckLayout(24, 6, { startFret: 0, endFret: 3 });
+    expect(openPosition.boardLeft).toBe(full.boardLeft);
+  });
 });

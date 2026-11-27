@@ -1221,11 +1221,12 @@ describe('App — Audio-Verdrahtung', () => {
       return Math.min(...notes);
     };
 
-    const lage1 = lowestNoteAt('/?root=A&scale=minor-pentatonic&box=1');
-    const lage4 = lowestNoteAt('/?root=A&scale=minor-pentatonic&box=4');
+    // Box 4 liegt am Sattel, Box 3 im 10. Bund.
+    const sattel = lowestNoteAt('/?root=A&scale=minor-pentatonic&box=4');
+    const oben = lowestNoteAt('/?root=A&scale=minor-pentatonic&box=3');
 
-    // Weiter oben am Hals gegriffen heißt höher gestimmt — eine ganze Oktave hier.
-    expect(lage4).toBeGreaterThan(lage1);
+    // Weiter oben am Hals gegriffen heißt höher gestimmt.
+    expect(oben).toBeGreaterThan(sattel);
   });
 
   it('lässt die Skala dagegen ersetzen statt stapeln — zwei Läufe übereinander wären Matsch', async () => {
@@ -1922,8 +1923,14 @@ describe('App — Bewegungen am Handy', () => {
 });
 
 describe('App — Blatt als Leiste', () => {
+  // Hochkant wie am Handy: dort liegt das Blatt über dem Hals.
+  const upright = () =>
+    window.localStorage.setItem('fretboard:view', JSON.stringify({ orientation: 'vertical' }));
+  afterEach(() => window.localStorage.removeItem('fretboard:view'));
+
   it('schrumpft nach einem Akkord auf eine Leiste, damit der Hals zu sehen ist', async () => {
     const user = userEvent.setup();
+    upright();
     window.history.replaceState(null, '', '/?root=C&scale=major');
     const { container } = render(<App />);
     openSheet(container, 'Akkorde');
@@ -1946,8 +1953,20 @@ describe('App — Blatt als Leiste', () => {
     expect(container.querySelector('.chord-detail')).not.toBeNull();
   });
 
+  it('bleibt mit waagerechtem Hals ganz — der liegt dort schon frei über dem Blatt', async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem('fretboard:view', JSON.stringify({ orientation: 'horizontal' }));
+    const { container } = render(<App />);
+    openSheet(container, 'Akkorde');
+
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[0]);
+    expect(container.querySelector('.sheet')?.classList.contains('is-compact')).toBe(false);
+    expect(container.querySelector('.chord-detail')).not.toBeNull();
+  });
+
   it('öffnet ein Blatt nach dem Schließen wieder ganz', async () => {
     const user = userEvent.setup();
+    upright();
     const { container } = render(<App />);
     openSheet(container, 'Akkorde');
     await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[0]);
