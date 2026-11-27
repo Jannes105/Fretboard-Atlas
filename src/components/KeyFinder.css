@@ -73,9 +73,11 @@
     background var(--transition-fast);
 }
 
-.keyfinder-result:hover {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+@media (hover: hover) {
+  .keyfinder-result:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
 }
 
 .keyfinder-key {
@@ -107,8 +109,10 @@
   transition: background var(--transition-fast);
 }
 
-.keyfinder-adopt:hover {
-  background: color-mix(in srgb, var(--accent) 24%, transparent);
+@media (hover: hover) {
+  .keyfinder-adopt:hover {
+    background: color-mix(in srgb, var(--accent) 24%, transparent);
+  }
 }
 
 /* A chord that does not belong to the key: named, not numbered, and dimmed. */

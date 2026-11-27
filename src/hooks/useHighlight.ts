@@ -34,6 +34,21 @@ function withOctave(name: string, midi: number): string {
   return `${name}${Math.floor(midi / 12) - 1}`;
 }
 
+/** A chord as the neck shows it: its tones, its root, its intervals. */
+export function chordPicked(chord: Chord): Picked {
+  return {
+    pitchClasses: chord.pitchClasses,
+    label: chord.name(),
+    chordTones: {
+      root: chord.root.pitchClass,
+      names: new Map(chord.notes.map((note) => [note.pitchClass, note.name()])),
+      intervals: chordIntervals(chord),
+    },
+    noteName: null,
+    unisonMidi: null,
+  };
+}
+
 export function useHighlight(chords: readonly Chord[], scale: Scale | null, spelling: Spelling) {
   const [highlight, setHighlight] = useState<Highlight>(null);
 
@@ -47,18 +62,7 @@ export function useHighlight(chords: readonly Chord[], scale: Scale | null, spel
 
     if (highlight.kind === 'chord') {
       const chord = chords[highlight.index];
-      if (!chord) return null;
-      return {
-        pitchClasses: chord.pitchClasses,
-        label: chord.name(),
-        chordTones: {
-          root: chord.root.pitchClass,
-          names: new Map(chord.notes.map((note) => [note.pitchClass, note.name()])),
-          intervals: chordIntervals(chord),
-        },
-        noteName: null,
-        unisonMidi: null,
-      };
+      return chord ? chordPicked(chord) : null;
     }
 
     if (highlight.kind === 'pitch') {

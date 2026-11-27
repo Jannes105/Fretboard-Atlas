@@ -226,9 +226,11 @@
   cursor: pointer;
 }
 
-.fretboard--playable .note:hover .note-dot {
-  stroke: var(--nut);
-  stroke-width: 3;
+@media (hover: hover) {
+  .fretboard--playable .note:hover .note-dot {
+    stroke: var(--nut);
+    stroke-width: 3;
+  }
 }
 
 .note-dot {

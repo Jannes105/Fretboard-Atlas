@@ -48,9 +48,11 @@
   font-weight: var(--weight-bold);
 }
 
-.rhythm-cell:hover {
-  border-color: var(--accent);
-  color: var(--text);
+@media (hover: hover) {
+  .rhythm-cell:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
 }
 
 .rhythm-cell:focus-visible {
@@ -79,7 +81,9 @@
     color var(--transition-fast);
 }
 
-.rhythm-preset:hover {
-  border-color: var(--accent);
-  color: var(--text);
+@media (hover: hover) {
+  .rhythm-preset:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
 }

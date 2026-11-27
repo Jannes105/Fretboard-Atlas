@@ -8,7 +8,8 @@ import { BottomTabs, type SheetId } from './components/BottomTabs';
 import { ChordRow } from './components/ChordRow';
 import { FretboardView } from './components/FretboardView';
 import { type Info, InfoBar } from './components/InfoBar';
-import { KeyButton, KeyPicker } from './components/KeyPicker';
+import { KeyPicker, KeyTitle } from './components/KeyPicker';
+import { NeedsKey } from './components/NeedsKey';
 import { NeckViewPanel } from './components/NeckViewPanel';
 import { ProgressionPanel } from './components/ProgressionPanel';
 import { ScaleTones } from './components/ScaleTones';
@@ -17,10 +18,11 @@ import { Sheet } from './components/Sheet';
 import { SoundPanel } from './components/SoundPanel';
 import { useAppState } from './hooks/useAppState';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
-import { useHighlight } from './hooks/useHighlight';
+import { chordPicked, useHighlight } from './hooks/useHighlight';
 import { useNeckModel } from './hooks/useNeckModel';
 import { useProgression } from './hooks/useProgression';
 import { useScaleRun } from './hooks/useScaleRun';
+import { useSheetHistory } from './hooks/useSheetHistory';
 import { useTheme } from './hooks/useTheme';
 import { useTransport } from './hooks/useTransport';
 import { useViewPrefs } from './hooks/useViewPrefs';
@@ -38,7 +40,7 @@ import {
   voicingsFor,
   withAccidentals,
 } from './theory';
-import { customProgId } from './urlState';
+import { customProgId, writeState } from './urlState';
 
 /** The neck with no key on it — where the app opens. */
 const ALL_NOTES_LABEL = 'Alle Töne';
@@ -134,25 +136,40 @@ export default function App() {
     material: [steps, chordTuning, progression.chosenVoicings],
   });
 
+  /**
+   * What the neck shows. While a progression plays, the chord being played —
+   * the bar below names it, so the dots above must agree. Otherwise what is
+   * picked; stopping brings that back.
+   */
+  const playingChord =
+    transport.isPlaying && transport.playingStep !== null
+      ? (steps[transport.playingStep]?.chord ?? null)
+      : null;
+  const shown = playingChord ? chordPicked(playingChord) : picked;
+
   // ---- Sheets ----
 
   /** Which sheet is up. Page state, not the link: a link carries the music. */
   const [sheet, setSheet] = useState<SheetId | null>(null);
 
   /**
-   * A tab opens its sheet, or shuts it when it is already up. Chords and the
-   * progression need a key; without one, they lead to where a key is chosen.
+   * A tab opens its own sheet, or shuts it when it is already up. Without a key,
+   * chords and the progression still open theirs — and say what they need.
    */
-  const toggleSheet = (id: SheetId) => {
-    if (sheet === id) {
-      setSheet(null);
-      return;
-    }
-    const needsKey = (id === 'chords' || id === 'progression') && scale === null;
-    setSheet(needsKey ? 'key' : id);
-  };
+  const toggleSheet = (id: SheetId) => setSheet((open) => (open === id ? null : id));
+
+  /** A quick key from a sheet waiting for one: set it, and stay in that sheet. */
+  const quickKey = (quickRoot: string, scaleTypeId: string) =>
+    patch((previous) => ({ ...previous, root: quickRoot, scaleTypeId }));
+
+  const needsKey = (what: string) => (
+    <NeedsKey what={what} onQuickKey={quickKey} onChooseKey={() => setSheet('key')} />
+  );
 
   const closeSheet = () => setSheet(null);
+
+  // The phone's back button closes a sheet rather than leaving the app.
+  useSheetHistory(sheet !== null, closeSheet, () => `${window.location.pathname}${writeState(state)}`);
 
   /**
    * How a key on this pitch is written: the name with fewer accidentals in its
@@ -230,12 +247,7 @@ export default function App() {
             and the document outline. */}
         <h2 className="sr-only">{scale ? scale.name() : ALL_NOTES_LABEL}</h2>
 
-        <KeyButton
-          scale={scale}
-          root={root}
-          expanded={sheet === 'key'}
-          onClick={() => toggleSheet('key')}
-        />
+        <KeyTitle scale={scale} root={root} />
 
         {scale ? (
           <button
@@ -400,7 +412,9 @@ export default function App() {
             {scale.type.name} hat {scale.notes.length} Stufen und keine Tonart, aus der sich
             Stufenakkorde borgen ließen. Wähl eine Dur-, Moll- oder Kirchentonart.
           </p>
-        ) : null}
+        ) : (
+          needsKey('die Stufenakkorde')
+        )}
       </Sheet>
 
       <Sheet
@@ -455,6 +469,8 @@ export default function App() {
             onGripsChange={(next) => update('grips', next)}
             onTranspose={transpose}
           />
+        ) : scale === null ? (
+          needsKey('eine Akkordfolge')
         ) : null}
       </Sheet>
 
@@ -536,10 +552,10 @@ export default function App() {
         zoom={state.boxZoom}
         sounding={soundingKeys}
         caged={neck.caged}
-        highlight={picked?.pitchClasses ?? null}
-        highlightLabel={picked?.label ?? null}
-        chordTones={picked?.chordTones ?? null}
-        unisonMidi={picked?.unisonMidi ?? null}
+        highlight={shown?.pitchClasses ?? null}
+        highlightLabel={shown?.label ?? null}
+        chordTones={shown?.chordTones ?? null}
+        unisonMidi={shown?.unisonMidi ?? null}
         characteristic={neck.characteristic?.note.pitchClass ?? null}
         spelling={viewPrefs.spelling}
         vertical={vertical}

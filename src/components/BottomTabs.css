@@ -29,9 +29,14 @@
   transition: color var(--transition-fast);
 }
 
-.bottom-tab:hover,
 .bottom-tab[aria-expanded='true'] {
   color: var(--accent-text);
+}
+
+@media (hover: hover) {
+  .bottom-tab:hover {
+    color: var(--accent-text);
+  }
 }
 
 .bottom-tab[aria-expanded='true'] {

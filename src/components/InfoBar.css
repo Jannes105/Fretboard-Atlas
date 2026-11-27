@@ -73,16 +73,24 @@
   cursor: pointer;
 }
 
-.info-bar-clear:hover,
-.info-bar-stop:hover {
-  background: color-mix(in srgb, var(--text) 14%, var(--bg));
+@media (hover: hover) {
+  .info-bar-clear:hover,
+  .info-bar-stop:hover {
+    background: color-mix(in srgb, var(--text) 14%, var(--bg));
+  }
 }
 
 /* The same filled stop as the transport's own ■. */
-.info-bar-stop,
-.info-bar-stop:hover {
+.info-bar-stop {
   background: var(--accent);
   color: var(--bg);
+}
+
+@media (hover: hover) {
+  .info-bar-stop:hover {
+    background: var(--accent);
+    color: var(--bg);
+  }
 }
 
 /* The same ring the neck draws around the exact pitch. */

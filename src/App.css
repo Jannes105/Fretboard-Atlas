@@ -173,7 +173,7 @@
    * Georgia has two weights, not a variable axis, and font-synthesis is off — so
    * --weight-medium lands on Bold wherever the display face is used. That is
    * fine for a 13 px chord symbol and far too dark for the key at 34 px, which
-   * therefore sets itself back to normal. See .key-trigger-root in KeyPicker.css.
+   * therefore sets itself back to normal. See .key-title-root in KeyPicker.css.
    */
   --weight-normal: 400;
   --weight-medium: 600;
@@ -268,9 +268,14 @@ body {
     color var(--transition-fast);
 }
 
-.trigger:hover,
 .trigger.is-open {
   border-color: var(--text-muted);
+}
+
+@media (hover: hover) {
+  .trigger:hover {
+    border-color: var(--text-muted);
+  }
 }
 
 /* The icon is what says WHAT opens, before the name is even read. */
@@ -290,9 +295,14 @@ body {
   color: var(--text-muted);
 }
 
-.trigger:hover .trigger-value,
 .trigger.is-open .trigger-value {
   color: inherit;
+}
+
+@media (hover: hover) {
+  .trigger:hover .trigger-value {
+    color: inherit;
+  }
 }
 
 /* The caret is what says "this opens". */
@@ -339,8 +349,10 @@ body {
     background var(--transition-fast);
 }
 
-.preset-button:hover {
-  border-color: var(--accent);
+@media (hover: hover) {
+  .preset-button:hover {
+    border-color: var(--accent);
+  }
 }
 
 .preset-button[aria-pressed='true'] {
@@ -367,8 +379,10 @@ body {
   cursor: pointer;
 }
 
-.fine-tuning > summary:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .fine-tuning > summary:hover {
+    color: var(--text);
+  }
 }
 
 .fine-tuning[open] > summary {
@@ -426,9 +440,11 @@ body {
     box-shadow var(--transition-fast);
 }
 
-.field select:hover,
-.select:hover {
-  border-color: var(--text-muted);
+@media (hover: hover) {
+  .field select:hover,
+  .select:hover {
+    border-color: var(--text-muted);
+  }
 }
 
 .field select:focus-visible,
@@ -545,8 +561,10 @@ button:focus-visible {
     color var(--transition-fast);
 }
 
-.segmented button:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .segmented button:hover {
+    color: var(--text);
+  }
 }
 
 /*
@@ -619,8 +637,10 @@ button:focus-visible {
     transform 0.08s ease;
 }
 
-.play-button:hover {
-  background: color-mix(in srgb, var(--accent) 26%, transparent);
+@media (hover: hover) {
+  .play-button:hover {
+    background: color-mix(in srgb, var(--accent) 26%, transparent);
+  }
 }
 
 .play-button:active {
@@ -737,8 +757,10 @@ button:focus-visible {
     background var(--transition-fast);
 }
 
-.chord-card:hover {
-  border-color: var(--chord);
+@media (hover: hover) {
+  .chord-card:hover {
+    border-color: var(--chord);
+  }
 }
 
 .chord-card.is-active {

@@ -1,0 +1,43 @@
+/* ---------- A sheet waiting for a key ---------- */
+
+.needs-key-text {
+  margin: 0 0 0.75rem;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.needs-key-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.needs-key-chip {
+  min-height: var(--tap);
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--panel-sunken);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.needs-key-chip:active {
+  border-color: var(--accent);
+}
+
+@media (hover: hover) {
+  .needs-key-chip:hover {
+    border-color: var(--accent);
+  }
+}
+
+.needs-key-more {
+  margin-top: 0.9rem;
+}
