@@ -32,6 +32,9 @@ import { NoteTspans } from './NoteText';
 import './FretboardView.css';
 
 /** Show the note name on each dot, or its scale degree. */
+/** The tallest a lying neck may draw, as a share of the screen. */
+const MAX_NECK_HEIGHT = '50svh';
+
 export type LabelMode = 'note' | 'degree';
 
 /** Which name a black key gets where no key decides it. */
@@ -698,7 +701,16 @@ export function FretboardView({
       // Lying down, the minimum width keeps the drawing at 1:1 so the names
       // stay the size they were drawn; upright, the page width IS the neck's
       // width, and the page scrolls down it instead.
-      style={vertical ? undefined : { minWidth: `${(layout.visibleFrets + 2) * FRET_WIDTH}px` }}
+      style={
+        vertical
+          ? undefined
+          : {
+              minWidth: `${(layout.visibleFrets + 2) * FRET_WIDTH}px`,
+              // No taller than half the screen: a box cropped to five frets
+              // would otherwise stretch to the full width and run below the fold.
+              width: `min(100%, calc(${MAX_NECK_HEIGHT} * ${(vw / height).toFixed(4)}))`,
+            }
+      }
       role="img"
       aria-label={`Griffbrett: ${described.join(', ')}. Pfeiltasten wandern über den Hals, Leertaste spielt den Ton.`}
       tabIndex={onHoldNote ? 0 : undefined}

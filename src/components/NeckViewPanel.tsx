@@ -25,13 +25,12 @@ interface NeckViewPanelProps {
 const fretLabel = (fret: number) => (fret === 0 ? 'offen' : `${fret}. Bund`);
 
 /**
- * How the neck is drawn, in the „Ansicht" sheet.
+ * How the neck is drawn, in the „Ansicht" sheet: one row per setting, the name
+ * on the left and the choice on the right.
  *
- * These used to stand as a row of three dropdowns and a toggle right above the
- * neck — four controls of equal weight between the key and the picture, every
- * one of them a refinement rather than a first step. The positions stay outside
- * (they are how you move around the neck); everything that only changes how the
- * same notes are drawn lives in here.
+ * Every choice of up to three is a segmented control, and the CAGED forms a row
+ * of chips — before, the sheet mixed segmented controls, dropdowns and
+ * checkboxes under three different kinds of heading.
  */
 export function NeckViewPanel({
   fretCount,
@@ -48,10 +47,10 @@ export function NeckViewPanel({
   minorTonic,
 }: NeckViewPanelProps) {
   return (
-    <div className="setup-panel view-panel">
+    <div className="option-rows view-panel">
       {/* How much neck: shorter is the exception, so it is three taps, not a list. */}
-      <div className="field field--plain">
-        <span>Bünde</span>
+      <div className="option-row">
+        <span className="option-label">Bünde</span>
         <div className="segmented" role="group" aria-label="Bünde">
           {FRET_COUNTS.map((count) => (
             <button
@@ -67,16 +66,15 @@ export function NeckViewPanel({
       </div>
 
       {hasScale ? (
-        <div className="field field--plain">
-          <span>Beschriftung</span>
-          {/* Two options are not worth a dropdown: both fit side by side. */}
+        <div className="option-row">
+          <span className="option-label">Beschriftung</span>
           <div className="segmented" role="group" aria-label="Beschriftung">
             <button
               type="button"
               aria-pressed={labelMode === 'note'}
               onClick={() => onLabelModeChange('note')}
             >
-              Notennamen
+              Töne
             </button>
             <button
               type="button"
@@ -91,44 +89,53 @@ export function NeckViewPanel({
 
       {/* Only meaningful with a position selected — there is nothing else to crop to. */}
       {hasBox ? (
-        <label className="toggle">
+        <label className="option-row switch-row">
+          <span className="option-label">Nur die gewählte Lage</span>
           <input
             type="checkbox"
+            role="switch"
+            className="switch"
             checked={boxZoom}
             onChange={(e) => onBoxZoomChange(e.target.checked)}
           />
-          <span>Nur die gewählte Lage zeigen</span>
         </label>
       ) : null}
 
       {/* Hidden where the forms would not hold — a wrong grip helps nobody. */}
       {cagedForms.length > 0 ? (
-        <label className="field">
-          <span>CAGED-Form</span>
-          <select
-            aria-label="CAGED-Form"
-            value={cagedForm ?? ''}
-            onChange={(e) =>
-              onCagedFormChange(e.target.value === '' ? null : (e.target.value as CagedForm))
-            }
-          >
-            <option value="">aus</option>
+        <div className="option-row option-row--stacked">
+          <span className="option-label">CAGED-Form</span>
+          <div className="caged-chips" role="group" aria-label="CAGED-Form">
+            <button
+              type="button"
+              className="option-chip"
+              aria-pressed={cagedForm === null}
+              onClick={() => onCagedFormChange(null)}
+            >
+              aus
+            </button>
             {cagedForms.map((placement) => (
-              <option key={placement.form} value={placement.form}>
-                {placement.form}-Form ({fretLabel(placement.startFret)})
-              </option>
+              <button
+                key={placement.form}
+                type="button"
+                className="option-chip"
+                aria-pressed={cagedForm === placement.form}
+                aria-label={`${placement.form}-Form (${fretLabel(placement.startFret)})`}
+                title={`${placement.form}-Form (${fretLabel(placement.startFret)})`}
+                data-form={placement.form}
+                onClick={() => onCagedFormChange(placement.form)}
+              >
+                {placement.form}
+              </button>
             ))}
-          </select>
-        </label>
-      ) : null}
-
-      {cagedForms.length > 0 ? (
-        <p className="hint view-hint">
-          Die Form des Grundakkords, über die Skala gelegt.
-          {minorTonic
-            ? ' In Moll gibt es nur die E-, A- und D-Form — die C- und G-Form sind als Moll-Griff nicht greifbar.'
-            : ''}
-        </p>
+          </div>
+          <p className="hint view-hint">
+            Die Form des Grundakkords, über die Skala gelegt.
+            {minorTonic
+              ? ' In Moll gibt es nur die E-, A- und D-Form — die C- und G-Form sind als Moll-Griff nicht greifbar.'
+              : ''}
+          </p>
+        </div>
       ) : null}
     </div>
   );

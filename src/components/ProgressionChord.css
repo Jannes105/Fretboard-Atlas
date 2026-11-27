@@ -2,9 +2,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  min-width: 6.5rem;
-  padding: 0.6rem 0.75rem;
+  gap: 0.1rem;
+  min-width: 0;
+  padding: 0.5rem 0.15rem 0.3rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--panel);
@@ -13,10 +13,25 @@
     background var(--transition-fast);
 }
 
-/* Marks the chord sounding right now, so you can see where the loop is. */
+/* Marks the chord sounding right now — in the neck's chord colour, the same
+   chord lit up there. */
 .progression-chord.is-playing {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+  border-color: var(--chord);
+  background: color-mix(in srgb, var(--chord) 16%, var(--panel));
+}
+
+/* Four to a row: the grip at a size that fits a quarter of a phone. */
+.progression .progression-chord .chord-diagram svg {
+  width: 100%;
+  max-width: 5rem;
+}
+
+.progression .progression-chord .chord-symbol {
+  font-size: var(--text-md);
+}
+
+.progression .progression-chord .roman {
+  font-size: var(--text-2xs);
 }
 
 .voicing-button {
@@ -24,8 +39,9 @@
   flex-direction: column;
   align-items: center;
   gap: 0.15rem;
-  margin-top: 0.3rem;
-  padding: 0.3rem;
+  width: 100%;
+  margin-top: 0.15rem;
+  padding: 0.15rem;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: none;

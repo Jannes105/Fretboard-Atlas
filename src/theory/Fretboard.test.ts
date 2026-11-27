@@ -154,15 +154,29 @@ describe('Skalen-Lagen (Boxen)', () => {
     );
   }
 
-  it('legt die 5 Lagen der A-Moll-Pentatonik auf die Bünde 5, 8, 10, 12, 15', () => {
+  /** Eine Lage über ihre Box-Nummer, nicht über ihren Platz in der Reihe. */
+  const box = (n: number, scale = aMinorPentatonic, on = board) =>
+    on.scalePositions(scale).find((p) => p.number === n)!;
+
+  it('legt die 5 Lagen der A-Moll-Pentatonik ab dem Sattel: Box 4, 5, 1, 2, 3', () => {
     const positions = board.scalePositions(aMinorPentatonic);
 
-    expect(positions.map((p) => p.anchorFret)).toEqual([5, 8, 10, 12, 15]);
-    expect(positions.map((p) => p.number)).toEqual([1, 2, 3, 4, 5]);
+    // Box 4 und 5 liegen eine Oktave tiefer als ab dem Grundton gezählt (12, 15):
+    // so hat auch der Anfang des Halses seine Lage.
+    expect(positions.map((p) => p.anchorFret)).toEqual([0, 3, 5, 8, 10]);
+    expect(positions.map((p) => p.number)).toEqual([4, 5, 1, 2, 3]);
+  });
+
+  it('gibt C-Dur eine Lage am Sattel, statt erst im 8. Bund anzufangen', () => {
+    const cMajor = new Scale(Note.parse('C'), MAJOR);
+    const positions = board.scalePositions(cMajor);
+
+    expect(positions.map((p) => p.anchorFret)).toEqual([0, 1, 3, 5, 7, 8, 10]);
+    expect(positions.map((p) => p.number)).toEqual([3, 4, 5, 6, 7, 1, 2]);
   });
 
   it('ergibt Box 1 exakt so, wie sie jeder Gitarrist greift', () => {
-    const box1 = board.scalePositions(aMinorPentatonic)[0];
+    const box1 = box(1);
 
     // e|--5--8--   B|--5--8--   G|--5--7--
     // D|--5--7--   A|--5--7--   E|--5--8--
@@ -177,7 +191,8 @@ describe('Skalen-Lagen (Boxen)', () => {
   });
 
   it('ergibt Box 2 und 3 exakt so, wie man sie lernt', () => {
-    const [, box2, box3] = board.scalePositions(aMinorPentatonic);
+    const box2 = box(2);
+    const box3 = box(3);
 
     expect(boxFrets(aMinorPentatonic, box2)).toEqual([
       [8, 10],
@@ -198,16 +213,14 @@ describe('Skalen-Lagen (Boxen)', () => {
     ]);
   });
 
-  it('ergibt Box 4 exakt so, wie man sie lernt', () => {
-    const box4 = board.scalePositions(aMinorPentatonic)[3];
-
-    expect(boxFrets(aMinorPentatonic, box4)).toEqual([
-      [12, 15],
-      [12, 15],
-      [12, 14],
-      [12, 14],
-      [13, 15],
-      [12, 15],
+  it('ergibt Box 4 exakt so, wie man sie lernt — am Sattel, eine Oktave unter Bund 12', () => {
+    expect(boxFrets(aMinorPentatonic, box(4))).toEqual([
+      [0, 3],
+      [0, 3],
+      [0, 2],
+      [0, 2],
+      [1, 3],
+      [0, 3],
     ]);
   });
 
@@ -245,20 +258,22 @@ describe('Skalen-Lagen (Boxen)', () => {
     const capo3 = new Fretboard(Tuning.STANDARD, 24, 3);
     const cMinorPentatonic = new Scale(Note.parse('C'), MINOR_PENTATONIC);
 
-    // C liegt im 8. Bund der tiefen E-Saite — die erste Lage beginnt dort.
-    expect(capo3.scalePositions(cMinorPentatonic)[0].anchorFret).toBe(8);
+    // C liegt im 8. Bund der tiefen E-Saite: dort liegt Box 1.
+    expect(box(1, cMinorPentatonic, capo3).anchorFret).toBe(8);
+    // Die tiefste Lage beginnt am Kapo, nicht darunter: Box 4 im 3. Bund.
+    expect(capo3.scalePositions(cMinorPentatonic)[0]).toMatchObject({ number: 4, anchorFret: 3 });
     // Keine Lage reicht hinter den Kapo.
     for (const position of capo3.scalePositions(cMinorPentatonic)) {
       expect(position.startFret).toBeGreaterThanOrEqual(3);
     }
   });
 
-  it('lässt Lagen weg, die nicht mehr auf den Hals passen', () => {
+  it('kappt Lagen am Ende eines kurzen Halses', () => {
     const short = new Fretboard(Tuning.STANDARD, 12);
     const positions = short.scalePositions(aMinorPentatonic);
 
-    // Lage 5 läge im 15. Bund — die gibt es auf einem 12-Bund-Hals nicht.
-    expect(positions.map((p) => p.anchorFret)).toEqual([5, 8, 10, 12]);
+    // Ab dem Sattel passen alle fünf auf 12 Bünde; die letzte endet am 12.
+    expect(positions.map((p) => p.anchorFret)).toEqual([0, 3, 5, 8, 10]);
     for (const position of positions) {
       expect(position.endFret).toBeLessThanOrEqual(12);
     }

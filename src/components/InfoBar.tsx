@@ -19,6 +19,9 @@ interface InfoBarProps {
   onStop: () => void;
 }
 
+/** How long after the last scroll the bar comes back. */
+const SCROLL_SETTLE_MS = 500;
+
 /** Whether this page can and may animate the bar away. */
 function canAnimate(): boolean {
   if (typeof window === 'undefined' || typeof Element === 'undefined') return false;
@@ -83,12 +86,32 @@ export function InfoBar({ info: current, onClear, onStop }: InfoBarProps) {
 
   const info = current ?? last;
 
+  /*
+   * While the page scrolls, the bar steps aside: scrolling the neck is looking
+   * for dots, and the bar floats right over the frets near the bottom. It comes
+   * back a moment after the scrolling stops.
+   */
+  const [scrolling, setScrolling] = useState(false);
+  useEffect(() => {
+    let timer: number | undefined;
+    const onScroll = () => {
+      setScrolling(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setScrolling(false), SCROLL_SETTLE_MS);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.clearTimeout(timer);
+    };
+  }, []);
+
   return (
     <div className="info-bar-slot" aria-live="polite">
       {info ? (
         <div
           ref={ref}
-          className={`info-bar info-bar--${info.kind}${leaving ? ' is-leaving' : ''}`}
+          className={`info-bar info-bar--${info.kind}${leaving ? ' is-leaving' : ''}${scrolling ? ' is-scrolling' : ''}`}
         >
           {info.kind === 'playing' ? (
             <button

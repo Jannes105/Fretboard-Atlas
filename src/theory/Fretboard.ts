@@ -106,13 +106,18 @@ export class Fretboard {
   }
 
   /**
-   * The playing positions ("boxes") of a scale, low to high.
+   * The playing positions ("boxes") of a scale, low to high on the neck.
    *
    * A scale with n notes has n boxes, and each one is anchored where one of its
    * degrees lands on the lowest string: box 1 on the root, box 2 on the second
-   * degree, and so on up the neck. Because the degrees rise in order, so do the
-   * boxes — for A minor pentatonic this lands on frets 5, 8, 10, 12 and 15, which
-   * are precisely the five shapes every guitarist learns.
+   * degree, and so on — the numbers every guitarist learns them by. For A minor
+   * pentatonic the shapes sit on frets 5, 8, 10, 12 and 15.
+   *
+   * Each box goes in the lowest octave it fits, from the nut (or capo) up, so the
+   * first frets have their position too: box 4 of A minor pentatonic is played
+   * at fret 0 as well as at 12, and C major's box 3 at 0 rather than at 12.
+   * Sorted by fret, the numbers then no longer start at 1 — A minor pentatonic
+   * reads 4, 5, 1, 2, 3 up the neck — but each one names the shape it always has.
    *
    * Boxes running off the end of the neck are dropped; the last one may be clipped.
    */
@@ -126,8 +131,10 @@ export class Fretboard {
     const positions: ScalePosition[] = [];
 
     scale.pitchClasses.forEach((pitchClass, degreeIndex) => {
-      // Each degree, counted upwards from the root — so the anchors ascend.
-      const anchorFret = rootFret + mod(pitchClass - rootPitchClass, 12);
+      // Each degree, counted upwards from the root, then an octave down where
+      // that still lies on the neck.
+      const above = rootFret + mod(pitchClass - rootPitchClass, 12);
+      const anchorFret = above - 12 >= this.lowestFret ? above - 12 : above;
       if (anchorFret > this.fretCount) return;
 
       positions.push({
@@ -138,7 +145,7 @@ export class Fretboard {
       });
     });
 
-    return positions;
+    return positions.sort((a, b) => a.anchorFret - b.anchorFret);
   }
 
   /** Every position where a note of the scale sounds, annotated with its scale degree. */

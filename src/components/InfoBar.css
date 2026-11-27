@@ -118,6 +118,16 @@
   }
 }
 
+/* While the page scrolls: nearly see-through, and taps go to the neck below. */
+.info-bar {
+  transition: opacity 0.2s ease;
+}
+
+.info-bar.is-scrolling {
+  opacity: 0.12;
+  pointer-events: none;
+}
+
 /* Fading out: its words stay, its buttons no longer answer. */
 .info-bar.is-leaving {
   pointer-events: none;
