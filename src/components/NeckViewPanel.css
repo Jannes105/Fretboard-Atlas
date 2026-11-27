@@ -4,3 +4,11 @@
   margin: 0;
   font-size: var(--text-xs);
 }
+
+/* The forms in one row of equal chips: „aus" and up to five letters. */
+.caged-chips {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 0.4rem;
+}

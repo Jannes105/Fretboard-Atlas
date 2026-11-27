@@ -18,9 +18,14 @@ interface ProgressionChordProps {
   isPlaying?: boolean;
 }
 
+/** "offen" or "5. Bund": where the grip sits — all a quarter-wide card has room for. */
+function where(baseFret: number): string {
+  return baseFret === 0 ? 'offen' : `${baseFret}. Bund`;
+}
+
 /** "A-Form, 5. Bund" — or just "5. Bund" for a generated grip with no form name. */
 function describe(shapeName: string, baseFret: number): string {
-  const position = baseFret === 0 ? 'offen' : `${baseFret}. Bund`;
+  const position = where(baseFret);
   return shapeName === '' ? position : `${shapeName}, ${position}`;
 }
 
@@ -85,12 +90,13 @@ export function ProgressionChord({
           onClick={onToggle}
           aria-expanded={isOpen}
           aria-label={`${step.chord.name()}: Griff wechseln (aktuell ${describe(voicing.shapeName, voicing.baseFret)})`}
+          title={describe(voicing.shapeName, voicing.baseFret)}
         >
-          {describe(voicing.shapeName, voicing.baseFret)} ▾
+          {where(voicing.baseFret)} ▾
         </button>
       ) : (
-        <span className="voicing-caption">
-          {describe(voicing.shapeName, voicing.baseFret)}
+        <span className="voicing-caption" title={describe(voicing.shapeName, voicing.baseFret)}>
+          {where(voicing.baseFret)}
         </span>
       )}
 

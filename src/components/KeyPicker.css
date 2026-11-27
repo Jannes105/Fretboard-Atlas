@@ -153,3 +153,40 @@
     font-size: var(--text-lg);
   }
 }
+
+/* ---------- Order inside „Wählen" ---------- */
+
+/* The key's tones first: inside the sheet's own flow, no extra rule around them. */
+.key-block {
+  margin-bottom: 0.9rem;
+}
+
+.key-block .scale-tones {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+/* Seven tones in one row, each an equal share. */
+.key-block .degree-chips {
+  flex-wrap: nowrap;
+}
+
+.key-block .degree-chips > li {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.key-block .degree-chip {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 0.15rem;
+}
+
+.more-scales {
+  margin-top: 0.4rem;
+}
+
+.more-scales[open] > summary {
+  margin-bottom: 0.5rem;
+}

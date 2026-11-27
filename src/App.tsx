@@ -375,15 +375,17 @@ export default function App() {
     >
       {shownSheet === 'key' ? (
         <>
-          {scale ? (
-            <ScaleTones
-              scale={scale}
-              characteristic={neck.characteristic}
-              isDegreeActive={isDegreeActive}
-              onPickDegree={pickDegree}
-            />
-          ) : null}
           <KeyPicker
+            tones={
+              scale ? (
+                <ScaleTones
+                  scale={scale}
+                  characteristic={neck.characteristic}
+                  isDegreeActive={isDegreeActive}
+                  onPickDegree={pickDegree}
+                />
+              ) : null
+            }
             scale={scale}
             root={root}
             spelling={viewPrefs.spelling}

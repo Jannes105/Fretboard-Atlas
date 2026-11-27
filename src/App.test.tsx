@@ -201,7 +201,7 @@ describe('App — Alle Töne', () => {
 
     await openKeyPicker(user, container);
     await user.click(
-      [...container.querySelectorAll<HTMLButtonElement>('.key-picker .link-button')].find((b) =>
+      [...container.querySelectorAll<HTMLButtonElement>('.key-picker .quiet-button')].find((b) =>
         b.textContent?.includes('Keine Tonart'),
       )!,
     );
@@ -345,7 +345,7 @@ function chipSymbols(container: HTMLElement): string[] {
 
 describe('App — Eigene Akkordfolge', () => {
   const progressionSelect = (container: HTMLElement) =>
-    [...container.querySelectorAll<HTMLSelectElement>('.panel-head select')].find((select) =>
+    [...container.querySelectorAll<HTMLSelectElement>('select[aria-label="Vorlage"]')].find((select) =>
       [...select.options].some((option) => option.value === 'custom'),
     )!;
 
@@ -577,7 +577,9 @@ describe('App — Einstellungen', () => {
     // Hals zu sehen ist, und stehen deshalb beim Hals.
     expect(instrumentSelects(container)).toHaveLength(2);
     expect(container.querySelector('section[aria-label="Hals"] [aria-label="Bünde"]')).not.toBeNull();
-    expect(container.querySelector('.app-footer select')).not.toBeNull();
+    // Ausrichtung und Farbschema: je drei Möglichkeiten, also Umschalter statt Dropdowns.
+    expect(container.querySelector('.app-footer [aria-label="Ausrichtung"]')).not.toBeNull();
+    expect(container.querySelector('.app-footer select')).toBeNull();
 
     await user.keyboard('{Escape}');
     expect(container.querySelector('.sheet')).toBeNull();
@@ -872,13 +874,17 @@ describe('App — Tonlänge', () => {
 });
 
 describe('App — Klick', () => {
-  it('stellt den Klick zu Tempo und Wiederholen, statt ihn im Rhythmus zu vergraben', async () => {
+  it('legt den Klick unter „Optionen" — mit seinem Stand auf dem Fach, nicht im Rhythmus vergraben', async () => {
     // Ein Metronom sucht keiner hinter „4/4 · Viertel“.
     const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?scale=major&click=countIn');
     const { container } = render(<App />);
     openSheet(container, 'Folge');
 
-    expect(container.querySelector('.transport [aria-label="Klick"]')).not.toBeNull();
+    const options = container.querySelector('.progression-options')!;
+    expect(options.querySelector('[aria-label="Klick"]')).not.toBeNull();
+    // Zugeklappt sagt das Fach, worauf er steht.
+    expect(options.querySelector('summary')?.textContent).toContain('Einzähler');
 
     await user.click(container.querySelector<HTMLButtonElement>('.rhythm-trigger')!);
     expect(container.querySelector('.rhythm-panel [aria-label="Klick"]')).toBeNull();
@@ -889,9 +895,10 @@ describe('App — Klick', () => {
     const { container } = render(<App />);
     openSheet(container, 'Folge');
 
-    await user.selectOptions(
-      container.querySelector<HTMLSelectElement>('[aria-label="Klick"]')!,
-      'metronome',
+    await user.click(
+      [...container.querySelectorAll<HTMLButtonElement>('[aria-label="Klick"] button')].find(
+        (b) => b.textContent === 'Metronom',
+      )!,
     );
     expect(window.location.search).toContain('click=metronome');
 
@@ -1055,16 +1062,19 @@ describe('App — Hervorhebung', () => {
     fireEvent.click(container.querySelector<HTMLButtonElement>('.sheet-done')!);
     expect(undos()).toEqual([clearButton(container)]);
   });
-  it('stellt die Stufen-Chips ins Tonart-Blatt, über den Wähler', () => {
+  it('stellt die Stufen-Chips ins Tonart-Blatt: unter den Reiter, über Grundton und Skala', () => {
     const { container } = render(<App />);
 
     // Unter einem aufrechten 24-Bund-Hals lagen sie zwei Bildschirme unter dem
     // Bild, das sie erklären. Im Blatt liegt der Hals darüber.
     expect(container.querySelector('.degree-chips')).toBeNull();
     openSheet(container, 'Tonart');
+    const tabs = container.querySelector('.sheet .key-tabs')!;
     const chips = container.querySelector('.sheet .degree-chips')!;
-    const picker = container.querySelector('.sheet .key-picker')!;
-    expect(chips.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const roots = container.querySelector('.sheet .root-grid')!;
+    // Der Reiter schaltet das ganze Blatt um, steht also ganz oben.
+    expect(tabs.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chips.compareDocumentPosition(roots) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
   it('lässt Escape bei offenem Blatt nur das Blatt schließen, die Hervorhebung bleibt', async () => {
     const user = userEvent.setup();
@@ -1524,7 +1534,7 @@ describe('App — Marker beim Abspielen der Skala', () => {
 
 describe('App — CAGED-Overlay', () => {
   const picker = (container: HTMLElement) =>
-    container.querySelector<HTMLSelectElement>('[aria-label="CAGED-Form"]');
+    container.querySelector<HTMLElement>('[role="group"][aria-label="CAGED-Form"]');
 
   it('legt die gewaehlte Form ueber den Hals', () => {
     window.history.replaceState(null, '', '/?root=A&scale=major&caged=E');
@@ -1571,9 +1581,9 @@ describe('App — CAGED-Overlay', () => {
 
     openView(container);
     expect(container.querySelector('.view-hint')?.textContent).toContain('In Moll');
-    const forms = [...picker(container)!.querySelectorAll('option')]
-      .map((option) => option.value)
-      .filter(Boolean);
+    const forms = [...picker(container)!.querySelectorAll<HTMLElement>('[data-form]')].map(
+      (chip) => chip.dataset.form,
+    );
     expect(new Set(forms)).toEqual(new Set(['A', 'E', 'D']));
   });
 });
@@ -1584,7 +1594,7 @@ describe('App — Neues aus dem UX-Review', () => {
     const { container } = render(<App />);
     openSheet(container, 'Folge');
 
-    const select = [...container.querySelectorAll<HTMLSelectElement>('.panel-head select')].find((s) =>
+    const select = [...container.querySelectorAll<HTMLSelectElement>('select[aria-label="Vorlage"]')].find((s) =>
       [...s.options].some((o) => o.value === 'custom'),
     )!;
     const first = [...select.options].find((o) => o.value === 'I-V-vi-IV')!;

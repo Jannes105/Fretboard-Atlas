@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Note, pitchClassNames, type Scale, scaleTypesInGroup, withAccidentals } from '../theory';
 import type { Spelling } from './FretboardView';
 import { KeyFinder } from './KeyFinder';
@@ -26,6 +26,8 @@ interface KeyPickerProps {
   onAdopt: (symbols: string[], root: string, scaleTypeId: string) => void;
   /** A match from the lookup is a finished answer: the sheet can close. */
   onDone: () => void;
+  /** The key's tones, shown first under „Wählen" — there is nothing to show without a key. */
+  tones?: ReactNode;
 }
 
 interface KeyTitleProps {
@@ -78,6 +80,7 @@ export function KeyPicker({
   onPickKey,
   onAdopt,
   onDone,
+  tones = null,
 }: KeyPickerProps) {
   const [tab, setTab] = useState<KeyPickerTab>('choose');
 
@@ -117,7 +120,14 @@ export function KeyPicker({
       </div>
 
       {tab === 'choose' ? (
-        <div role="tabpanel">
+        <div role="tabpanel" className="key-panel">
+          {tones ? (
+            <section className="key-block" aria-label="Töne der Tonart">
+              <p className="key-section">Töne · antippen zeigt sie auf dem Hals</p>
+              {tones}
+            </section>
+          ) : null}
+
           <p className="key-section">Grundton</p>
           <div className="root-grid" role="group" aria-label="Grundton">
             {Array.from({ length: 12 }, (_, pitchClass) => {
@@ -156,8 +166,17 @@ export function KeyPicker({
             {scaleTypesInGroup('basics').map((type) => scaleButton(type.id, type.name))}
           </div>
 
-          <details className="fine-tuning more-scales" open={scale?.type.group === 'more'}>
-            <summary>Weitere Skalen</summary>
+          {/* Folded like every other „more" in the sheets: name, a taste of what is
+              inside, and a caret. */}
+          <details className="sheet-fold more-scales" open={scale?.type.group === 'more'}>
+            <summary>
+              <h3>Weitere Skalen</h3>
+              <span className="sheet-fold-value">
+                {scaleTypesInGroup('more')
+                  .map((type) => type.name)
+                  .join(', ')}
+              </span>
+            </summary>
             <div className="scale-options" role="group" aria-label="Weitere Skalen">
               {scaleTypesInGroup('more').map((type) => scaleButton(type.id, type.name))}
             </div>
@@ -165,12 +184,13 @@ export function KeyPicker({
 
           {scale ? (
             <div className="key-panel-foot">
+              {/* Quiet: leaving the key is a way back, not the next step. */}
               <button
                 type="button"
-                className="link-button"
+                className="quiet-button"
                 onClick={() => onScaleTypeChange(null)}
               >
-                Keine Tonart — alle Töne zeigen
+                Keine Tonart · alle Töne zeigen
               </button>
             </div>
           ) : null}
