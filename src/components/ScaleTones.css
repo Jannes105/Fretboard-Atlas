@@ -38,8 +38,10 @@
     background var(--transition-fast);
 }
 
-.degree-chip:hover {
-  border-color: var(--accent);
+@media (hover: hover) {
+  .degree-chip:hover {
+    border-color: var(--accent);
+  }
 }
 
 .degree-chip.is-active {

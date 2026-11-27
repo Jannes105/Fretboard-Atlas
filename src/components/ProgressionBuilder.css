@@ -95,9 +95,11 @@
   cursor: pointer;
 }
 
-.builder-bars:hover {
-  border-color: var(--accent);
-  color: var(--text);
+@media (hover: hover) {
+  .builder-bars:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
 }
 
 .builder-remove {
@@ -116,9 +118,11 @@
   cursor: pointer;
 }
 
-.builder-remove:hover {
-  background: color-mix(in srgb, var(--accent) 30%, transparent);
-  color: var(--text);
+@media (hover: hover) {
+  .builder-remove:hover {
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+    color: var(--text);
+  }
 }
 
 .builder-clear {
@@ -134,8 +138,10 @@
   cursor: pointer;
 }
 
-.builder-clear:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .builder-clear:hover {
+    color: var(--text);
+  }
 }
 
 .builder-add {
@@ -172,9 +178,11 @@
     background var(--transition-fast);
 }
 
-.builder-diatonic-btn:hover {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+@media (hover: hover) {
+  .builder-diatonic-btn:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
 }
 
 .builder-roman {
@@ -222,8 +230,10 @@
   cursor: pointer;
 }
 
-.builder-type-add:hover {
-  border-color: var(--accent);
+@media (hover: hover) {
+  .builder-type-add:hover {
+    border-color: var(--accent);
+  }
 }
 
 .builder-error {

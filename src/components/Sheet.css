@@ -16,6 +16,19 @@
   border-radius: 14px 14px 0 0;
   background: var(--panel);
   box-shadow: 0 -8px 24px rgb(0 0 0 / 18%);
+  /* Springs back when a pull on the head falls short. */
+  transition: transform 0.2s ease-out;
+}
+
+/* Under the finger: follow it exactly, no lag. */
+.sheet.is-pulled {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    transition: none;
+  }
 }
 
 /* It takes the focus so the keyboard lands inside; the ring would only be noise. */
@@ -30,6 +43,13 @@
   gap: 0.75rem;
   padding: 0.85rem 1rem 0.5rem;
   border-bottom: 1px solid var(--border);
+  /* The head is the handle: a vertical drag here is ours, not the page's. */
+  touch-action: none;
+  cursor: grab;
+}
+
+.sheet.is-pulled .sheet-head {
+  cursor: grabbing;
 }
 
 .sheet-grip {

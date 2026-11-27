@@ -1,51 +1,31 @@
 /*
- * The key is still the headline of the page — but now it LOOKS like what it is:
- * a button. A border, a caret and a hover state, at headline size. The dashed
- * underline it had before said „editable" only to someone who already knew.
+ * The key, as the headline of the screen. Just a name — changing it is the
+ * „Tonart" tab's job — so no border, no caret, nothing that asks to be tapped.
  */
-.key-trigger {
+.key-title {
   display: inline-flex;
   align-items: baseline;
   gap: 0.5rem;
   min-height: var(--tap);
-  padding: 0.3rem 0.85rem 0.35rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--border-control));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-  transition:
-    border-color var(--transition-fast),
-    background var(--transition-fast);
+  margin: 0;
+  padding: 0.3rem 0 0.35rem;
 }
 
-.key-trigger:hover,
-.key-trigger.is-open {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
-}
-
-.key-trigger-root {
+.key-title-root {
   color: var(--accent-text);
   font-family: var(--font-display);
   font-size: var(--text-3xl);
   line-height: 1;
 }
 
-.key-trigger-type {
+.key-title-type {
   font-size: var(--text-xl);
   font-weight: var(--weight-medium);
   letter-spacing: -0.015em;
 }
 
-.key-trigger .trigger-caret {
-  align-self: center;
+.key-title-type--none {
   color: var(--text-muted);
-}
-
-.key-trigger.is-open .trigger-caret {
-  transform: rotate(180deg);
 }
 
 .key-tabs {
@@ -133,9 +113,11 @@
   text-align: left;
 }
 
-.root-option:hover,
-.key-option:hover {
-  border-color: var(--accent);
+@media (hover: hover) {
+  .root-option:hover,
+  .key-option:hover {
+    border-color: var(--accent);
+  }
 }
 
 .root-option[aria-pressed='true'],
@@ -162,11 +144,11 @@
 }
 
 @media (max-width: 700px) {
-  .key-trigger-root {
+  .key-title-root {
     font-size: var(--text-2xl);
   }
 
-  .key-trigger-type {
+  .key-title-type {
     font-size: var(--text-lg);
   }
 }

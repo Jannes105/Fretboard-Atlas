@@ -28,41 +28,30 @@ interface KeyPickerProps {
   onDone: () => void;
 }
 
-interface KeyButtonProps {
+interface KeyTitleProps {
   scale: Scale | null;
   root: string;
-  expanded: boolean;
-  onClick: () => void;
 }
 
 /**
- * The key's name at the top of the screen, and the way to change it: it opens the
- * „Tonart" sheet. It says „Tonart wählen" until there is one.
+ * The key's name at the top of the screen. Only a name: the way to change it is
+ * the „Tonart" tab at the bottom, where the thumb already is. A second, identical
+ * way in up here only raised the question which of the two to use.
  */
-export function KeyButton({ scale, root, expanded, onClick }: KeyButtonProps) {
+export function KeyTitle({ scale, root }: KeyTitleProps) {
   return (
-    <button
-      type="button"
-      className={expanded ? 'key-trigger is-open' : 'key-trigger'}
-      aria-expanded={expanded}
-      aria-haspopup="dialog"
-      aria-controls="sheet-key"
-      onClick={onClick}
-    >
+    <p className="key-title" aria-hidden="true">
       {scale ? (
         <>
-          <span className="key-trigger-root">
+          <span className="key-title-root">
             <NoteText name={root} />
           </span>
-          <span className="key-trigger-type">{scale.type.name}</span>
+          <span className="key-title-type">{scale.type.name}</span>
         </>
       ) : (
-        <span className="key-trigger-type">Tonart wählen</span>
+        <span className="key-title-type key-title-type--none">Alle Töne</span>
       )}
-      <span className="trigger-caret" aria-hidden="true">
-        ▾
-      </span>
-    </button>
+    </p>
   );
 }
 
@@ -74,8 +63,7 @@ export function KeyButton({ scale, root, expanded, onClick }: KeyButtonProps) {
  * called „Tonart finden" — and opened something else. A newcomer told „wähl oben
  * eine Tonart" found no control by that name, or the wrong one.
  *
- * Now the button says „Tonart wählen" until there is one, and then names it. The
- * panel shows the twelve roots as a grid (one tap, no list to scroll) and the
+ * The panel shows the twelve roots as a grid (one tap, no list to scroll) and the
  * scales as buttons, most-used first. Each choice applies at once, so the neck
  * changes above the sheet while you look.
  *

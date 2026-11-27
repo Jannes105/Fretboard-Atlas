@@ -62,8 +62,10 @@
   cursor: pointer;
 }
 
-.grip-step:hover {
-  border-color: var(--text-muted);
+@media (hover: hover) {
+  .grip-step:hover {
+    border-color: var(--text-muted);
+  }
 }
 
 .chord-append {
@@ -79,6 +81,8 @@
   cursor: pointer;
 }
 
-.chord-append:hover {
-  background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+@media (hover: hover) {
+  .chord-append:hover {
+    background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+  }
 }

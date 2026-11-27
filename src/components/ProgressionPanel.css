@@ -101,8 +101,10 @@
   cursor: pointer;
 }
 
-.transpose button:hover {
-  border-color: var(--accent);
+@media (hover: hover) {
+  .transpose button:hover {
+    border-color: var(--accent);
+  }
 }
 
 /* The roman numerals, now a footnote to the chord names in the dropdown. */

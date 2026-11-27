@@ -149,9 +149,11 @@ describe('App — Alle Töne', () => {
     expect(clearButton(container)).toBeNull();
   });
 
-  it('sagt auf dem Knopf, was er tut: „Tonart wählen"', () => {
+  it('nennt oben, was der Hals zeigt: „Alle Töne" — und ist kein zweiter Weg zur Tonart', () => {
     const { container } = openApp();
-    expect(container.querySelector('.key-trigger')?.textContent).toContain('Tonart wählen');
+    expect(container.querySelector('.key-title')?.textContent).toContain('Alle Töne');
+    // Die Tonart wählt man über den Reiter unten, nicht noch einmal oben.
+    expect(container.querySelector('.shell-top [aria-controls="sheet-key"]')).toBeNull();
   });
 
   it('macht aus einem Grundton allein gleich eine Tonart — Dur', async () => {
@@ -208,18 +210,38 @@ describe('App — Alle Töne', () => {
     await openFinder(user, container);
     expect(container.querySelector('.keyfinder-field input')).not.toBeNull();
   });
-  it('führt von „Akkorde" ohne Tonart dorthin, wo man eine wählt', () => {
+  it('öffnet „Akkorde" ohne Tonart trotzdem — mit dem, was fehlt, einen Tipp entfernt', () => {
     const { container } = openApp();
 
-    // Ohne Tonart gibt es keine Stufenakkorde — ein leeres Blatt wäre eine Sackgasse.
+    // Das angetippte Blatt geht auf, nicht ein anderes.
     openSheet(container, 'Akkorde');
+    expect(container.querySelector('.sheet')?.getAttribute('aria-label')).toBe('Akkorde');
+    expect(container.querySelector('.needs-key')).not.toBeNull();
+
+    // Eine Schnell-Tonart füllt das Blatt an Ort und Stelle.
+    fireEvent.click(
+      [...container.querySelectorAll<HTMLButtonElement>('.needs-key-chip')].find(
+        (b) => b.textContent === 'C-Dur',
+      )!,
+    );
+    expect(container.querySelector('.sheet')?.getAttribute('aria-label')).toBe('Akkorde');
+    expect(container.querySelectorAll('.chord-card')).toHaveLength(7);
+    expect(container.querySelector('.scale-title h2')?.textContent).toBe('C-Dur (Ionisch)');
+  });
+
+  it('führt von „Folge" ohne Tonart auf Wunsch zur ganzen Tonartwahl', () => {
+    const { container } = openApp();
+
+    openSheet(container, 'Folge');
+    expect(container.querySelector('.needs-key')).not.toBeNull();
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.needs-key-more')!);
     expect(container.querySelector('.sheet')?.getAttribute('aria-label')).toBe('Tonart');
   });
 });
 
 /** Open the key picker on its first tab. */
-async function openKeyPicker(user: ReturnType<typeof userEvent.setup>, container: HTMLElement) {
-  await user.click(container.querySelector<HTMLButtonElement>('.key-trigger')!);
+async function openKeyPicker(_user: ReturnType<typeof userEvent.setup>, container: HTMLElement) {
+  openSheet(container, 'Tonart');
 }
 
 /** Open the key picker on the chord-lookup tab. */
@@ -511,17 +533,17 @@ describe('App — Einstellungen', () => {
 
     // Die Überschrift bleibt für Screenreader und folgt der Auswahl.
     expect(container.querySelector('.scale-title h2')?.textContent).toBe('C-Dur (Ionisch)');
-    // Der Knopf selbst nennt die neue Tonart.
-    expect(container.querySelector('.key-trigger')?.textContent).toContain('Dur (Ionisch)');
+    // Der Titel oben nennt die neue Tonart.
+    expect(container.querySelector('.key-title')?.textContent).toContain('Dur (Ionisch)');
   });
 
-  it('hält den Kopf frei: oben ein einziger Tonart-Knopf, der Rest wartet in den Blättern', () => {
+  it('hält den Kopf frei: oben nur der Name der Tonart, der Rest wartet in den Blättern', () => {
     const { container } = render(<App />);
 
     // Vorher waren es acht gleichrangige Dropdowns in einem Block, dann zwei
     // unsichtbare Selects über einer Überschrift, dann zwei Auslöser daneben.
     expect(container.querySelectorAll('.shell-top select')).toHaveLength(0);
-    expect(container.querySelectorAll('.shell-top .key-trigger')).toHaveLength(1);
+    expect(container.querySelectorAll('.shell-top .key-title')).toHaveLength(1);
     // Kein Blatt ist offen, bevor man danach fragt.
     expect(container.querySelector('.sheet')).toBeNull();
   });
@@ -1815,5 +1837,64 @@ describe('App — Noten finden, zweiter Durchgang', () => {
     // Die Treffer außerhalb der Lage sind leiser, aber nicht weggedimmt.
     expect(container.querySelectorAll('.note-dot--picked.is-faint').length).toBeGreaterThan(0);
     expect(container.querySelectorAll('.note-dot--picked.is-dimmed')).toHaveLength(0);
+  });
+});
+
+describe('App — Bewegungen am Handy', () => {
+  it('schließt ein offenes Blatt mit der Zurück-Taste, statt die App zu verlassen', () => {
+    const { container } = render(<App />);
+    openSheet(container, 'Ansicht');
+    expect(container.querySelector('.sheet')).not.toBeNull();
+
+    // Die Zurück-Taste des Telefons kommt als popstate an.
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    expect(container.querySelector('.sheet')).toBeNull();
+    // Der Link bleibt der aktuelle, nicht der vom Eintrag darunter.
+    expect(window.location.search).toContain('scale=major');
+  });
+
+  it('schließt ein Blatt, wenn man den Kopf weit genug nach unten zieht', () => {
+    const { container } = render(<App />);
+    openSheet(container, 'Ansicht');
+    const head = container.querySelector<HTMLElement>('.sheet-head')!;
+
+    // Ein kurzer Zug federt zurück …
+    fireEvent.pointerDown(head, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(head, { clientY: 130, pointerId: 1 });
+    fireEvent.pointerUp(head, { clientY: 130, pointerId: 1 });
+    expect(container.querySelector('.sheet')).not.toBeNull();
+
+    // … ein langer schließt.
+    fireEvent.pointerDown(head, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(head, { clientY: 260, pointerId: 1 });
+    fireEvent.pointerUp(head, { clientY: 260, pointerId: 1 });
+    expect(container.querySelector('.sheet')).toBeNull();
+  });
+
+  it('zeigt beim Abspielen der Folge den gespielten Akkord auf dem Hals', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?root=C&scale=major');
+    const { container } = render(<App />);
+
+    // Vorher ist ein anderer Akkord ausgewählt: vii° (Bdim).
+    openSheet(container, 'Akkorde');
+    await user.click(
+      [...container.querySelectorAll<HTMLButtonElement>('.chord-card')].find((b) =>
+        b.textContent?.includes('Bdim'),
+      )!,
+    );
+
+    openSheet(container, 'Folge');
+    await user.click(container.querySelector<HTMLButtonElement>('.transport .play-button')!);
+    const onChord = player.startProgression.mock.calls[0][1].onChord!;
+    // I – V – vi – IV: der zweite Akkord ist G.
+    act(() => onChord(1));
+
+    expect(container.querySelector('.fretboard')?.getAttribute('aria-label')).toContain('G');
+    expect(pickedLabels(container).sort()).toEqual(expect.arrayContaining(['G', 'B', 'D']));
+    expect(pickedLabels(container)).not.toContain('F');
   });
 });

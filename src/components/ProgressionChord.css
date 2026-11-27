@@ -39,10 +39,16 @@
   cursor: default;
 }
 
-.voicing-button:not(:disabled):hover,
 .voicing-button:focus-visible {
   border-color: var(--accent);
   outline: none;
+}
+
+@media (hover: hover) {
+  .voicing-button:not(:disabled):hover {
+    border-color: var(--accent);
+    outline: none;
+  }
 }
 
 /* The border alone cannot carry focus here: a selected grip already has an
@@ -68,8 +74,10 @@
   cursor: pointer;
 }
 
-.voicing-switch:hover {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+@media (hover: hover) {
+  .voicing-switch:hover {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
 }
 
 .voicing-caption {
@@ -114,10 +122,16 @@
     background var(--transition-fast);
 }
 
-.voicing-option:hover,
 .voicing-option:focus-visible {
   border-color: var(--accent);
   outline: none;
+}
+
+@media (hover: hover) {
+  .voicing-option:hover {
+    border-color: var(--accent);
+    outline: none;
+  }
 }
 
 /* Same reason as .voicing-button: .is-selected below is already accent-bordered. */
