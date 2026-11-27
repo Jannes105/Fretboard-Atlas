@@ -1856,6 +1856,18 @@ describe('App — Bewegungen am Handy', () => {
     expect(window.location.search).toContain('scale=major');
   });
 
+  it('behält beim Reiterwechsel den Rahmen und tauscht nur den Inhalt', () => {
+    const { container } = render(<App />);
+    openSheet(container, 'Akkorde');
+    const frame = container.querySelector('.sheet');
+
+    openSheet(container, 'Folge');
+    // Derselbe Rahmen, kein neues Blatt: er bleibt stehen, der Inhalt blendet über.
+    expect(container.querySelector('.sheet')).toBe(frame);
+    expect(frame?.getAttribute('aria-label')).toBe('Akkordfolge');
+    expect(frame?.id).toBe('sheet-progression');
+  });
+
   it('schließt ein Blatt, wenn man den Kopf weit genug nach unten zieht', () => {
     const { container } = render(<App />);
     openSheet(container, 'Ansicht');

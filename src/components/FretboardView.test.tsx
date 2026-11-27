@@ -250,6 +250,28 @@ describe('FretboardView — aufrechter Hals', () => {
     }
   });
 
+  it('führt beim Zurück auf den ganzen Hals dorthin, wo die Lage war', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      const { rerender, container } = render(
+        <FretboardView scale={aMinorPentatonic} fretboard={board} labelMode="note" position={box4} zoom vertical />,
+      );
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      rerender(
+        <FretboardView scale={aMinorPentatonic} fretboard={board} labelMode="note" position={null} zoom vertical />,
+      );
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      // Die Marke steht an der Lage, nicht am Anfang des Halses.
+      const top = parseFloat(container.querySelector<HTMLElement>('.box-anchor')!.style.top);
+      expect(top).toBeGreaterThan(0);
+    } finally {
+      // @ts-expect-error jsdom has none; put it back the way it was.
+      delete Element.prototype.scrollIntoView;
+    }
+  });
+
   it('scrollt nicht, wenn der Hals ohnehin auf die Lage beschnitten ist', () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;

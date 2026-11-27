@@ -103,3 +103,44 @@
   border-radius: 50%;
   vertical-align: -0.1rem;
 }
+
+/* ---------- Motion ---------- */
+
+/* Rises in from just above the tabs. */
+.info-bar {
+  animation: info-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes info-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+/* Fading out: its words stay, its buttons no longer answer. */
+.info-bar.is-leaving {
+  pointer-events: none;
+}
+
+/* The words: a new message fades over the old one instead of swapping. */
+.info-bar-message {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  animation: info-swap 0.16s ease-out;
+}
+
+@keyframes info-swap {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .info-bar,
+  .info-bar-message {
+    animation: none;
+  }
+}

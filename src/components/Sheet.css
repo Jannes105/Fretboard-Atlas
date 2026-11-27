@@ -16,8 +16,24 @@
   border-radius: 14px 14px 0 0;
   background: var(--panel);
   box-shadow: 0 -8px 24px rgb(0 0 0 / 18%);
-  /* Springs back when a pull on the head falls short. */
-  transition: transform 0.2s ease-out;
+  overflow: hidden;
+  /* Rises into place; then springs back from a short pull, and follows its
+     contents' height instead of jumping. */
+  animation: sheet-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition:
+    transform 0.2s ease-out,
+    height 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(105%);
+  }
+}
+
+/* Dropping away: already gone as far as taps are concerned. */
+.sheet.is-closing {
+  pointer-events: none;
 }
 
 /* Under the finger: follow it exactly, no lag. */
@@ -26,7 +42,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sheet {
+  .sheet,
+  .sheet-content {
+    animation: none;
     transition: none;
   }
 }
@@ -85,13 +103,27 @@
 }
 
 .sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* What the frame measures its height from — so the padding lives here. */
+.sheet-content {
   padding: 0.9rem 1rem 1.25rem;
+  animation: sheet-swap 0.18s ease-out;
+}
+
+@keyframes sheet-swap {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 /* The empty note's own top margin spaced it from a panel above on the long page. */
-.sheet-body > .empty:first-child {
+.sheet-content > .empty:first-child {
   margin-top: 0;
 }
 

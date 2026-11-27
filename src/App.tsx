@@ -168,6 +168,13 @@ export default function App() {
 
   const closeSheet = () => setSheet(null);
 
+  /**
+   * The sheet whose contents are in the frame: the open one, and after closing
+   * the last one, so it can drop away with its contents rather than empty.
+   */
+  const [shownSheet, setShownSheet] = useState<SheetId | null>(sheet);
+  if (sheet !== null && sheet !== shownSheet) setShownSheet(sheet);
+
   // The phone's back button closes a sheet rather than leaving the app.
   useSheetHistory(sheet !== null, closeSheet, () => `${window.location.pathname}${writeState(state)}`);
 
@@ -321,221 +328,224 @@ export default function App() {
   );
 
   const sheets = (
-    <>
-      <Sheet id="sheet-key" title={SHEET_TITLES.key} open={sheet === 'key'} onClose={closeSheet}>
-        {scale ? (
-          <ScaleTones
+    <Sheet
+      id={shownSheet}
+      title={shownSheet ? SHEET_TITLES[shownSheet] : ''}
+      open={sheet !== null}
+      onClose={closeSheet}
+    >
+      {shownSheet === 'key' ? (
+        <>
+          {scale ? (
+            <ScaleTones
+              scale={scale}
+              characteristic={neck.characteristic}
+              isDegreeActive={isDegreeActive}
+              onPickDegree={pickDegree}
+            />
+          ) : null}
+          <KeyPicker
             scale={scale}
-            characteristic={neck.characteristic}
-            isDegreeActive={isDegreeActive}
-            onPickDegree={pickDegree}
-          />
-        ) : null}
-        <KeyPicker
-          scale={scale}
-          root={root}
-          spelling={viewPrefs.spelling}
-          onRootChange={(pitchClass) =>
-            patch((previous) => {
-              // A root alone shows nothing — it needs a scale to be a key, and
-              // major is the scale everyone starts from.
-              const scaleTypeId = previous.scaleTypeId ?? 'major';
-              return { ...previous, scaleTypeId, root: spelledRoot(pitchClass, scaleTypeId) };
-            })
-          }
-          onScaleTypeChange={(next) =>
-            patch((previous) =>
-              next === null
-                ? { ...previous, scaleTypeId: null }
-                : // A new scale can want the other name — D♭ major, but C♯ minor.
-                  {
-                    ...previous,
-                    scaleTypeId: next,
-                    root: spelledRoot(Note.parse(previous.root).pitchClass, next),
-                  },
-            )
-          }
-          onPickKey={(pickedRoot, pickedScaleTypeId) =>
-            patch((previous) => ({ ...previous, root: pickedRoot, scaleTypeId: pickedScaleTypeId }))
-          }
-          onAdopt={(symbols, pickedRoot, pickedScaleTypeId) => {
-            patch((previous) => ({
-              ...previous,
-              root: pickedRoot,
-              scaleTypeId: pickedScaleTypeId,
-              // Adopted chords start at one bar each.
-              progressionId: customProgId(symbols.map((symbol) => ({ symbol, bars: 1 }))),
-            }));
-            // Land on the progression it just made, so the click visibly goes
-            // somewhere.
-            setSheet('progression');
-          }}
-          // A plain match is a finished answer: close and show the neck.
-          onDone={closeSheet}
-        />
-      </Sheet>
-
-      <Sheet
-        id="sheet-chords"
-        title={SHEET_TITLES.chords}
-        open={sheet === 'chords'}
-        onClose={closeSheet}
-      >
-        {chords.length > 0 ? (
-          <ChordRow
-            chords={chords}
-            borrowedFrom={neck.isBorrowedHarmony ? chordScale : null}
-            chordSize={state.chordSize}
-            onChordSizeChange={(next) => update('chordSize', next)}
-            isChordActive={isChordActive}
-            onPickChord={pickChord}
-            onAppend={(chord) =>
-              update(
-                'progressionId',
-                customProgId([
-                  ...(customChordSteps ??
-                    steps.map((step) => ({ symbol: step.chord.name(), bars: 1 }))),
-                  { symbol: chord.name(), bars: 1 },
-                ]),
+            root={root}
+            spelling={viewPrefs.spelling}
+            onRootChange={(pitchClass) =>
+              patch((previous) => {
+                // A root alone shows nothing — it needs a scale to be a key, and
+                // major is the scale everyone starts from.
+                const scaleTypeId = previous.scaleTypeId ?? 'major';
+                return { ...previous, scaleTypeId, root: spelledRoot(pitchClass, scaleTypeId) };
+              })
+            }
+            onScaleTypeChange={(next) =>
+              patch((previous) =>
+                next === null
+                  ? { ...previous, scaleTypeId: null }
+                  : // A new scale can want the other name — D♭ major, but C♯ minor.
+                    {
+                      ...previous,
+                      scaleTypeId: next,
+                      root: spelledRoot(Note.parse(previous.root).pitchClass, next),
+                    },
               )
             }
-            voicingsOf={(chord) => voicingsFor(chord, { tuning: chordTuning })}
-            onHearVoicing={hearVoicing}
-            preferOpen={state.grips === 'open'}
-          />
-        ) : scale ? (
-          /*
-           * Unreachable today: every scale on offer either has seven degrees of its
-           * own or names the key it borrows from.
-           */
-          <p className="empty">
-            {scale.type.name} hat {scale.notes.length} Stufen und keine Tonart, aus der sich
-            Stufenakkorde borgen ließen. Wähl eine Dur-, Moll- oder Kirchentonart.
-          </p>
-        ) : (
-          needsKey('die Stufenakkorde')
-        )}
-      </Sheet>
-
-      <Sheet
-        id="sheet-progression"
-        title={SHEET_TITLES.progression}
-        open={sheet === 'progression'}
-        onClose={closeSheet}
-      >
-        {chords.length > 0 ? (
-          <ProgressionPanel
-            progressions={progression.progressions}
-            presetChords={progression.presetChords}
-            preset={progression.preset}
-            isCustom={progression.isCustom}
-            customChordSteps={customChordSteps}
-            onProgressionIdChange={(next) => update('progressionId', next)}
-            steps={steps}
-            stepVoicings={stepVoicings}
-            voicingIndex={voicingIndex}
-            onSelectVoicing={progression.selectVoicing}
-            openPicker={openPicker}
-            onTogglePicker={(step) => setOpenPicker((open) => (open === step ? null : step))}
-            onHearVoicing={hearVoicing}
-            isPlaying={transport.isPlaying}
-            playingStep={transport.playingStep}
-            onToggleTransport={transport.toggle}
-            bpm={bpm}
-            onBpmChange={(next) => update('bpm', next)}
-            loop={loop}
-            onLoopChange={(next) => update('loop', next)}
-            beatsPerBar={beatsPerBar}
-            rhythm={rhythm}
-            strum={strum}
-            feel={feel}
-            sustain={sustain}
-            click={click}
-            onBeatsPerBarChange={(nextBeats) =>
-              // The pattern length follows the meter, so a new meter resets it.
+            onPickKey={(pickedRoot, pickedScaleTypeId) =>
+              patch((previous) => ({ ...previous, root: pickedRoot, scaleTypeId: pickedScaleTypeId }))
+            }
+            onAdopt={(symbols, pickedRoot, pickedScaleTypeId) => {
               patch((previous) => ({
                 ...previous,
-                beatsPerBar: nextBeats,
-                rhythm: serializePattern(defaultPattern(nextBeats)),
-              }))
-            }
-            onRhythmChange={(next) => update('rhythm', next)}
-            onStrumChange={(next) => update('strum', next)}
-            onFeelChange={(next) => update('feel', next)}
-            onSustainChange={(next) => update('sustain', next)}
-            onClickChange={(next) => update('click', next)}
-            onApplyStyle={(settings) => patch((previous) => ({ ...previous, ...settings }))}
-            grips={state.grips}
-            onGripsChange={(next) => update('grips', next)}
-            onTranspose={transpose}
+                root: pickedRoot,
+                scaleTypeId: pickedScaleTypeId,
+                // Adopted chords start at one bar each.
+                progressionId: customProgId(symbols.map((symbol) => ({ symbol, bars: 1 }))),
+              }));
+              // Land on the progression it just made, so the click visibly goes
+              // somewhere.
+              setSheet('progression');
+            }}
+            // A plain match is a finished answer: close and show the neck.
+            onDone={closeSheet}
           />
-        ) : scale === null ? (
-          needsKey('eine Akkordfolge')
-        ) : null}
-      </Sheet>
+        </>
+      ) : null}
 
-      <Sheet id="sheet-view" title={SHEET_TITLES.view} open={sheet === 'view'} onClose={closeSheet}>
-        <section className="sheet-section" aria-label="Hals">
-          <h3>Hals</h3>
-          <NeckViewPanel
-            fretCount={state.fretCount}
-            onFretCountChange={(next) => update('fretCount', next)}
-            hasScale={scale !== null}
-            labelMode={labelMode}
-            onLabelModeChange={(next) => update('labelMode', next)}
-            hasBox={box !== null}
-            boxZoom={state.boxZoom}
-            onBoxZoomChange={(next) => update('boxZoom', next)}
-            cagedForms={neck.cagedForms}
-            cagedForm={state.cagedForm}
-            onCagedFormChange={(next) => update('cagedForm', next)}
-            minorTonic={neck.isMinorTonic}
-          />
-        </section>
+      {shownSheet === 'chords' ? (
+        <>
+          {chords.length > 0 ? (
+            <ChordRow
+              chords={chords}
+              borrowedFrom={neck.isBorrowedHarmony ? chordScale : null}
+              chordSize={state.chordSize}
+              onChordSizeChange={(next) => update('chordSize', next)}
+              isChordActive={isChordActive}
+              onPickChord={pickChord}
+              onAppend={(chord) =>
+                update(
+                  'progressionId',
+                  customProgId([
+                    ...(customChordSteps ??
+                      steps.map((step) => ({ symbol: step.chord.name(), bars: 1 }))),
+                    { symbol: chord.name(), bars: 1 },
+                  ]),
+                )
+              }
+              voicingsOf={(chord) => voicingsFor(chord, { tuning: chordTuning })}
+              onHearVoicing={hearVoicing}
+              preferOpen={state.grips === 'open'}
+            />
+          ) : scale ? (
+            /*
+             * Unreachable today: every scale on offer either has seven degrees of its
+             * own or names the key it borrows from.
+             */
+            <p className="empty">
+              {scale.type.name} hat {scale.notes.length} Stufen und keine Tonart, aus der sich
+              Stufenakkorde borgen ließen. Wähl eine Dur-, Moll- oder Kirchentonart.
+            </p>
+          ) : (
+            needsKey('die Stufenakkorde')
+          )}
+        </>
+      ) : null}
 
-        <section className="sheet-section" aria-label="Auf diesem Gerät">
-          <h3>Auf diesem Gerät</h3>
-          <AppFooter
-            theme={theme}
-            onThemeChange={setTheme}
-            prefs={viewPrefs}
-            onOrientationChange={setOrientation}
-            onLeftyChange={setLefty}
-          />
-        </section>
+      {shownSheet === 'progression' ? (
+        <>
+          {chords.length > 0 ? (
+            <ProgressionPanel
+              progressions={progression.progressions}
+              presetChords={progression.presetChords}
+              preset={progression.preset}
+              isCustom={progression.isCustom}
+              customChordSteps={customChordSteps}
+              onProgressionIdChange={(next) => update('progressionId', next)}
+              steps={steps}
+              stepVoicings={stepVoicings}
+              voicingIndex={voicingIndex}
+              onSelectVoicing={progression.selectVoicing}
+              openPicker={openPicker}
+              onTogglePicker={(step) => setOpenPicker((open) => (open === step ? null : step))}
+              onHearVoicing={hearVoicing}
+              isPlaying={transport.isPlaying}
+              playingStep={transport.playingStep}
+              onToggleTransport={transport.toggle}
+              bpm={bpm}
+              onBpmChange={(next) => update('bpm', next)}
+              loop={loop}
+              onLoopChange={(next) => update('loop', next)}
+              beatsPerBar={beatsPerBar}
+              rhythm={rhythm}
+              strum={strum}
+              feel={feel}
+              sustain={sustain}
+              click={click}
+              onBeatsPerBarChange={(nextBeats) =>
+                // The pattern length follows the meter, so a new meter resets it.
+                patch((previous) => ({
+                  ...previous,
+                  beatsPerBar: nextBeats,
+                  rhythm: serializePattern(defaultPattern(nextBeats)),
+                }))
+              }
+              onRhythmChange={(next) => update('rhythm', next)}
+              onStrumChange={(next) => update('strum', next)}
+              onFeelChange={(next) => update('feel', next)}
+              onSustainChange={(next) => update('sustain', next)}
+              onClickChange={(next) => update('click', next)}
+              onApplyStyle={(settings) => patch((previous) => ({ ...previous, ...settings }))}
+              grips={state.grips}
+              onGripsChange={(next) => update('grips', next)}
+              onTranspose={transpose}
+            />
+          ) : scale === null ? (
+            needsKey('eine Akkordfolge')
+          ) : null}
+        </>
+      ) : null}
 
-        {/* Set once and left alone: folded, with the current value on the fold. */}
-        <section className="sheet-section" aria-label="Instrument">
-          <SetupPanel
-            tuning={neck.tuning}
-            tuningId={state.tuningId}
-            isCustomTuning={neck.isCustomTuning}
-            capo={state.capo}
-            fretCount={state.fretCount}
-            onTuningIdChange={(next) => update('tuningId', next)}
-            onCapoChange={(next) => update('capo', next)}
-          />
-        </section>
+      {shownSheet === 'view' ? (
+        <>
+          <section className="sheet-section" aria-label="Hals">
+            <h3>Hals</h3>
+            <NeckViewPanel
+              fretCount={state.fretCount}
+              onFretCountChange={(next) => update('fretCount', next)}
+              hasScale={scale !== null}
+              labelMode={labelMode}
+              onLabelModeChange={(next) => update('labelMode', next)}
+              hasBox={box !== null}
+              boxZoom={state.boxZoom}
+              onBoxZoomChange={(next) => update('boxZoom', next)}
+              cagedForms={neck.cagedForms}
+              cagedForm={state.cagedForm}
+              onCagedFormChange={(next) => update('cagedForm', next)}
+              minorTonic={neck.isMinorTonic}
+            />
+          </section>
 
-        <section className="sheet-section" aria-label="Klang">
-          <SoundPanel
-            sound={state.sound}
-            amp={state.amp}
-            pickup={state.pickup}
-            tone={state.tone}
-            reverb={state.reverb}
-            delay={state.delay}
-            onSoundChange={(next) => update('sound', next)}
-            onApplyPreset={(settings) => patch((previous) => ({ ...previous, ...settings }))}
-            onAmpChange={(next) => update('amp', next)}
-            onPickupChange={(next) => update('pickup', next)}
-            onToneChange={(next) => update('tone', next)}
-            onReverbChange={(next) => update('reverb', next)}
-            onDelayChange={(next) => update('delay', next)}
-          />
-        </section>
-      </Sheet>
-    </>
+          <section className="sheet-section" aria-label="Auf diesem Gerät">
+            <h3>Auf diesem Gerät</h3>
+            <AppFooter
+              theme={theme}
+              onThemeChange={setTheme}
+              prefs={viewPrefs}
+              onOrientationChange={setOrientation}
+              onLeftyChange={setLefty}
+            />
+          </section>
+
+          {/* Set once and left alone: folded, with the current value on the fold. */}
+          <section className="sheet-section" aria-label="Instrument">
+            <SetupPanel
+              tuning={neck.tuning}
+              tuningId={state.tuningId}
+              isCustomTuning={neck.isCustomTuning}
+              capo={state.capo}
+              fretCount={state.fretCount}
+              onTuningIdChange={(next) => update('tuningId', next)}
+              onCapoChange={(next) => update('capo', next)}
+            />
+          </section>
+
+          <section className="sheet-section" aria-label="Klang">
+            <SoundPanel
+              sound={state.sound}
+              amp={state.amp}
+              pickup={state.pickup}
+              tone={state.tone}
+              reverb={state.reverb}
+              delay={state.delay}
+              onSoundChange={(next) => update('sound', next)}
+              onApplyPreset={(settings) => patch((previous) => ({ ...previous, ...settings }))}
+              onAmpChange={(next) => update('amp', next)}
+              onPickupChange={(next) => update('pickup', next)}
+              onToneChange={(next) => update('tone', next)}
+              onReverbChange={(next) => update('reverb', next)}
+              onDelayChange={(next) => update('delay', next)}
+            />
+          </section>
+        </>
+      ) : null}
+    </Sheet>
   );
 
   return (
