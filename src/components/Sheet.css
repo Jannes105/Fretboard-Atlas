@@ -89,17 +89,28 @@
   font-weight: var(--weight-medium);
 }
 
+/*
+ * Closing is the quietest thing in the sheet, not the loudest: a word, no
+ * filled box. The orange belongs to what you choose inside.
+ */
 .sheet-done {
   min-height: var(--tap);
-  padding: 0 1.1rem;
-  border: 1px solid var(--accent-text);
+  margin-right: -0.5rem;
+  padding: 0 0.6rem;
+  border: none;
   border-radius: var(--radius-md);
-  background: var(--accent-text);
-  color: var(--bg);
+  background: none;
+  color: var(--accent-text);
   font: inherit;
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   cursor: pointer;
+}
+
+@media (hover: hover) {
+  .sheet-done:hover {
+    background: var(--panel-sunken);
+  }
 }
 
 .sheet-body {
@@ -183,4 +194,35 @@
 
 .sheet-fold[open] > summary {
   margin-bottom: 0.4rem;
+}
+
+/* ---------- Strip ----------
+ *
+ * After a pick, the sheet keeps only its head and one row, so the neck above
+ * shows what was picked. The head says it can open up again.
+ */
+.sheet.is-compact .sheet-head {
+  cursor: pointer;
+}
+
+.sheet.is-compact .sheet-content {
+  padding-top: 0.6rem;
+  padding-bottom: 0.75rem;
+}
+
+.sheet-expand {
+  min-height: var(--tap);
+  padding: 0 0.6rem;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .sheet-expand:hover {
+    color: var(--text);
+  }
 }

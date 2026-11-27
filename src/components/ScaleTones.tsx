@@ -7,6 +7,8 @@ interface ScaleTonesProps {
   characteristic: { index: number; note: Note; why: string } | null;
   isDegreeActive: (index: number) => boolean;
   onPickDegree: (index: number) => void;
+  /** Just the chips, for the sheet shrunk to a strip. */
+  compact?: boolean;
 }
 
 /**
@@ -16,7 +18,13 @@ interface ScaleTonesProps {
  * They used to sit under the neck as its legend — which, on a phone with an
  * upright 24-fret neck, was two screens below the picture they explained.
  */
-export function ScaleTones({ scale, characteristic, isDegreeActive, onPickDegree }: ScaleTonesProps) {
+export function ScaleTones({
+  scale,
+  characteristic,
+  isDegreeActive,
+  onPickDegree,
+  compact = false,
+}: ScaleTonesProps) {
   return (
     <section className="scale-tones" aria-label="Töne der Tonart">
       <ul className="degree-chips">
@@ -51,7 +59,7 @@ export function ScaleTones({ scale, characteristic, isDegreeActive, onPickDegree
        * notes are the neighbour's too; without this line the neck shows two
        * pictures nobody can tell apart.
        */}
-      {characteristic ? (
+      {characteristic && !compact ? (
         <p className="characteristic-hint">
           <span className="characteristic-mark" aria-hidden="true" />
           Charakterton{' '}

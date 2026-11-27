@@ -83,6 +83,15 @@ function openSheet(container: HTMLElement, name: SheetName) {
   if (tab.getAttribute('aria-expanded') !== 'true') fireEvent.click(tab);
 }
 
+/**
+ * A pick shrinks the sheet to a strip, so the neck shows it; „Mehr" brings the
+ * whole sheet back — grips, „+ zur Folge" and the rest.
+ */
+function expandSheet(container: HTMLElement) {
+  const more = container.querySelector<HTMLButtonElement>('.sheet-expand');
+  if (more) fireEvent.click(more);
+}
+
 /** The ✕ in the info bar: the one way back from a highlight. */
 const clearButton = (container: HTMLElement) =>
   container.querySelector<HTMLButtonElement>('.info-bar-clear');
@@ -361,6 +370,7 @@ describe('App — Eigene Akkordfolge', () => {
     // Kein „+“ an jeder Karte mehr: eines, für den Akkord, den man gewählt hat.
     expect(container.querySelector('.chord-append')).toBeNull();
     await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[2]); // iii = C#m
+    expandSheet(container);
     await user.click(container.querySelector<HTMLButtonElement>('.chord-append')!);
 
     openSheet(container, 'Folge');
@@ -376,6 +386,7 @@ describe('App — Eigene Akkordfolge', () => {
 
     expect(container.querySelector('.chord-detail')).toBeNull();
     await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[0]); // C
+    expandSheet(container);
 
     const caption = () => container.querySelector('.chord-detail .chord-diagram')?.textContent ?? '';
     // Der erste Griff ist der, den man zuerst lernt.
@@ -931,10 +942,10 @@ describe('App — Hervorhebung', () => {
 
     // 3. Chip = Terz von A-Dur = C#. Auf dem Hals steht sie als C♯ — die ASCII-
     // Schreibweise bleibt der URL vorbehalten, siehe theory/format.ts.
-    const chips = container.querySelectorAll<HTMLButtonElement>('.degree-chip');
-    await user.click(chips[2]);
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.degree-chip')[2]);
 
-    expect(chips[2].getAttribute('aria-pressed')).toBe('true');
+    // Das Blatt schrumpft auf die Leiste; der Chip darin ist der gedrückte.
+    expect(container.querySelectorAll('.degree-chip')[2].getAttribute('aria-pressed')).toBe('true');
     const labels = pickedLabels(container);
     expect(labels.length).toBeGreaterThan(0);
     expect(new Set(labels)).toEqual(new Set(['C♯']));
@@ -947,9 +958,8 @@ describe('App — Hervorhebung', () => {
     await user.click(container.querySelectorAll<HTMLButtonElement>('.degree-chip')[2]); // C# als Stufe
 
     openSheet(container, 'Akkorde');
-    const cards = container.querySelectorAll<HTMLButtonElement>('.chord-card');
-    await user.click(cards[0]); // I = A-Dur (A C# E)
-    expect(cards[0].getAttribute('aria-pressed')).toBe('true');
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[0]); // I = A-Dur (A C# E)
+    expect(container.querySelectorAll('.chord-card')[0].getAttribute('aria-pressed')).toBe('true');
 
     // Der ganze Akkord in einer Farbe — auch das A, obwohl es der Skalengrundton
     // ist. Vorher blieb es orange, und der Akkord sah aus wie zwei Dinge.
@@ -985,11 +995,11 @@ describe('App — Hervorhebung', () => {
     const { container } = render(<App />);
     openSheet(container, 'Akkorde');
 
-    const card = container.querySelectorAll<HTMLButtonElement>('.chord-card')[0];
-    await user.click(card);
-    await user.click(card);
+    const card = () => container.querySelectorAll<HTMLButtonElement>('.chord-card')[0];
+    await user.click(card());
+    await user.click(card());
 
-    expect(card.getAttribute('aria-pressed')).toBe('true');
+    expect(card().getAttribute('aria-pressed')).toBe('true');
     expect(player.play).toHaveBeenCalledTimes(2);
   });
 
@@ -1908,5 +1918,42 @@ describe('App — Bewegungen am Handy', () => {
     expect(container.querySelector('.fretboard')?.getAttribute('aria-label')).toContain('G');
     expect(pickedLabels(container).sort()).toEqual(expect.arrayContaining(['G', 'B', 'D']));
     expect(pickedLabels(container)).not.toContain('F');
+  });
+});
+
+describe('App — Blatt als Leiste', () => {
+  it('schrumpft nach einem Akkord auf eine Leiste, damit der Hals zu sehen ist', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', '/?root=C&scale=major');
+    const { container } = render(<App />);
+    openSheet(container, 'Akkorde');
+
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[5]); // vi = Am
+    const sheet = container.querySelector('.sheet')!;
+    expect(sheet.classList.contains('is-compact')).toBe(true);
+    // Alle sieben Akkorde bleiben einen Tipp entfernt, das Griffbild wartet.
+    expect(container.querySelectorAll('.chord-strip .chord-card')).toHaveLength(7);
+    expect(container.querySelector('.chord-detail')).toBeNull();
+
+    // Ein anderer Akkord aus der Leiste: sie bleibt eine Leiste.
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[4]); // V = G
+    expect(container.querySelector('.sheet')?.classList.contains('is-compact')).toBe(true);
+    expect(pickedLabels(container)).toEqual(expect.arrayContaining(['G', 'B', 'D']));
+
+    // „Mehr" holt das ganze Blatt zurück, mit dem Griff zum gewählten Akkord.
+    expandSheet(container);
+    expect(container.querySelector('.sheet')?.classList.contains('is-compact')).toBe(false);
+    expect(container.querySelector('.chord-detail')).not.toBeNull();
+  });
+
+  it('öffnet ein Blatt nach dem Schließen wieder ganz', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    openSheet(container, 'Akkorde');
+    await user.click(container.querySelectorAll<HTMLButtonElement>('.chord-card')[0]);
+
+    fireEvent.click(container.querySelector<HTMLButtonElement>('.sheet-done')!);
+    openSheet(container, 'Akkorde');
+    expect(container.querySelector('.sheet')?.classList.contains('is-compact')).toBe(false);
   });
 });

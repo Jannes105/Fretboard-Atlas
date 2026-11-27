@@ -66,12 +66,8 @@ export function ChordRow({
 
   return (
     <section className="chord-sheet" aria-label="Leitereigene Akkorde">
+      {/* The size first, where the eye starts; the source, when there is one, after. */}
       <div className="sheet-toolbar">
-        {borrowedFrom ? (
-          <span className="panel-source">aus {withAccidentals(borrowedFrom.name())}</span>
-        ) : (
-          <span />
-        )}
         <div className="segmented" role="group" aria-label="Akkordgröße">
           {SIZES.map((size) => (
             <button
@@ -84,6 +80,9 @@ export function ChordRow({
             </button>
           ))}
         </div>
+        {borrowedFrom ? (
+          <span className="panel-source">aus {withAccidentals(borrowedFrom.name())}</span>
+        ) : null}
       </div>
 
       <ol className="chord-grid">
@@ -183,5 +182,38 @@ function ChordDetail({ chord, voicings, preferOpen, onHear, onAppend }: ChordDet
         + <NoteText name={chord.name()} /> zur Folge
       </button>
     </div>
+  );
+}
+
+interface ChordStripProps {
+  chords: readonly Chord[];
+  isChordActive: (index: number) => boolean;
+  onPickChord: (index: number) => void;
+}
+
+/**
+ * The key's chords in one row, for the „Akkorde" sheet shrunk to a strip: after
+ * a pick, the neck above is what you want to see, and the next chord is still
+ * one tap away. Grips and „+ zur Folge" wait behind „Mehr".
+ */
+export function ChordStrip({ chords, isChordActive, onPickChord }: ChordStripProps) {
+  return (
+    <ol className="chord-strip" aria-label="Leitereigene Akkorde">
+      {chords.map((chord, i) => (
+        <li key={chord.name()}>
+          <button
+            type="button"
+            className={isChordActive(i) ? 'chord-card chord-chip is-active' : 'chord-card chord-chip'}
+            aria-pressed={isChordActive(i)}
+            onClick={() => onPickChord(i)}
+          >
+            <span className="roman">{chord.romanNumeral(i)}</span>
+            <span className="chord-symbol">
+              <NoteText name={chord.name()} />
+            </span>
+          </button>
+        </li>
+      ))}
+    </ol>
   );
 }
