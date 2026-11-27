@@ -194,7 +194,7 @@ export function SoundPanel({
           {soundSummary({ sound, amp, pickup, tone, reverb, delay })}
         </span>
       </summary>
-      <div className="setup-panel sound-panel">
+      <div className="option-rows sound-panel">
         <div className="preset-grid" role="group" aria-label="Klang-Voreinstellung">
           {SOUND_PRESETS.map((entry) => (
             <button
@@ -212,41 +212,57 @@ export function SoundPanel({
         {/* Everything the presets combine, for whoever wants to turn the knobs
             themselves. Shut by default: the four buttons are the answer for
             almost everyone, and nine controls at once were the problem. */}
-        <details className="fine-tuning">
-          <summary>Feinabstimmung</summary>
+        <details className="sheet-fold">
+          <summary>
+            <h3>Feinabstimmung</h3>
+          </summary>
 
-          <label className="field">
-            <span>Verzerrung</span>
-            <select value={sound} onChange={(e) => onSoundChange(e.target.value as Timbre)}>
-              <option value="clean">Clean</option>
-              <option value="electric">Overdrive</option>
-            </select>
-          </label>
+          <div className="option-rows">
+          {/* Two choices: a switch of two halves, not a list. */}
+          <div className="option-row">
+            <span className="option-label">Verzerrung</span>
+            <div className="segmented" role="group" aria-label="Verzerrung">
+              <button type="button" aria-pressed={sound === 'clean'} onClick={() => onSoundChange('clean')}>
+                Clean
+              </button>
+              <button
+                type="button"
+                aria-pressed={sound === 'electric'}
+                onClick={() => onSoundChange('electric')}
+              >
+                Overdrive
+              </button>
+            </div>
+          </div>
 
           {/* Clean never reaches the amplifier, so choosing one there would be a
               control that does nothing. */}
           {sound === 'electric' ? (
-            <label className="field">
-              <span>Verstärker</span>
-              <select value={amp} onChange={(e) => onAmpChange(e.target.value as AmpId)}>
+            <label className="option-row">
+              <span className="option-label">Verstärker</span>
+              <span className="select-box">
+              <select className="select" value={amp} onChange={(e) => onAmpChange(e.target.value as AmpId)}>
                 {AMP_LABELS.map((entry) => (
                   <option key={entry.value} value={entry.value}>
                     {entry.label}
                   </option>
                 ))}
               </select>
+              </span>
             </label>
           ) : null}
 
-          <label className="field">
-            <span>Tonabnehmer</span>
-            <select value={pickup} onChange={(e) => onPickupChange(e.target.value as PickupId)}>
+          <label className="option-row">
+            <span className="option-label">Tonabnehmer</span>
+            <span className="select-box">
+            <select className="select" value={pickup} onChange={(e) => onPickupChange(e.target.value as PickupId)}>
               {PICKUP_LABELS.map((entry) => (
                 <option key={entry.value} value={entry.value}>
                   {entry.label}
                 </option>
               ))}
             </select>
+            </span>
           </label>
 
           {/* Sliders and not dropdowns: a tone control is turned, and a decibel is
@@ -272,30 +288,35 @@ export function SoundPanel({
             ))}
           </div>
 
-          <label className="field">
-            <span>Hall</span>
-            <select value={reverb} onChange={(e) => onReverbChange(e.target.value as ReverbId)}>
+          <label className="option-row">
+            <span className="option-label">Hall</span>
+            <span className="select-box">
+            <select className="select" value={reverb} onChange={(e) => onReverbChange(e.target.value as ReverbId)}>
               {REVERB_LABELS.map((entry) => (
                 <option key={entry.value} value={entry.value}>
                   {entry.label}
                 </option>
               ))}
             </select>
+            </span>
           </label>
 
-          <label className="field">
-            <span>Delay</span>
-            <select value={delay} onChange={(e) => onDelayChange(e.target.value as DelayId)}>
+          <label className="option-row">
+            <span className="option-label">Delay</span>
+            <span className="select-box">
+            <select className="select" value={delay} onChange={(e) => onDelayChange(e.target.value as DelayId)}>
               {DELAY_LABELS.map((entry) => (
                 <option key={entry.value} value={entry.value}>
                   {entry.label}
                 </option>
               ))}
             </select>
+            </span>
           </label>
           {/* The echo follows the transport rather than a millisecond setting, so
               moving the tempo slider moves it too. */}
           {delay === 'off' ? null : <p className="hint">Folgt dem Tempo der Akkordfolge.</p>}
+          </div>
         </details>
       </div>
     </details>

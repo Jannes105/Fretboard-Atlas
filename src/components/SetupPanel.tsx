@@ -49,10 +49,11 @@ export function SetupPanel({
         <h3>Instrument</h3>
         <span className="sheet-fold-value">{instrumentSummary(tuning, isCustomTuning, capo)}</span>
       </summary>
-      <div className="setup-panel">
-        <label className="field">
-          <span>Stimmung</span>
-          <select
+      <div className="option-rows">
+        <label className="option-row">
+          <span className="option-label">Stimmung</span>
+          <span className="select-box">
+            <select className="select"
             value={isCustomTuning ? 'custom' : tuningId}
             onChange={(e) =>
               onTuningIdChange(
@@ -69,7 +70,8 @@ export function SetupPanel({
               </option>
             ))}
             <option value="custom">Eigene Stimmung</option>
-          </select>
+            </select>
+          </span>
         </label>
 
         {isCustomTuning ? (
@@ -98,9 +100,10 @@ export function SetupPanel({
           </div>
         ) : null}
 
-        <label className="field">
-          <span>Kapo</span>
-          <select value={capo} onChange={(e) => onCapoChange(Number(e.target.value))}>
+        <label className="option-row">
+          <span className="option-label">Kapo</span>
+          <span className="select-box">
+            <select className="select" value={capo} onChange={(e) => onCapoChange(Number(e.target.value))}>
             <option value={0}>ohne</option>
             {/* Also capped by the neck, which today never bites — the shortest
                 neck on offer has as many frets as MAX_CAPO. It is here so that
@@ -111,9 +114,9 @@ export function SetupPanel({
                 {fret}. Bund
               </option>
             ))}
-          </select>
+            </select>
+          </span>
         </label>
-
       </div>
     </details>
   );

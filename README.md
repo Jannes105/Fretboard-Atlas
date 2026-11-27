@@ -78,7 +78,7 @@ npm run dev
 | `npm test` | alle Tests (Vitest) |
 | `npm run lint` | Linter (oxlint) |
 | `npm run build` | Typecheck und Produktions-Build nach `dist/` |
-| `npm run icons` | PWA-Icons aus `scripts/icon.svg` neu rendern |
+| `npm run icons` | PWA-Icons und Favicon aus `icons/build-icons.mjs` neu rendern |
 
 ## Technik
 
